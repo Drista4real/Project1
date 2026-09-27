@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Design System: Kakeibo Zen (Từ Google Stitch)
+/// Design System: Kakeibo Zen
 class AppTheme {
   // Brand Colors từ Stitch "Kakeibo Zen"
   static const Color primaryForestGreen = Color(0xFF0D5C46); // Xanh rừng Kakeibo
