@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'core/constants/supabase_config.dart';
+import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
-import 'features/dashboard/dashboard_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,11 +21,11 @@ class KakeiboZenApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Kakeibo Zen - Sổ Thu Chi & Dự Báo Dòng Tiền AI',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.kakeiboTheme,
-      home: const DashboardScreen(),
+      routerConfig: appRouter,
     );
   }
 }
