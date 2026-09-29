@@ -1,18 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import '../../core/constants/supabase_config.dart';
-import '../../core/di/injection.dart';
-import '../../core/router/app_router.dart';
-import '../../core/theme/app_theme.dart';
-import '../finance/domain/entities/category.dart';
-import '../finance/domain/entities/financial_overview.dart';
-import '../finance/domain/entities/transaction.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../finance/domain/entities/category.dart';
+import '../../../finance/domain/entities/financial_overview.dart';
+import '../../../finance/domain/entities/transaction.dart';
 import 'app_screens.dart';
 
 part 'ledger_tab.dart';
-part 'reports_tab.dart';
-part 'budget_tab.dart';
-part 'settings_tab.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -26,9 +20,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final _getTransactions = AppDependencies.getTransactions;
   final _getCategories = AppDependencies.getCategories;
   final _addTransaction = AppDependencies.addTransaction;
-  // ignore: prefer_final_fields
-  int _currentNavIndex = 0;
-  bool _showCalendar = false;
+  bool _showCalendar = true;
+  DateTime _displayedMonth = DateTime(
+    DateTime.now().year,
+    DateTime.now().month,
+  );
 
   bool _isLoading = false;
   FinancialOverview _overview = FinancialOverview(
@@ -318,19 +314,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: _buildKakeiboAppBar(),
-      body: _showCalendar ? _buildCalendarTab() : _buildDashboardTab(),
-      bottomNavigationBar: const AppScreenNavigation(selectedIndex: 0),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          await context.push<bool>(AppRoutes.addTransaction);
-          _loadAllData();
-        },
-        backgroundColor: AppTheme.primaryForestGreen,
-        elevation: 3,
-        shape: const CircleBorder(),
-        child: const Icon(Icons.add, color: Colors.white, size: 28),
+      body: _buildDashboardTab(),
+      bottomNavigationBar: AppScreenNavigation(
+        selectedIndex: 0,
+        onTransactionAdded: _loadAllData,
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
     );
   }
 
@@ -390,21 +378,5 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ],
     );
-  }
-
-  // ignore: unused_element
-  Widget _buildSelectedTabBody() {
-    switch (_currentNavIndex) {
-      case 0:
-        return _showCalendar ? _buildCalendarTab() : _buildDashboardTab();
-      case 1:
-        return _buildReportsTab();
-      case 2:
-        return _buildBudgetTab();
-      case 3:
-        return _buildSettingsTab();
-      default:
-        return _buildDashboardTab();
-    }
   }
 }

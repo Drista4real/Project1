@@ -1,7 +1,7 @@
 import 'package:go_router/go_router.dart';
 
-import '../../features/dashboard/app_screens.dart';
-import '../../features/dashboard/dashboard_screen.dart';
+import '../../features/dashboard/presentation/screens/app_screens.dart';
+import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 
 abstract final class AppRoutes {
   static const ledger = '/';
@@ -32,7 +32,7 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: AppRoutes.addTransaction,
-      builder: (context, state) => const AddTransactionScreen(),
+      builder: (context, state) => const QuickAddTransactionScreen(),
     ),
   ],
 );
