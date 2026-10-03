@@ -4,22 +4,29 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../finance/domain/entities/category.dart';
 import '../../../finance/domain/entities/financial_overview.dart';
 import '../../../finance/domain/entities/transaction.dart';
+import '../../../finance/domain/repositories/finance_repository.dart';
+import '../../../finance/domain/usecases/add_transaction.dart';
 import 'app_screens.dart';
+import 'auth_screen.dart';
+import 'transaction_detail_screen.dart';
 
 part 'ledger_tab.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final FinanceRepository? repository;
+  const DashboardScreen({super.key, this.repository});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  final _getOverview = AppDependencies.getOverview;
-  final _getTransactions = AppDependencies.getTransactions;
-  final _getCategories = AppDependencies.getCategories;
-  final _addTransaction = AppDependencies.addTransaction;
+  FinanceRepository get _repository =>
+      widget.repository ?? AppDependencies.financeRepository;
+  Future<FinancialOverview> _getOverview() => _repository.getOverview();
+  Future<List<Transaction>> _getTransactions() => _repository.getTransactions();
+  Future<List<Category>> _getCategories() => _repository.getCategories();
+  AddTransaction get _addTransaction => AddTransaction(_repository);
   bool _showCalendar = true;
   DateTime _displayedMonth = DateTime(
     DateTime.now().year,
@@ -27,10 +34,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   );
 
   bool _isLoading = false;
+  String? _loadError;
   FinancialOverview _overview = FinancialOverview(
-    currentBalance: 18450000,
-    monthlyIncome: 24500000,
-    monthlyExpense: 6050000,
+    currentBalance: 0,
+    monthlyIncome: 0,
+    monthlyExpense: 0,
   );
   List<Transaction> _transactions = [];
   List<Category> _categories = [];
@@ -42,7 +50,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _loadAllData() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
     try {
       final overview = await _getOverview();
       final txList = await _getTransactions();
@@ -55,11 +66,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _categories = catList;
         });
       }
-    } catch (_) {
-      // Fallback
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _loadError = '$error';
+          _transactions = [];
+        });
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _openTransaction(Transaction transaction) async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => TransactionDetailScreen(
+          transactionId: transaction.id,
+          repository: _repository,
+        ),
+      ),
+    );
+    if (changed == true && mounted) await _loadAllData();
+  }
+
+  Future<void> _signIn() async {
+    final signedIn = await Navigator.of(
+      context,
+    ).push<bool>(MaterialPageRoute(builder: (_) => const AuthScreen()));
+    if (signedIn == true && mounted) await _loadAllData();
   }
 
   String _formatVND(double amount) {

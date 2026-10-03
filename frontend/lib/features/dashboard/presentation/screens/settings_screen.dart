@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/constants/supabase_config.dart';
+import '../../../../core/di/injection.dart';
+import '../../../finance/domain/repositories/management_repository.dart';
+import '../../../finance/domain/usecases/finance_insights.dart';
+import 'transaction_detail_screen.dart';
+import 'auth_screen.dart';
+import 'management_screen.dart';
 import '../widgets/kakeibo_ui.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.repository});
+  final ManagementRepository? repository;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -17,6 +25,162 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _reminders = true;
   bool _biometrics = true;
   bool _darkMode = false;
+  bool _loading = false;
+  bool _saving = false;
+  String? _error;
+  int _generation = 0;
+  FinanceRecord? _profile;
+  List<FinanceRecord> _tagRecords = [];
+  List<FinanceRecord> _transactions = [];
+  List<FinanceRecord> _transactionTags = [];
+  DateTimeRange? _customRange;
+  ManagementRepository get _repository =>
+      widget.repository ?? AppDependencies.managementRepository;
+
+  Future<void> _manage(String resource) async {
+    await openFinanceModule(context, resource, repository: _repository);
+    if (mounted) await _loadSettings();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _range = 'Tháng này';
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    final generation = ++_generation;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final values = await Future.wait([
+        _repository.get('profile', 'me'),
+        _repository.references('tags'),
+        _repository.references('transactions'),
+        _repository.references('transaction_tags'),
+      ]);
+      if (!mounted || generation != _generation) return;
+      setState(() {
+        _profile = values[0] as FinanceRecord;
+        _tagRecords = values[1] as List<FinanceRecord>;
+        _transactions = values[2] as List<FinanceRecord>;
+        _transactionTags = values[3] as List<FinanceRecord>;
+        _reminders = _profile!['reminder_time'] != null;
+        _biometrics = _profile!['biometrics_enabled'] == true;
+        _darkMode = _profile!['dark_mode_enabled'] == true;
+        _tags.removeWhere(
+          (name) => !_tagRecords.any((tag) => tag['name'] == name),
+        );
+      });
+    } catch (error) {
+      if (mounted && generation == _generation) {
+        setState(() {
+          _error = '$error';
+          _profile = null;
+          _transactions = [];
+          _tagRecords = [];
+          _transactionTags = [];
+        });
+      }
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  Future<void> _savePreference(String field, dynamic value) async {
+    if (_saving || _profile == null) return;
+    setState(() => _saving = true);
+    try {
+      await _repository.save('profile', {field: value}, key: 'me');
+      if (mounted) await _loadSettings();
+    } catch (error) {
+      if (mounted) _notice('$error');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _selectRange(String range) async {
+    if (range == 'Tùy chọn') {
+      final selected = await showDateRangePicker(
+        context: context,
+        firstDate: DateTime(1900),
+        lastDate: DateTime(2200),
+        initialDateRange: _customRange,
+      );
+      if (selected == null || !mounted) return;
+      setState(() {
+        _customRange = selected;
+        _range = range;
+      });
+    } else {
+      setState(() => _range = range);
+    }
+  }
+
+  List<FinanceRecord> get _filteredTransactions {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final start = switch (_range) {
+      'Hôm nay' => today,
+      'Tuần này' => DateTime(now.year, now.month, now.day - now.weekday + 1),
+      'Tùy chọn' => _customRange?.start ?? today,
+      _ => DateTime(now.year, now.month),
+    };
+    final end = switch (_range) {
+      'Hôm nay' => DateTime(now.year, now.month, now.day + 1),
+      'Tuần này' => DateTime(now.year, now.month, now.day - now.weekday + 8),
+      'Tùy chọn' =>
+        _customRange == null
+            ? DateTime(now.year, now.month, now.day + 1)
+            : DateTime(
+                _customRange!.end.year,
+                _customRange!.end.month,
+                _customRange!.end.day + 1,
+              ),
+      _ => DateTime(now.year, now.month + 1),
+    };
+    final query = _search.text.trim().toLowerCase();
+    final tagIds = _tagRecords
+        .where((tag) => _tags.contains(tag['name']))
+        .map((tag) => tag['id'])
+        .toSet();
+    final taggedIds = _transactionTags
+        .where((item) => tagIds.contains(item['tag_id']))
+        .map((item) => item['transaction_id'])
+        .toSet();
+    return _transactions.where((item) {
+      final date = financeDate(item['transaction_date']);
+      if (date == null || date.isBefore(start) || !date.isBefore(end)) {
+        return false;
+      }
+      if (_tags.isNotEmpty && !taggedIds.contains(item['id'])) return false;
+      final category = item['categories'];
+      final relatedNames = _transactionTags
+          .where((link) => link['transaction_id'] == item['id'])
+          .map(
+            (link) => _tagRecords
+                .where((tag) => tag['id'] == link['tag_id'])
+                .map((tag) => tag['name'])
+                .join(' '),
+          )
+          .join(' ');
+      final text =
+          '${item['clean_description'] ?? ''} ${item['raw_description'] ?? ''} ${item['amount']} ${category is Map ? category['name'] : ''} $relatedNames'
+              .toLowerCase();
+      return query.isEmpty || text.contains(query.replaceFirst('#', ''));
+    }).toList();
+  }
+
+  String _dateLabel(FinanceRecord item) {
+    final date = financeDate(item['transaction_date']);
+    return date == null ? '' : '${date.day}/${date.month}/${date.year}';
+  }
 
   @override
   void dispose() {
@@ -26,13 +190,100 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final matches = _filteredTransactions;
     return Scaffold(
       appBar: const AppScreenHeader(subtitle: 'Tiện Ích và Cài Đặt'),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
         children: [
+          Card(
+            child: ListTile(
+              leading: const Icon(
+                Icons.person_outline,
+                color: AppTheme.primaryForestGreen,
+              ),
+              title: Text(
+                SupabaseConfig.currentUser?.email ??
+                    'Đăng nhập để quản lý giao dịch',
+              ),
+              trailing: TextButton(
+                onPressed: () async {
+                  if (SupabaseConfig.isAuthenticated) {
+                    await SupabaseConfig.client.auth.signOut();
+                  } else {
+                    if (!context.mounted) return;
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const AuthScreen()),
+                    );
+                  }
+                  if (mounted) await _loadSettings();
+                },
+                child: Text(
+                  SupabaseConfig.isAuthenticated ? 'Đăng xuất' : 'Đăng nhập',
+                ),
+              ),
+            ),
+          ),
+          if (_loading) const LinearProgressIndicator(),
+          if (_error != null)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_error!),
+                    TextButton(
+                      onPressed: _loading ? null : _loadSettings,
+                      child: const Text('Thử lại'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          if (_profile != null)
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.person_outline),
+                title: Text('${_profile!['full_name'] ?? 'Hồ sơ cá nhân'}'),
+                subtitle: Text(
+                  'Ngày nhận lương: ${_profile!['payroll_day'] ?? 'Chưa đặt'}',
+                ),
+                trailing: const Icon(Icons.edit_outlined),
+                onTap: () async {
+                  await openFinanceModule(
+                    context,
+                    'profile',
+                    repository: _repository,
+                  );
+                  if (mounted) await _loadSettings();
+                },
+              ),
+            ),
+          Card(
+            child: ListTile(
+              leading: const Icon(
+                Icons.account_balance_wallet_outlined,
+                color: AppTheme.primaryForestGreen,
+              ),
+              title: const Text('Quản lý tài chính'),
+              subtitle: const Text(
+                'Ví, danh mục, ngân sách, tiết kiệm và dữ liệu khác',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => ManagementScreen(repository: _repository),
+                  ),
+                );
+                if (mounted) await _loadSettings();
+              },
+            ),
+          ),
           TextField(
             controller: _search,
+            onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               hintText: 'Tìm theo ghi chú, số tiền, #hashtag...',
               prefixIcon: const Icon(Icons.search, color: AppTheme.textMuted),
@@ -46,18 +297,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _manage('accounts'),
+                icon: const Icon(Icons.account_balance_wallet_outlined),
+                label: const Text('Ví'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _manage('categories'),
+                icon: const Icon(Icons.category_outlined),
+                label: const Text('Danh mục'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _manage('saving_goals'),
+                icon: const Icon(Icons.savings_outlined),
+                label: const Text('Tiết kiệm'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _manage('debts_loans'),
+                icon: const Icon(Icons.handshake_outlined),
+                label: const Text('Sổ nợ'),
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Thẻ của bạn',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+              TextButton(
+                onPressed: () => _manage('tags'),
+                child: const Text('Quản lý thẻ'),
+              ),
+              TextButton(
+                onPressed: () => _manage('transaction_tags'),
+                child: const Text('Gắn thẻ'),
+              ),
+            ],
+          ),
+          if (!_loading && _profile != null && _tagRecords.isEmpty)
+            const Text(
+              'Chưa có thẻ. Tạo thẻ và gắn vào giao dịch để lọc theo sự kiện.',
+              style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+            ),
           SizedBox(
             height: 34,
             child: ListView(
               scrollDirection: Axis.horizontal,
               children: [
-                for (final tag in [
-                  'dulich',
-                  'damcuoi',
-                  'quatet',
-                  'caphe',
-                  'anuong',
-                ])
+                for (final tag in _tagRecords.map((item) => '${item['name']}'))
                   Padding(
                     padding: const EdgeInsets.only(right: 7),
                     child: FilterChip(
@@ -96,12 +390,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 for (final range in [
                   'Hôm nay',
                   'Tuần này',
-                  'Tháng 10',
+                  'Tháng này',
                   'Tùy chọn',
                 ])
                   Expanded(
                     child: GestureDetector(
-                      onTap: () => setState(() => _range = range),
+                      onTap: () => _selectRange(range),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 140),
                         padding: const EdgeInsets.symmetric(
@@ -138,6 +432,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 18),
+          if (_customRange != null && _range == 'Tùy chọn')
+            Text(
+              '${_customRange!.start.day}/${_customRange!.start.month}/${_customRange!.start.year} – ${_customRange!.end.day}/${_customRange!.end.month}/${_customRange!.end.year}',
+              style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+            ),
+          if (_profile != null)
+            KakeiboCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Giao dịch phù hợp (${matches.length})',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  if (matches.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 12),
+                      child: Text('Không có giao dịch phù hợp.'),
+                    ),
+                  for (final item in matches.take(12))
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(
+                        '${item['clean_description'] ?? item['raw_description'] ?? 'Giao dịch'}',
+                      ),
+                      subtitle: Text(_dateLabel(item)),
+                      trailing: Text(formatVnd(financeAmount(item['amount']))),
+                      onTap: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => TransactionDetailScreen(
+                              transactionId: item['id'] as int,
+                            ),
+                          ),
+                        );
+                        if (mounted) await _loadSettings();
+                      },
+                    ),
+                  if (matches.length > 12)
+                    const Text(
+                      'Hiển thị 12 kết quả đầu tiên. Thu hẹp bộ lọc để tìm thêm.',
+                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                    ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 18),
           KakeiboCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,19 +490,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const Color(0xFFC9EFD9),
                     ),
                     const SizedBox(width: 10),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Google Drive...',
+                            'Dữ liệu tài chính',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
                           Text(
-                            'Đã tự động sao lưu lúc\n10:30 sáng nay • 2.4 MB',
+                            _profile == null
+                                ? 'Chưa tải dữ liệu'
+                                : '${_transactions.length} giao dịch · ${_tagRecords.length} thẻ',
                             style: TextStyle(
                               fontSize: 10,
                               color: AppTheme.textMuted,
@@ -172,11 +515,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     FilledButton.icon(
-                      onPressed: () =>
-                          _notice('Đã bắt đầu sao lưu lên Google Drive.'),
+                      onPressed: _loading || _saving ? null : _loadSettings,
                       icon: const Icon(Icons.sync, size: 15),
                       label: const Text(
-                        'Sao lưu ngay',
+                        'Tải lại',
                         style: TextStyle(fontSize: 10),
                       ),
                       style: FilledButton.styleFrom(
@@ -207,7 +549,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Mã hóa đầu-cuối chuẩn AES-256',
+                          'Dữ liệu riêng theo tài khoản đăng nhập',
                           style: TextStyle(
                             fontSize: 10,
                             color: AppTheme.textMuted,
@@ -215,7 +557,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                       Text(
-                        'An toàn 100%',
+                        'Cá nhân',
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
@@ -236,7 +578,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     _iconTile(Icons.self_improvement, const Color(0xFFFFE0D6)),
                     const SizedBox(width: 10),
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -255,7 +597,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           SizedBox(height: 4),
                           Text(
-                            '21:00 mỗi tối',
+                            _profile?['reminder_time'] == null
+                                ? 'Chưa đặt giờ nhắc'
+                                : '${_profile!['reminder_time']}'.substring(
+                                    0,
+                                    5,
+                                  ),
                             style: TextStyle(
                               fontSize: 11,
                               color: AppTheme.expenseCoral,
@@ -267,10 +614,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     Switch(
                       value: _reminders,
-                      onChanged: (value) => setState(() => _reminders = value),
+                      onChanged: _loading || _saving || _profile == null
+                          ? null
+                          : (value) => _savePreference(
+                              'reminder_time',
+                              value ? '20:30:00' : null,
+                            ),
                       activeThumbColor: AppTheme.primaryForestGreen,
                     ),
                   ],
+                ),
+                TextButton.icon(
+                  onPressed: _loading || _saving || _profile == null
+                      ? null
+                      : () async {
+                          final stored =
+                              '${_profile?['reminder_time'] ?? '20:30:00'}'
+                                  .split(':');
+                          final picked = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay(
+                              hour: (int.tryParse(stored[0]) ?? 20).clamp(
+                                0,
+                                23,
+                              ),
+                              minute: (int.tryParse(stored[1]) ?? 30).clamp(
+                                0,
+                                59,
+                              ),
+                            ),
+                          );
+                          if (picked != null && mounted) {
+                            await _savePreference(
+                              'reminder_time',
+                              '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}:00',
+                            );
+                          }
+                        },
+                  icon: const Icon(Icons.schedule),
+                  label: const Text('Chọn giờ nhắc'),
                 ),
                 const SizedBox(height: 14),
                 Container(
@@ -339,22 +721,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 9),
           _SettingTile(
             icon: Icons.fingerprint,
-            title: 'Bảo mật Face ID & Vân tay',
-            subtitle: 'Khóa tức thì khi thoát khỏi ứng dụng',
+            title: 'Ưu tiên Face ID & Vân tay',
+            subtitle: 'Lưu tùy chọn; khóa sinh trắc học chưa được bật',
             trailing: Switch(
               value: _biometrics,
-              onChanged: (value) => setState(() => _biometrics = value),
+              onChanged: _loading || _saving || _profile == null
+                  ? null
+                  : (value) => _savePreference('biometrics_enabled', value),
               activeThumbColor: AppTheme.primaryForestGreen,
             ),
           ),
           const SizedBox(height: 9),
           _SettingTile(
             icon: Icons.dark_mode_outlined,
-            title: 'Giao diện Tối OLED',
-            subtitle: 'Tiết kiệm pin, bảo vệ thị lực ban đêm',
+            title: 'Ưu tiên giao diện tối',
+            subtitle: 'Lưu lựa chọn vào hồ sơ cá nhân',
             trailing: Switch(
               value: _darkMode,
-              onChanged: (value) => setState(() => _darkMode = value),
+              onChanged: _loading || _saving || _profile == null
+                  ? null
+                  : (value) => _savePreference('dark_mode_enabled', value),
               activeThumbColor: AppTheme.primaryForestGreen,
             ),
           ),
@@ -395,7 +781,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: const AppScreenNavigation(selectedIndex: 3),
+      bottomNavigationBar: AppScreenNavigation(
+        selectedIndex: 3,
+        onTransactionAdded: _loadSettings,
+      ),
     );
   }
 

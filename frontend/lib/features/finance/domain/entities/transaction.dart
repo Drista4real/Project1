@@ -2,6 +2,8 @@ class Transaction {
   final int id;
   final String userId;
   final int? categoryId;
+  final int? accountId;
+  final int? toAccountId;
   final double amount;
   final String transactionType;
   final String? rawDescription;
@@ -16,6 +18,8 @@ class Transaction {
     required this.id,
     required this.userId,
     this.categoryId,
+    this.accountId,
+    this.toAccountId,
     required this.amount,
     required this.transactionType,
     this.rawDescription,

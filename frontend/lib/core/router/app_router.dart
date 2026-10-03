@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/dashboard/presentation/screens/app_screens.dart';
@@ -35,7 +34,7 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: AppRoutes.addTransaction,
-      builder: (context, state) => const AiQuickInputScreen(),
+      builder: (context, state) => const QuickAddTransactionScreen(),
     ),
     GoRoute(
       path: AppRoutes.aiQuickInput,
@@ -43,11 +42,7 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: AppRoutes.forecast,
-      builder: (context, state) => const Scaffold(
-        appBar: AppScreenHeader(subtitle: 'Dự Báo'),
-        body: CashflowForecastScreen(),
-        bottomNavigationBar: AppScreenNavigation(selectedIndex: 1),
-      ),
+      builder: (context, state) => const ForecastPage(),
     ),
   ],
 );

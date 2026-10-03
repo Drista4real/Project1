@@ -11,6 +11,8 @@ class AddTransaction {
     required String description,
     int? categoryId,
     String? categoryName,
+    int? accountId,
+    DateTime? transactionDate,
   }) {
     return repository.addTransaction(
       amount: amount,
@@ -18,6 +20,8 @@ class AddTransaction {
       description: description,
       categoryId: categoryId,
       categoryName: categoryName,
+      accountId: accountId,
+      transactionDate: transactionDate,
     );
   }
 }
