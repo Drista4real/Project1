@@ -56,34 +56,59 @@ Cơ sở dữ liệu được triển khai trực tiếp trên **Supabase Postgr
 
 ```mermaid
 erDiagram
+    PROFILES ||--o{ ACCOUNTS : owns
     PROFILES ||--o{ TRANSACTIONS : owns
+    PROFILES ||--o{ BUDGETS : sets
+    PROFILES ||--o{ SAVING_GOALS : sets
+    PROFILES ||--o{ DEBTS_LOANS : manages
+    PROFILES ||--o{ RECURRING_TRANSACTIONS : schedules
     PROFILES ||--o{ CASHFLOW_FORECASTS : receives
-    PROFILES ||--o{ AI_CONSULTATIONS : requests
+    PROFILES ||--o{ CASHFLOW_ALERTS : receives
+    PROFILES ||--o{ AI_CHAT_SESSIONS : conducts
+    
+    ACCOUNTS ||--o{ TRANSACTIONS : logs
+    ACCOUNTS ||--o{ SAVING_GOALS : links
     CATEGORIES ||--o{ TRANSACTIONS : categorizes
+    CATEGORIES ||--o{ BUDGETS : limits
+    CATEGORIES ||--o{ RECURRING_TRANSACTIONS : classifies
+    CATEGORIES ||--o{ CATEGORIES : parent_child
+
+    TRANSACTIONS ||--o{ TRANSACTION_TAGS : labeled
+    TAGS ||--o{ TRANSACTION_TAGS : attaches
+    AI_CHAT_SESSIONS ||--o{ AI_CHAT_MESSAGES : contains
 
     PROFILES {
         uuid id PK
         text email
         text full_name
         decimal current_balance
-        timestamptz created_at
+        int payroll_day
+        decimal monthly_savings_target
+    }
+
+    ACCOUNTS {
+        bigint id PK
+        uuid user_id FK
+        text name
+        text account_type
+        decimal balance
+        text currency
     }
 
     CATEGORIES {
         bigint id PK
         uuid user_id FK
+        bigint parent_id FK
         text name
-        text icon
-        text color
+        text pillar
         boolean is_income
     }
-
-    PROFILES ||--o{ BUDGETS : sets
-    CATEGORIES ||--o{ BUDGETS : limits
 
     TRANSACTIONS {
         bigint id PK
         uuid user_id FK
+        bigint account_id FK
+        bigint to_account_id FK
         bigint category_id FK
         decimal amount
         text transaction_type
@@ -92,6 +117,7 @@ erDiagram
         text category_predicted
         numeric confidence_score
         boolean is_verified
+        text pillar
         timestamptz transaction_date
     }
 
@@ -99,8 +125,40 @@ erDiagram
         bigint id PK
         uuid user_id FK
         bigint category_id FK
+        text pillar
         date month_year
         decimal limit_amount
+        int alert_threshold_percent
+    }
+
+    SAVING_GOALS {
+        bigint id PK
+        uuid user_id FK
+        text name
+        decimal target_amount
+        decimal current_amount
+        date target_date
+        text status
+    }
+
+    DEBTS_LOANS {
+        bigint id PK
+        uuid user_id FK
+        text type
+        text person_name
+        decimal amount
+        decimal paid_amount
+        date due_date
+        text status
+    }
+
+    RECURRING_TRANSACTIONS {
+        bigint id PK
+        uuid user_id FK
+        text frequency
+        decimal amount
+        date next_execution_date
+        boolean is_active
     }
 
     CASHFLOW_FORECASTS {
@@ -114,32 +172,62 @@ erDiagram
         text model_name
     }
 
-    AI_CONSULTATIONS {
+    CASHFLOW_ALERTS {
         bigint id PK
         uuid user_id FK
-        text user_query
-        jsonb context_summary
-        text ai_recommendation
+        text alert_type
+        text severity
+        date predicted_deficit_date
+        decimal predicted_deficit_amount
+        text suggested_action
+    }
+
+    AI_CHAT_SESSIONS {
+        bigint id PK
+        uuid user_id FK
+        text title
         timestamptz created_at
+    }
+
+    AI_CHAT_MESSAGES {
+        bigint id PK
+        bigint session_id FK
+        text sender
+        text content
+        jsonb context_snapshot
     }
 ```
 
-### Các bảng dữ liệu chính & Tính năng nâng cao:
-1. `public.profiles`: Thông tin tài khoản người dùng, liên kết `auth.users`, ngày nhận lương `payroll_day` và số dư `current_balance`.
-2. `public.categories`: Danh mục thu/chi (hỗ trợ phân loại mặc định và danh mục tùy chỉnh).
-3. `public.transactions`: Lịch sử giao dịch, nội dung sao kê gốc, nhãn AI dự đoán và điểm tin cậy.
-4. `public.budgets`: Quản lý hạn mức chi tiêu theo tháng cho từng danh mục.
-5. `public.cashflow_forecasts`: Dữ liệu số dư, dòng tiền dự kiến 7 - 30 ngày từ mô hình AI (DLinear/LSTM).
-6. `public.ai_consultations`: Lịch sử tư vấn tài chính thông minh tích hợp Google Gemini AI.
-7. `public.notes`: Bảng kiểm tra kết nối nhanh giữa Flutter và PostgreSQL.
+### Các phân hệ dữ liệu chính (13 Bảng & 3 Analytics Views):
+1. **Phân hệ Core & Tài khoản:**
+   * `public.profiles`: Thông tin cá nhân, cài đặt tiền tệ, ngày nhận lương (`payroll_day`), mục tiêu tiết kiệm, giờ nhắc nhở.
+   * `public.accounts`: Đa tài khoản/ví tiền (Tiền mặt, Ngân hàng MB/VCB, Ví MoMo, Thẻ tín dụng, Đầu tư) với số dư và hạn mức riêng.
+2. **Phân hệ Thu/Chi & Phương pháp Kakeibo:**
+   * `public.categories`: Danh mục hỗ trợ đa cấp (Cha - Con) và tích hợp 4 trụ cột Kakeibo Nhật Bản (*Thiết yếu - Needs, Mong muốn - Wants, Văn hóa - Culture, Dự phòng - Unexpected*).
+   * `public.transactions`: Lịch sử giao dịch thu, chi, và chuyển khoản giữa các ví. Lưu trữ dữ liệu sao kê SMS gốc, kết quả tiền xử lý NLP và gán nhãn PhoBERT/Gemini.
+   * `public.tags` & `public.transaction_tags`: Quản lý hashtag sự kiện (#dulich, #damcuoi, #quatet...).
+3. **Phân hệ Kế hoạch Tài chính:**
+   * `public.budgets`: Quản lý hạn mức chi tiêu theo tháng, theo danh mục hoặc theo trụ cột Kakeibo với ngưỡng cảnh báo động.
+   * `public.saving_goals`: Heo đất / Hũ tiết kiệm tích lũy cho mục tiêu cụ thể (quỹ khẩn cấp, mua sắm lớn...).
+   * `public.debts_loans`: Sổ ghi nợ và cho vay, theo dõi kỳ hạn thanh toán và nhắc nợ.
+   * `public.recurring_transactions`: Quản lý hóa đơn định kỳ, thuê bao tháng (tiền nhà, internet, gym...).
+4. **Phân hệ AI Dự báo & Trợ lý Thông minh:**
+   * `public.cashflow_forecasts`: Chuỗi thời gian dự báo số dư 7 - 30 ngày (DLinear / LSTM) kèm khoảng tin cậy.
+   * `public.cashflow_alerts`: Cảnh báo nguy cơ thâm hụt số dư trước ngày nhận lương kèm hành động đề xuất.
+   * `public.ai_consultations`, `public.ai_chat_sessions`, `public.ai_chat_messages`: Hệ thống lưu trữ phiên tư vấn tài chính thông minh của Google Gemini AI kèm snapshot tài chính.
+   * `public.notes`: Bảng kiểm tra kết nối nhanh giữa Flutter và PostgreSQL.
 
-### Tối ưu hóa hiệu năng & Bảo mật:
-* **Tối ưu RLS Policies:** Sử dụng biểu thức `(SELECT auth.uid())` giúp Postgres cache kết quả phiên đăng nhập, tăng tốc độ truy vấn từ 10x đến 100x so với gọi hàm lặp lại trên từng dòng.
-* **Tự động hóa bằng Trigger:** Tự động tạo hồ sơ khi người dùng đăng ký (`on_auth_user_created`) và cập nhật thời gian sửa đổi `updated_at`.
-* **Đánh chỉ mục (Indexing):** Toàn bộ khóa ngoại (`user_id`, `category_id`) và các trường lọc thường xuyên (`transaction_date`, `month_year`) đều được đánh index tối ưu.
+### Tối ưu hóa hiệu năng & Tự động hóa (Automation & Performance):
+* **Tối ưu RLS Policies:** Sử dụng biểu thức `(SELECT auth.uid())` giúp Postgres cache kết quả phiên đăng nhập, tăng tốc độ truy vấn từ 10x đến 100x.
+* **Tự động hóa Trigger nghiệp vụ:**
+  * `trg_sync_transaction_balance`: Tự động cộng/trừ số dư ví (`accounts.balance`) và đồng bộ về tổng tài sản (`profiles.current_balance`) mỗi khi thêm/sửa/xóa giao dịch hoặc chuyển ví.
+  * `on_auth_user_created`: Tự động tạo hồ sơ profile và ví mặc định "Ví Tiền Mặt" ngay khi người dùng đăng ký tài khoản.
+  * `handle_updated_at`: Tự động cập nhật mốc thời gian sửa đổi cho tất cả các bảng.
+* **Đánh chỉ mục (Indexing):** Toàn bộ khóa ngoại và các trường thời gian / trạng thái thường xuyên lọc (`user_id`, `transaction_date`, `pillar`, `status`) đều được lập B-Tree Indexes tối ưu.
+* **Analytics Views:** Cung cấp sẵn các view báo cáo: `v_current_month_spending_by_category`, `v_kakeibo_monthly_summary`, `v_monthly_budget_progress`.
 
 > [!TIP]
-> Toàn bộ script DDL, triggers và policies được lưu trữ tại: [`supabase/schema.sql`](file:///d:/Project1/supabase/schema.sql). Bạn có thể sao chép và dán trực tiếp vào **SQL Editor** trên Supabase Dashboard để kích hoạt ngay.
+> Toàn bộ script DDL, triggers, indexes và RLS policies đầy đủ được lưu trữ tại: [`supabase/schema.sql`](file:///d:/Project1/supabase/schema.sql). Bạn có thể sao chép và dán trực tiếp vào **SQL Editor** trên Supabase Dashboard để kích hoạt ngay.
 
 ---
 
