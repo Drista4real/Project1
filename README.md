@@ -16,15 +16,14 @@ Hệ thống giải quyết bài toán bằng cách kết hợp:
 * **Kiến trúc AI phân tầng (Tiered Hybrid AI):**
   * *Tầng 1 (Local/Edge - Low Latency < 50ms):* Fine-tune mô hình ngôn ngữ nhỏ gọn tiếng Việt (PhoBERT) để gán nhãn tự động nội dung chuyển khoản và mô hình học sâu chuỗi thời gian (DLinear/LSTM) để dự báo số dư/dòng tiền 7–30 ngày.
   * *Tầng 2 (Cloud LLM - Reasoning Engine):* Gemini API đóng vai trò Chuyên gia tư vấn tài chính (Financial Advisor), chỉ kích hoạt khi fallback gán nhãn ca khó và phân tích thói quen, lập kế hoạch tiết kiệm chuyên sâu.
-* **Hạ tầng phân tán chịu tải cao (High Concurrency & Rate-limit Resilience):**
-  * Sử dụng hàng đợi thông điệp (Message Broker: Redis/RabbitMQ kết hợp Celery) xử lý bất đồng bộ, tích hợp Exponential Backoff & Retry giải quyết triệt để bài toán nghẽn cổ chai rate-limit.
-  * Container hóa toàn bộ hệ thống bằng Docker, triển khai mở rộng tự động với Kubernetes (HPA) và kiểm thử tải với Locust (chịu tải tăng gấp 10 lần).
+* **Hạ tầng Dữ liệu & Backend Hiện đại (Supabase & PostgreSQL):**
+  * Sử dụng **Supabase Cloud (PostgreSQL)** làm cơ sở dữ liệu chính: hỗ trợ Row Level Security (RLS) bảo mật tuyệt đối cho dữ liệu tài chính từng người dùng, Realtime subscriptions, Auth đa phương thức và Auto-generated RESTful APIs.
+* **Đa nền tảng (Cross-platform Flutter App):**
+  * Ứng dụng client phát triển trên **Flutter (Dart)** hỗ trợ mượt mà trên Mobile (Android, iOS) và Web với kiến trúc Module hóa (Feature-first).
 
 ---
 
 ## 2. KẾ HOẠCH THỰC HIỆN CHI TIẾT THEO GIAI ĐOẠN
-
-Dự án được phân chia nghiêm ngặt thành 2 giai đoạn kế thừa lẫn nhau:
 
 ```
                   ┌─────────────────────────────────────────────────────────┐
@@ -35,170 +34,289 @@ Dự án được phân chia nghiêm ngặt thành 2 giai đoạn kế thừa l�
                                               ▼
                   ┌─────────────────────────────────────────────────────────┐
                   │                 GIAI ĐOẠN 2: CUỐI KỲ                    │
-                  │       Đóng gói Microservices, Web Fullstack & K8s       │
+                  │       Đóng gói App Flutter, Supabase & AI Backend       │
                   └─────────────────────────────────────────────────────────┘
 ```
 
 ### 2.1. GIAI ĐOẠN 1: GIỮA KỲ (Nghiên cứu & Thực nghiệm Mô hình AI)
+* **Dataset:** Xây dựng tập dữ liệu 5,000 - 10,000 giao dịch ngân hàng thực tế (sao kê MBBank, Vietcombank, Techcombank...). Chuẩn hóa teencode, viết tắt, danh mục 8-10 nhóm chi tiêu.
+* **NLP Model:** `vinai/phobert-base-v2` kết hợp LoRA (Parameter-Efficient Fine-Tuning) phân loại nội dung chuyển khoản tiếng Việt với F1-Score $\ge 88\%$. Fallback sang Gemini khi độ tin cậy thấp.
+* **Time-Series Forecasting:** So sánh thực nghiệm ARIMA vs. LSTM/Bi-LSTM vs. DLinear để dự báo số dư và xu hướng thâm hụt 7 - 30 ngày.
 
-#### A. Mục tiêu & Phạm vi
-* Xây dựng bộ dữ liệu (dataset) tài chính cá nhân tiếng Việt chuẩn hóa.
-* Huấn luyện và đánh giá mô hình phân loại giao dịch đa tầng (PhoBERT + LoRA vs. Gemini Fallback).
-* Huấn luyện và thực nghiệm so sánh các mô hình dự báo chuỗi thời gian đa biến (ARIMA vs. LSTM/GRU vs. DLinear).
-* Đo lường định lượng và bàn giao pipeline thực nghiệm hoàn chỉnh trên Google Colab/Jupyter Notebook.
-
-#### B. Quy trình thực hiện chi tiết (Làm gì và Làm như thế nào?)
-
-##### Bước 1: Xây dựng & Tiền xử lý Dataset (Data Engineering)
-* **Dữ liệu phân loại văn bản (Transaction Text Classification):**
-  * Thu thập/giả lập tập dữ liệu 5,000 - 10,000 giao dịch ngân hàng thực tế (sao kê MBBank, Vietcombank, Techcombank...).
-  * Làm sạch text: Xử lý teencode, viết tắt (*"ck" -> "chuyển khoản"*, *"cf" -> "cà phê"*, *"an trua" -> "ăn trưa"*), chuẩn hóa unicode tiếng Việt, tách từ với `pyvi` hoặc `rdrsegmenter`.
-  * Chuẩn hóa bộ nhãn phân loại (Taxonomy): 8 - 10 danh mục chính (Ăn uống, Hóa đơn dịch vụ, Nhà ở/Thuê trọ, Mua sắm, Di chuyển, Lương thưởng, Chuyển tiền cá nhân, Khác).
-* **Dữ liệu chuỗi thời gian đa biến (Multivariate Time-Series):**
-  * Cấu trúc đặc trưng: Thời gian (Timestamp), Số tiền thu/chi (Amount), Số dư lũy kế (Cumulative Balance), Chu kỳ nhận lương (Payroll Flag), Ngày trong tuần (Day of week - 0-6), Tính mùa vụ (Cuối tháng, Lễ tết).
-  * Chuẩn hóa dữ liệu bằng `MinMaxScaler` hoặc `StandardScaler` để đảm bảo độ hội tụ cho Deep Learning.
-
-##### Bước 2: Huấn luyện & Đánh giá Mô hình Phân loại Đa tầng
-* **Tầng cục bộ (Local Model):**
-  * Nền tảng: Mô hình ngôn ngữ `vinai/phobert-base-v2`.
-  * Phương pháp: Ứng dụng kỹ thuật PEFT/LoRA (Parameter-Efficient Fine-Tuning) để tối ưu thời gian huấn luyện trên GPU T4 (Google Colab/Kaggle) mà vẫn giữ được độ chính xác cao.
-  * Cơ chế định tuyến tự động (Routing Logic):
-    $$	ext{Target} = egin{cases} 	ext{PhoBERT Output}, & 	ext{khi } \max(P) \ge 	au \ (	ext{ngưỡng tin cậy, ví dụ } 0.85) \ 	ext{Gemini API Fallback}, & 	ext{khi } \max(P) < 	au 	ext{ hoặc cấu trúc đa nghĩa} \end{cases}$$
-* **Tầng dự phòng (Cloud Fallback):**
-  * Prompt Engineering với Few-shot Learning và Structured Output (JSON Schema) cho Gemini 2.5 Flash / Flash-Lite nhằm trích xuất nhãn và độ tin cậy.
-
-##### Bước 3: Nghiên cứu & Dự báo Dòng tiền Đa biến
-* Triển khai mô hình cơ sở (Baseline): Mô hình thống kê truyền thống **ARIMA / SARIMAX**.
-* Triển khai mô hình học sâu (Deep Learning): **LSTM / Bi-LSTM / GRU** và **DLinear** (Linear-based Time-Series Architecture).
-* Dự báo đa bước (Multi-step Forecasting): Dự báo chuỗi 7 ngày và 30 ngày tiếp theo.
-* Đánh giá so sánh định lượng:
-  * Mean Absolute Error (MAE)
-  * Root Mean Square Error (RMSE)
-  * Mean Absolute Percentage Error (MAPE)
-  * Độ trễ suy luận (Inference Latency tính bằng mili-giây).
-
-##### Bước 4: Deliverables Giữa kỳ
-1. `notebooks/01_nlp_phobert_finetune.ipynb`: Huấn luyện & đánh giá PhoBERT.
-2. `notebooks/02_timeseries_forecasting.ipynb`: Thực nghiệm so sánh ARIMA vs LSTM vs DLinear.
-3. `models/`: Trọng số mô hình đã huấn luyện (`phobert_lora_weights/`, `lstm_forecast.pt`).
-4. `reports/Bao_cao_thuc_nghiem_giua_ky.pdf`: Đồ thị Training Loss, Bảng F1-score ma trận nhầm lẫn (Confusion Matrix), Biểu đồ đường dự báo dòng tiền vs thực tế.
+### 2.2. GIAI ĐOẠN 2: CUỐI KỲ (Hệ thống Flutter App & Supabase BaaS)
+* **Frontend:** Ứng dụng Flutter trực quan: Dashboard tài chính, quản lý thu/chi, cảnh báo thâm hụt và biểu đồ dự báo.
+* **Database & BaaS:** Supabase PostgreSQL với đầy đủ RLS, Functions và Edge Triggers.
+* **AI Service:** Tích hợp API dự báo dòng tiền và trợ lý tài chính thông minh Gemini.
 
 ---
 
-### 2.2. GIAI ĐOẠN 2: CUỐI KỲ (Hệ thống Web Fullstack, Message Queue & DevOps K8s)
+## 3. THIẾT KẾ CƠ SỞ DỮ LIỆU & KIẾN TRÚC DỮ LIỆU (POSTGRESQL & SUPABASE)
 
-#### A. Mục tiêu & Phạm vi
-* Xây dựng ứng dụng Web hoàn chỉnh phục vụ người dùng cuối.
-* Đóng gói mô hình AI thành Microservices hiệu năng cao.
-* Thiết kế kiến trúc chịu tải với Message Queue (Redis/RabbitMQ + Celery), xử lý giới hạn Rate-limit.
-* Triển khai hạ tầng Container hóa (Docker, Docker Compose, Kubernetes) và Stress-test chứng minh khả năng chịu tải tăng 10 lần.
+Cơ sở dữ liệu được triển khai trực tiếp trên **Supabase PostgreSQL** với mô hình quan hệ chuẩn hóa và bảo mật đa tầng bằng **Row Level Security (RLS)**:
 
-#### B. Quy trình thực hiện chi tiết
+```mermaid
+erDiagram
+    PROFILES ||--o{ ACCOUNTS : owns
+    PROFILES ||--o{ TRANSACTIONS : owns
+    PROFILES ||--o{ BUDGETS : sets
+    PROFILES ||--o{ SAVING_GOALS : sets
+    PROFILES ||--o{ DEBTS_LOANS : manages
+    PROFILES ||--o{ RECURRING_TRANSACTIONS : schedules
+    PROFILES ||--o{ CASHFLOW_FORECASTS : receives
+    PROFILES ||--o{ CASHFLOW_ALERTS : receives
+    PROFILES ||--o{ AI_CHAT_SESSIONS : conducts
+    
+    ACCOUNTS ||--o{ TRANSACTIONS : logs
+    ACCOUNTS ||--o{ SAVING_GOALS : links
+    CATEGORIES ||--o{ TRANSACTIONS : categorizes
+    CATEGORIES ||--o{ BUDGETS : limits
+    CATEGORIES ||--o{ RECURRING_TRANSACTIONS : classifies
+    CATEGORIES ||--o{ CATEGORIES : parent_child
 
-##### Bước 1: Thiết kế Kiến trúc Hệ thống & Cơ sở Dữ liệu
-* **Kiến trúc phân tầng (Tiered Architecture):**
-  * **Frontend Client (Next.js 14 App Router, TailwindCSS):** Giao diện Dashboard trực quan, tích hợp thư viện biểu đồ Recharts/Chart.js hiển thị dòng tiền lịch sử và đường dự báo 7–30 ngày.
-  * **Backend API Gateway (FastAPI):** Tiếp nhận yêu cầu, xử lý nghiệp vụ xác thực (JWT), CRUD giao dịch, tương tác PostgreSQL.
-  * **AI Worker / Microservice (Python / Celery):** Xử lý bất đồng bộ các tác vụ nặng: chạy mô hình dự báo định kỳ, gọi Gemini API phân tích báo cáo tuần/tháng.
-  * **Message Broker & Cache (Redis / RabbitMQ):** Đệm hàng đợi yêu cầu và lưu trữ cache dự báo, cache session.
-  * **Database (PostgreSQL):** Lưu trữ quan hệ thực thể người dùng, danh mục, giao dịch và lịch sử dự báo.
+    TRANSACTIONS ||--o{ TRANSACTION_TAGS : labeled
+    TAGS ||--o{ TRANSACTION_TAGS : attaches
+    AI_CHAT_SESSIONS ||--o{ AI_CHAT_MESSAGES : contains
 
-##### Bước 2: Xử lý Bài toán Rate-Limit & Scale x10 (Tư duy Phản biện)
-* **Giải quyết nghẽn Rate-limit của Gemini API:**
-  * Giới hạn thông thường của Gemini Free Tier là 15 RPM (Requests Per Minute). Khi có 200 người dùng đồng thời bấm "Tạo báo cáo chi tiêu", hệ thống không gọi trực tiếp API đồng bộ.
-  * *Cơ chế giải quyết:* 
-    1. Request được đóng gói thành Task đẩy vào **Redis Queue**.
-    2. Backend trả về ngay mã Task ID (`HTTP 202 Accepted`) cho Client để Client không bị treo UI.
-    3. **Celery Worker** sử dụng cơ chế Token Bucket / Rate Limiter để giới hạn tần suất gọi Gemini (ví dụ: tối đa 12 requests/phút).
-    4. Tích hợp giải thuật **Exponential Backoff & Retry** khi gặp lỗi `HTTP 429 Too Many Requests`.
-    5. Kết quả sau khi sinh xong được ghi vào PostgreSQL/Redis, đẩy thông báo về Client qua WebSocket hoặc Server-Sent Events (SSE).
-* **Giải quyết bài toán tải tăng gấp 10 lần:**
-  * Chia tách Backend phục vụ I/O và AI Inference Service thành 2 container riêng biệt.
-  * Sử dụng Redis Cache cho các dữ liệu ít biến động (báo cáo tháng, danh mục).
+    PROFILES {
+        uuid id PK
+        text email
+        text full_name
+        decimal current_balance
+        int payroll_day
+        decimal monthly_savings_target
+    }
 
-##### Bước 3: DevOps, Container Hóa & Kubernetes Deployment
-* **Docker hóa:** Viết `Dockerfile` tối ưu nhiều tầng (Multi-stage build) cho Next.js, FastAPI và Celery Worker.
-* **Kubernetes (K8s) Orchestration:**
-  * Viết các manifest `Deployment`, `Service`, `ConfigMap`, `Secret`, `Ingress`.
-  * Cấu hình **Horizontal Pod Autoscaler (HPA)** dựa trên CPU/Memory Utilization (tự động mở rộng từ 2 pods lên 10 pods khi CPU đạt > 70%).
-* **Kiểm thử tải (Stress Testing):**
-  * Sử dụng **Locust** viết kịch bản giả lập hàng nghìn người dùng đồng thời thực hiện thao tác: Đăng nhập, thêm giao dịch, tải biểu đồ dự báo.
-  * Lập báo cáo kiểm thử: Tỉ lệ thành công (Success Rate 99.x%), Response Time (P95, P99), biểu đồ K8s tự động scale-up pods khi tải tăng đột biến.
+    ACCOUNTS {
+        bigint id PK
+        uuid user_id FK
+        text name
+        text account_type
+        decimal balance
+        text currency
+    }
+
+    CATEGORIES {
+        bigint id PK
+        uuid user_id FK
+        bigint parent_id FK
+        text name
+        text pillar
+        boolean is_income
+    }
+
+    TRANSACTIONS {
+        bigint id PK
+        uuid user_id FK
+        bigint account_id FK
+        bigint to_account_id FK
+        bigint category_id FK
+        decimal amount
+        text transaction_type
+        text raw_description
+        text clean_description
+        text category_predicted
+        numeric confidence_score
+        boolean is_verified
+        text pillar
+        timestamptz transaction_date
+    }
+
+    BUDGETS {
+        bigint id PK
+        uuid user_id FK
+        bigint category_id FK
+        text pillar
+        date month_year
+        decimal limit_amount
+        int alert_threshold_percent
+    }
+
+    SAVING_GOALS {
+        bigint id PK
+        uuid user_id FK
+        text name
+        decimal target_amount
+        decimal current_amount
+        date target_date
+        text status
+    }
+
+    DEBTS_LOANS {
+        bigint id PK
+        uuid user_id FK
+        text type
+        text person_name
+        decimal amount
+        decimal paid_amount
+        date due_date
+        text status
+    }
+
+    RECURRING_TRANSACTIONS {
+        bigint id PK
+        uuid user_id FK
+        text frequency
+        decimal amount
+        date next_execution_date
+        boolean is_active
+    }
+
+    CASHFLOW_FORECASTS {
+        bigint id PK
+        uuid user_id FK
+        date forecast_date
+        decimal predicted_balance
+        decimal predicted_income
+        decimal predicted_expense
+        text risk_level
+        text model_name
+    }
+
+    CASHFLOW_ALERTS {
+        bigint id PK
+        uuid user_id FK
+        text alert_type
+        text severity
+        date predicted_deficit_date
+        decimal predicted_deficit_amount
+        text suggested_action
+    }
+
+    AI_CHAT_SESSIONS {
+        bigint id PK
+        uuid user_id FK
+        text title
+        timestamptz created_at
+    }
+
+    AI_CHAT_MESSAGES {
+        bigint id PK
+        bigint session_id FK
+        text sender
+        text content
+        jsonb context_snapshot
+    }
+```
+
+### Các phân hệ dữ liệu chính (13 Bảng & 3 Analytics Views):
+1. **Phân hệ Core & Tài khoản:**
+   * `public.profiles`: Thông tin cá nhân, cài đặt tiền tệ, ngày nhận lương (`payroll_day`), mục tiêu tiết kiệm, giờ nhắc nhở.
+   * `public.accounts`: Đa tài khoản/ví tiền (Tiền mặt, Ngân hàng MB/VCB, Ví MoMo, Thẻ tín dụng, Đầu tư) với số dư và hạn mức riêng.
+2. **Phân hệ Thu/Chi & Phương pháp Kakeibo:**
+   * `public.categories`: Danh mục hỗ trợ đa cấp (Cha - Con) và tích hợp 4 trụ cột Kakeibo Nhật Bản (*Thiết yếu - Needs, Mong muốn - Wants, Văn hóa - Culture, Dự phòng - Unexpected*).
+   * `public.transactions`: Lịch sử giao dịch thu, chi, và chuyển khoản giữa các ví. Lưu trữ dữ liệu sao kê SMS gốc, kết quả tiền xử lý NLP và gán nhãn PhoBERT/Gemini.
+   * `public.tags` & `public.transaction_tags`: Quản lý hashtag sự kiện (#dulich, #damcuoi, #quatet...).
+3. **Phân hệ Kế hoạch Tài chính:**
+   * `public.budgets`: Quản lý hạn mức chi tiêu theo tháng, theo danh mục hoặc theo trụ cột Kakeibo với ngưỡng cảnh báo động.
+   * `public.saving_goals`: Heo đất / Hũ tiết kiệm tích lũy cho mục tiêu cụ thể (quỹ khẩn cấp, mua sắm lớn...).
+   * `public.debts_loans`: Sổ ghi nợ và cho vay, theo dõi kỳ hạn thanh toán và nhắc nợ.
+   * `public.recurring_transactions`: Quản lý hóa đơn định kỳ, thuê bao tháng (tiền nhà, internet, gym...).
+4. **Phân hệ AI Dự báo & Trợ lý Thông minh:**
+   * `public.cashflow_forecasts`: Chuỗi thời gian dự báo số dư 7 - 30 ngày (DLinear / LSTM) kèm khoảng tin cậy.
+   * `public.cashflow_alerts`: Cảnh báo nguy cơ thâm hụt số dư trước ngày nhận lương kèm hành động đề xuất.
+   * `public.ai_consultations`, `public.ai_chat_sessions`, `public.ai_chat_messages`: Hệ thống lưu trữ phiên tư vấn tài chính thông minh của Google Gemini AI kèm snapshot tài chính.
+   * `public.notes`: Bảng kiểm tra kết nối nhanh giữa Flutter và PostgreSQL.
+
+### Tối ưu hóa hiệu năng & Tự động hóa (Automation & Performance):
+* **Tối ưu RLS Policies:** Sử dụng biểu thức `(SELECT auth.uid())` giúp Postgres cache kết quả phiên đăng nhập, tăng tốc độ truy vấn từ 10x đến 100x.
+* **Tự động hóa Trigger nghiệp vụ:**
+  * `trg_sync_transaction_balance`: Tự động cộng/trừ số dư ví (`accounts.balance`) và đồng bộ về tổng tài sản (`profiles.current_balance`) mỗi khi thêm/sửa/xóa giao dịch hoặc chuyển ví.
+  * `on_auth_user_created`: Tự động tạo hồ sơ profile và ví mặc định "Ví Tiền Mặt" ngay khi người dùng đăng ký tài khoản.
+  * `handle_updated_at`: Tự động cập nhật mốc thời gian sửa đổi cho tất cả các bảng.
+* **Đánh chỉ mục (Indexing):** Toàn bộ khóa ngoại và các trường thời gian / trạng thái thường xuyên lọc (`user_id`, `transaction_date`, `pillar`, `status`) đều được lập B-Tree Indexes tối ưu.
+* **Analytics Views:** Cung cấp sẵn các view báo cáo: `v_current_month_spending_by_category`, `v_kakeibo_monthly_summary`, `v_monthly_budget_progress`.
+
+> [!TIP]
+> Toàn bộ script DDL, triggers, indexes và RLS policies đầy đủ được lưu trữ tại: [`supabase/schema.sql`](file:///d:/Project1/supabase/schema.sql). Bạn có thể sao chép và dán trực tiếp vào **SQL Editor** trên Supabase Dashboard để kích hoạt ngay.
 
 ---
 
-## 3. THIẾT KẾ CƠ SỞ DỮ LIỆU & KIẾN TRÚC DỮ LIỆU (DATA SCHEMA)
+## 4. CẤU TRÚC KHO CHỨA MÃ NGUỒN (REPOSITORY STRUCTURE)
 
-## 4. CẤU TRÚC KHO CHỨA MÃ NGUỒN TRÊN GITHUB (REPOSITORY STRUCTURE)
-
-Dự án được tổ chức theo mô hình **Monorepo** rõ ràng, tạo sự liên kết mạch lạc giữa nghiên cứu giữa kỳ và mã nguồn cuối kỳ:
+Dự án được cấu trúc theo mô hình **Feature-Driven Architecture** chuẩn mực cho ứng dụng Flutter và dịch vụ backend Supabase:
 
 ```text
-financial-cashflow-ai-system/
-├── .github/
-│   └── workflows/
-│       └── ci-cd.yml                # Pipeline kiểm tra lint, test tự động
-├── docs/                            # Tài liệu phân tích, kiến trúc, báo cáo
-│   ├── architectures/               # Sơ đồ C4, sequence diagram
-│   ├── reports/                     # File PDF báo cáo giữa kỳ & cuối kỳ
-│   └── api-spec.yaml                # OpenAPI / Swagger specs
-├── mid-term-ai/                     # [GIAI ĐOẠN GIỮA KỲ] Không gian nghiên cứu AI
-│   ├── data/
-│   │   ├── raw/                     # Dữ liệu gốc thu thập
-│   │   └── processed/               # Dữ liệu sau khi làm sạch & tokenize
-│   ├── notebooks/
-│   │   ├── 01_eda_and_cleaning.ipynb
-│   │   ├── 02_phobert_classification.ipynb
-│   │   └── 03_time_series_dlinear_lstm.ipynb
-│   ├── models/                      # Trọng số mô hình đã huấn luyện (.pt, LoRA weights)
-│   └── requirements-ai.txt          # PyTorch, Transformers, PEFT, Scikit-learn
-├── backend/                         # [GIAI ĐOẠN CUỐI KỲ] FastAPI Application
-│   ├── app/
-│   │   ├── api/v1/                  # Router endpoints (auth, transactions, forecast)
-│   │   ├── core/                    # Config, database connection, security
-│   │   ├── models/                  # SQLAlchemy ORM models
-│   │   ├── schemas/                 # Pydantic validation schemas
-│   │   ├── services/                # Business logic
-│   │   └── workers/                 # Celery task definitions, Gemini rate-limiter
-│   ├── Dockerfile
-│   └── requirements.txt
-├── frontend/                        # [GIAI ĐOẠN CUỐI KỲ] Next.js Client App
-│   ├── src/
-│   │   ├── app/                     # Next.js App Router (pages & layouts)
-│   │   ├── components/              # UI components (charts, forms, tables)
-│   │   ├── hooks/                   # Custom hooks
-│   │   └── lib/                     # API client, utility functions
-│   ├── Dockerfile
-│   └── package.json
-├── k8s/                             # Manifests triển khai Kubernetes
-│   ├── backend-deployment.yaml
-│   ├── frontend-deployment.yaml
-│   ├── celery-worker-deployment.yaml
-│   ├── redis-deployment.yaml
-│   ├── hpa.yaml                     # Cấu hình Horizontal Pod Autoscaler
-│   └── ingress.yaml
-├── load-test/                       # Kịch bản stress test hệ thống
-│   ├── locustfile.py
-│   └── run_test.sh
-├── docker-compose.yml               # Môi trường chạy full-stack cục bộ
-├── README.md                        # Giới thiệu tổng quan dự án trên GitHub
-└── LICENSE
+Project1/
+├── .agents/                          # Agent skills & workflows
+├── android/                          # Cấu hình Native Android
+├── ios/                              # Cấu hình Native iOS
+├── web/                              # Cấu hình Web App
+├── supabase/                         # Database Migration & Schema
+│   └── schema.sql                    # Script DDL PostgreSQL & RLS Policies
+├── lib/
+│   ├── core/
+│   │   ├── constants/
+│   │   │   └── supabase_config.dart  # URL, API Keys & Supabase Client
+│   │   ├── theme/
+│   │   │   └── app_theme.dart        # Bảng màu tài chính & Typography (Material 3)
+│   │   └── utils/
+│   ├── models/
+│   │   ├── category_model.dart       # Data model danh mục thu/chi
+│   │   └── transaction_model.dart    # Data model giao dịch tài chính
+│   ├── services/
+│   │   └── supabase_service.dart     # Service đóng gói các câu lệnh truy vấn PostgreSQL
+│   ├── features/
+│   │   ├── dashboard/                # Màn hình tổng quan số dư, biểu đồ và kiểm tra kết nối
+│   │   │   └── dashboard_screen.dart
+│   │   ├── transactions/             # Quản lý nhập liệu, danh sách thu/chi
+│   │   └── forecast/                 # Trực quan hóa dự báo dòng tiền
+│   ├── supabase_config.dart          # Export tương thích cấu hình
+│   └── main.dart                     # Điểm khởi chạy ứng dụng (Entry point)
+├── test/
+│   └── widget_test.dart              # Kiểm thử Widget tự động
+├── pubspec.yaml                      # Khai báo thư viện (supabase_flutter, etc.)
+└── README.md                         # Báo cáo đề tài & hướng dẫn dự án
 ```
 
 ---
 
-## 5. BẢNG PHÂN BỔ NHIỆM VỤ THỰC HIỆN TRONG NHÓM
+## 5. HƯỚNG DẪN CÀI ĐẶT & CHẠY ỨNG DỤNG (GETTING STARTED)
 
-Dự án phân chia công việc cho các thành viên đảm bảo tiến độ song song cả hai giai đoạn
+### 5.1. Yêu cầu môi trường
+* **Flutter SDK:** $\ge 3.24.0$ (Đã kiểm tra trên Flutter 3.41.x & Dart 3.11.x)
+* **Tài khoản Supabase:** Miễn phí tại [supabase.com](https://supabase.com)
 
-## 6. KẾ HOẠCH BÀN GIAO & TIÊU CHÍ NGHIỆM THU (ACCEPTANCE CRITERIA)
+### 5.2. Các bước thiết lập
 
-### 6.1. Nghiệm thu Giữa kỳ
-* **Mô hình NLP:** PhoBERT đạt F1-Score $\ge 88\%$ trên tập kiểm thử nội dung tiếng Việt. Độ trễ suy luận tầng cục bộ $< 50	ext{ms}$. Cơ chế Fallback sang Gemini kích hoạt chuẩn xác khi độ tin cậy thấp.
-* **Mô hình Time-Series:** Mô hình học sâu (LSTM/DLinear) chứng minh được sai số MAPE thấp hơn rõ rệt so với Baseline ARIMA trên chuỗi dự báo 7 – 30 ngày.
-* **Báo cáo:** Bản thuyết minh đầy đủ bảng so sánh định lượng, biểu đồ mất mát và mã nguồn Jupyter Notebook chạy tái lập kết quả 100%.
+#### 1. Khởi tạo Database trên Supabase
+1. Vào [Supabase Dashboard](https://supabase.com/dashboard) -> Tạo project mới.
+2. Vào mục **SQL Editor**, dán toàn bộ nội dung từ file [`supabase/schema.sql`](file:///d:/Project1/supabase/schema.sql) và nhấn **Run** để khởi tạo cấu trúc bảng và RLS.
 
-### 6.2. Nghiệm thu Cuối kỳ
-* **Chức năng:** Người dùng tạo tài khoản, nhập giao dịch được tự động phân loại, xem báo cáo trực quan và biểu đồ dự báo số dư tương lai.
-* **Độ bền hệ thống:** Khi gửi đồng loạt 100 requests yêu cầu phân tích LLM, hệ thống không bị lỗi 429 hoặc Crash nhờ hàng đợi Celery + Redis.
-* **Khả năng co giãn (Scalability):** Dưới tải giả lập của Locust gấp 10 lần lưu lượng thông thường, Kubernetes tự động mở rộng số Pod (HPA) thành công, tỉ lệ phản hồi lỗi $< 1\%$.
+#### 2. Cấu hình Khóa API
+Mở file [`lib/core/constants/supabase_config.dart`](file:///d:/Project1/lib/core/constants/supabase_config.dart) và đảm bảo các thông số chính xác:
+```dart
+class SupabaseConfig {
+  static const String supabaseUrl = 'https://syjigvtyxfkmmqipxufm.supabase.co';
+  static const String supabaseAnonKey = 'sb_publishable_gexOlWlrEdiPuyda9jixOA_cujZIIOX';
+  ...
+}
+```
+
+#### 3. Chạy ứng dụng
+Cài đặt thư viện và khởi chạy trên Chrome hoặc Thiết bị mô phỏng:
+```bash
+# Tải các dependencies
+flutter pub get
+
+# Chạy ứng dụng (trên Chrome Web hoặc Device)
+flutter run -d chrome
+```
+
+---
+
+## 6. BẢNG PHÂN BỔ NHIỆM VỤ THỰC HIỆN TRONG NHÓM
+
+| Thành viên | Trách nhiệm chính | Giai đoạn 1 (Giữa kỳ) | Giai đoạn 2 (Cuối kỳ) |
+| :--- | :--- | :--- | :--- |
+| **Thành viên 1** | Team Lead & AI Engineer | Xây dựng dataset, huấn luyện PhoBERT + LoRA phân loại giao dịch | Tích hợp Gemini Fallback & API Endpoint AI |
+| **Thành viên 2** | Time-Series & Data Pipeline | Tiền xử lý chuỗi thời gian, huấn luyện ARIMA, LSTM & DLinear | Đóng gói pipeline dự báo dòng tiền 7-30 ngày |
+| **Thành viên 3** | Backend & Database (Supabase) | Thiết kế Data Schema, đặc tả quan hệ thực thể | Triển khai PostgreSQL trên Supabase, viết RLS, Indexes |
+| **Thành viên 4** | Mobile/Web Frontend (Flutter) | Thiết kế Wireframe giao diện, luồng người dùng | Xây dựng Flutter UI/UX, tích hợp Supabase SDK & Charts |
+
+---
+
+## 7. TIÊU CHÍ NGHIỆM THU (ACCEPTANCE CRITERIA)
+
+* **NLP Model:** PhoBERT đạt F1-Score $\ge 88\%$ trên tập dữ liệu tiếng Việt; độ trễ suy luận $< 50\text{ms}$.
+* **Time-Series:** Mô hình DLinear / LSTM đạt chỉ số MAPE tối ưu hơn mô hình truyền thống ARIMA.
+* **Hệ thống Frontend & Backend:** Ứng dụng Flutter tương tác mượt mà với cơ sở dữ liệu Supabase PostgreSQL, bảo mật phân quyền theo từng User ID, phản hồi thời gian thực và đồng bộ dữ liệu đa nền tảng.

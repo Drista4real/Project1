@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: kakeibo-api
+    runtime: docker
+    plan: free
+    region: singapore
+    branch: app_CRUD
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    buildFilter:
+      paths:
+        - backend/**
+        - render.yaml
+    healthCheckPath: /health
+    autoDeployTrigger: off
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        value: '[]'
