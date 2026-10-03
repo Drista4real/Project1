@@ -5,15 +5,17 @@ import '../widgets/kakeibo_ui.dart';
 
 class SpendingDonutChartCard extends StatelessWidget {
   final List<String> names;
-  final List<int> shares;
+  final List<num> shares;
   final List<Color> colors;
   final double totalExpense;
+  final String totalLabel;
 
   const SpendingDonutChartCard({
     required this.names,
     required this.shares,
     required this.colors,
     required this.totalExpense,
+    this.totalLabel = 'Tổng chi trong kỳ',
     super.key,
   });
 
@@ -33,14 +35,25 @@ class SpendingDonutChartCard extends StatelessWidget {
               const Expanded(
                 child: Text(
                   'Phân bổ chi tiêu',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
                 ),
               ),
               IconButton(
-                onPressed: () {},
+                onPressed: () => showDialog<void>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Phân bổ chi tiêu'),
+                    content: const Text(
+                      'Tỷ lệ được tính từ các giao dịch chi tiêu trong kỳ đã chọn. Chuyển tiền giữa các ví không được tính vào chi tiêu.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Đóng'),
+                      ),
+                    ],
+                  ),
+                ),
                 icon: const Icon(
                   Icons.info_outline,
                   size: 18,
@@ -64,12 +77,9 @@ class SpendingDonutChartCard extends StatelessWidget {
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      'Tổng chi tháng 10',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppTheme.textMuted,
-                      ),
+                    Text(
+                      totalLabel,
+                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -81,25 +91,14 @@ class SpendingDonutChartCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 3),
-                    const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.eco_outlined,
-                          size: 13,
-                          color: AppTheme.incomeEmerald,
+                    if (totalExpense == 0)
+                      const Text(
+                        'Chưa có chi tiêu',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: AppTheme.textMuted,
                         ),
-                        SizedBox(width: 4),
-                        Text(
-                          '92% định mức',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: AppTheme.textMuted,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
                   ],
                 ),
               ],
@@ -136,7 +135,7 @@ class SpendingDonutChartCard extends StatelessWidget {
 }
 
 class _DonutPainter extends CustomPainter {
-  final List<int> shares;
+  final List<num> shares;
   final List<Color> colors;
   _DonutPainter({required this.shares, required this.colors});
 
@@ -144,6 +143,19 @@ class _DonutPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
     var start = -1.5708;
+    if (shares.isEmpty) {
+      canvas.drawArc(
+        rect.deflate(10),
+        start,
+        6.28318,
+        false,
+        Paint()
+          ..color = AppTheme.borderLight
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 17,
+      );
+      return;
+    }
     for (var i = 0; i < shares.length; i++) {
       final sweep = 6.28318 * shares[i] / 100;
       final paint = Paint()
@@ -151,7 +163,13 @@ class _DonutPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 17
         ..strokeCap = StrokeCap.round;
-      canvas.drawArc(rect.deflate(10), start, sweep - .035, false, paint);
+      canvas.drawArc(
+        rect.deflate(10),
+        start,
+        (sweep - .035).clamp(0, 6.28318),
+        false,
+        paint,
+      );
       start += sweep;
     }
   }

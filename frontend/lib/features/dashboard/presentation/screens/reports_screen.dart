@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../finance/domain/entities/financial_overview.dart';
+import '../../../finance/domain/usecases/finance_insights.dart';
 import '../widgets/category_spending_report_card.dart';
+import '../widgets/finance_data_view.dart';
 import '../widgets/kakeibo_ui.dart';
 import '../widgets/report_mode_bottom_toggle.dart';
 import '../widgets/spending_donut_chart_card.dart';
@@ -11,108 +12,174 @@ import '../widgets/weekly_spending_trend_card.dart';
 import 'cashflow_forecast_screen.dart';
 
 class ReportsScreen extends StatefulWidget {
-  const ReportsScreen({super.key});
-
+  const ReportsScreen({super.key, this.insights});
+  final FinanceInsights? insights;
   @override
   State<ReportsScreen> createState() => _ReportsScreenState();
 }
 
 class _ReportsScreenState extends State<ReportsScreen> {
-  final _getOverview = AppDependencies.getOverview;
-  FinancialOverview _overview = FinancialOverview(
-    currentBalance: 18450000,
-    monthlyIncome: 24500000,
-    monthlyExpense: 13550000,
-  );
+  final _dataController = FinanceDataController();
   String _period = 'Tháng';
-  // Mode: 'history' (Thống kê quá khứ) or 'forecast' (Dự báo AI)
   String _activeTab = 'history';
+  DateTime _anchor = DateTime.now();
+
+  (DateTime, DateTime) get _range => switch (_period) {
+    'Tuần' => (
+      DateTime(_anchor.year, _anchor.month, _anchor.day - _anchor.weekday + 1),
+      DateTime(_anchor.year, _anchor.month, _anchor.day - _anchor.weekday + 8),
+    ),
+    'Năm' => (DateTime(_anchor.year), DateTime(_anchor.year + 1)),
+    _ => (
+      DateTime(_anchor.year, _anchor.month),
+      DateTime(_anchor.year, _anchor.month + 1),
+    ),
+  };
+
+  void _move(int step) => setState(
+    () => _anchor = switch (_period) {
+      'Tuần' => DateTime(_anchor.year, _anchor.month, _anchor.day + step * 7),
+      'Năm' => DateTime(_anchor.year + step, _anchor.month),
+      _ => DateTime(_anchor.year, _anchor.month + step),
+    },
+  );
 
   @override
-  void initState() {
-    super.initState();
-    _getOverview()
-        .then((value) {
-          if (mounted) setState(() => _overview = value);
-        })
-        .catchError((_) {});
-  }
+  Widget build(BuildContext context) => Scaffold(
+    appBar: const AppScreenHeader(subtitle: 'Báo Cáo'),
+    body: _activeTab == 'forecast'
+        ? CashflowForecastScreen(
+            insights: widget.insights,
+            controller: _dataController,
+            onSwitchToHistory: () => setState(() => _activeTab = 'history'),
+          )
+        : FinanceDataView<SpendingData>(
+            controller: _dataController,
+            load: (widget.insights ?? AppDependencies.financeInsights).spending,
+            builder: (context, data, refresh) => _history(data),
+          ),
+    bottomNavigationBar: AppScreenNavigation(
+      selectedIndex: 1,
+      onTransactionAdded: _dataController.refresh,
+    ),
+  );
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: const AppScreenHeader(subtitle: 'Báo Cáo'),
-      body: _activeTab == 'forecast'
-          ? CashflowForecastScreen(
-              onSwitchToHistory: () => setState(() => _activeTab = 'history'),
-            )
-          : _buildHistoryReportBody(),
-      bottomNavigationBar: const AppScreenNavigation(selectedIndex: 1),
-    );
-  }
-
-  Widget _buildHistoryReportBody() {
-    const colors = [
-      Color(0xFFA64220),
-      Color(0xFF285B45),
-      Color(0xFFF17A59),
-      Color(0xFF76CBB2),
-      Color(0xFFC4CDC7),
-    ];
-    const names = [
-      'Ăn uống (42%)',
-      'Nhà ở (28%)',
-      'Mua sắm (15%)',
-      'Di chuyển (10%)',
-      'Khác (5%)',
-    ];
-    const shares = [42, 28, 15, 10, 5];
-    const amounts = [5690000, 3790000, 2030000, 1355000, 685000];
-
+  Widget _history(SpendingData data) {
+    final (start, end) = _range;
+    final items = data.between(start, end);
+    final spent = data.total(items, 'expense');
+    final income = data.total(items, 'income');
+    final groups = data.distribution(items);
+    final shares = groups
+        .map((item) => spent == 0 ? 0.0 : item.amount / spent * 100)
+        .toList();
+    final colors = groups
+        .map(
+          (item) => Color(
+            int.tryParse(item.color.replaceFirst('#', 'FF'), radix: 16) ??
+                0xFF7B8782,
+          ),
+        )
+        .toList();
+    final names = groups.map((item) => item.name).toList();
+    final lastDay = end.subtract(const Duration(days: 1));
+    final title = _period == 'Tháng'
+        ? 'Tháng ${_anchor.month}, ${_anchor.year}'
+        : _period == 'Năm'
+        ? 'Năm ${_anchor.year}'
+        : '${start.day}/${start.month} – ${lastDay.day}/${lastDay.month}/${lastDay.year}';
     return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        // Tab Tuần / Tháng / Năm
-        _buildPeriodToggle(),
-
-        const SizedBox(height: 18),
-
-        // Subtitle & An yên badge
-        _buildReportTitleHeader(),
-
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: const Color(0xFFE8EDE8),
+            borderRadius: BorderRadius.circular(24),
+          ),
+          child: Row(
+            children: [
+              for (final period in ['Tuần', 'Tháng', 'Năm'])
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => setState(() => _period = period),
+                    style: TextButton.styleFrom(
+                      backgroundColor: _period == period
+                          ? Colors.white
+                          : Colors.transparent,
+                    ),
+                    child: Text(period),
+                  ),
+                ),
+            ],
+          ),
+        ),
         const SizedBox(height: 16),
-
-        // Phân bổ chi tiêu Donut Chart Card (Widget riêng)
+        Row(
+          children: [
+            IconButton(
+              tooltip: 'Kỳ trước',
+              onPressed: () => _move(-1),
+              icon: const Icon(Icons.chevron_left),
+            ),
+            Expanded(
+              child: Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: AppTheme.primaryForestGreen,
+                ),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Kỳ sau',
+              onPressed: () => _move(1),
+              icon: const Icon(Icons.chevron_right),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        KakeiboCard(
+          child: Wrap(
+            spacing: 20,
+            runSpacing: 12,
+            children: [
+              _metric('Thu nhập', income, AppTheme.incomeEmerald),
+              _metric('Chi tiêu', spent, AppTheme.expenseCoral),
+              _metric('Thu − chi', income - spent, AppTheme.primaryForestGreen),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
         SpendingDonutChartCard(
-          names: names,
+          names: [
+            for (var index = 0; index < names.length; index++)
+              '${names[index]} (${shares[index].toStringAsFixed(1)}%)',
+          ],
           shares: shares,
           colors: colors,
-          totalExpense: _overview.monthlyExpense,
+          totalExpense: spent,
+          totalLabel: 'Tổng chi trong kỳ',
         ),
-
         const SizedBox(height: 16),
-
-        // Xu hướng trong tuần Card (Widget riêng)
-        const WeeklySpendingTrendCard(),
-
+        WeeklySpendingTrendCard(amounts: data.week(_anchor)),
         const SizedBox(height: 16),
-
-        // Hạng mục chi nhiều nhất Card (Widget riêng)
-        const CategorySpendingReportCard(
+        CategorySpendingReportCard(
           names: names,
           shares: shares,
-          amounts: amounts,
+          amounts: groups.map((item) => item.amount).toList(),
           colors: colors,
         ),
-
-        const SizedBox(height: 14),
-
-        // Tâm niệm Kakeibo Banner
-        _buildMindfulnessBanner(),
-
+        const SizedBox(height: 16),
+        const KakeiboCard(
+          child: Text(
+            'Biết rõ dòng tiền là bước đầu tiên để làm chủ chi tiêu.',
+          ),
+        ),
         const SizedBox(height: 18),
-
-        // Pill Switcher ở cuối: [Thống kê quá khứ] | [Dự báo AI Mới] (Widget riêng)
         ReportModeBottomToggle(
           activeTab: _activeTab,
           onTabChanged: (tab) => setState(() => _activeTab = tab),
@@ -121,172 +188,17 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
-  Widget _buildPeriodToggle() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE8EDE8),
-        borderRadius: BorderRadius.circular(24),
+  Widget _metric(String title, double amount, Color color) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        title,
+        style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
       ),
-      child: Row(
-        children: [
-          for (final label in ['Tuần', 'Tháng', 'Năm'])
-            Expanded(
-              child: GestureDetector(
-                onTap: () => setState(() => _period = label),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 160),
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  decoration: BoxDecoration(
-                    color: _period == label ? Colors.white : Colors.transparent,
-                    borderRadius: BorderRadius.circular(22),
-                  ),
-                  child: Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: _period == label
-                          ? AppTheme.primaryForestGreen
-                          : AppTheme.textMuted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
+      Text(
+        formatVnd(amount),
+        style: TextStyle(fontWeight: FontWeight.w700, color: color),
       ),
-    );
-  }
-
-  Widget _buildReportTitleHeader() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'BÁO CÁO TÀI CHÍNH',
-              style: TextStyle(
-                fontSize: 10,
-                color: AppTheme.textMuted,
-                letterSpacing: .6,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Row(
-              children: [
-                Text(
-                  _period == 'Tháng' ? 'Tháng 10, 2024' : '$_period 2024',
-                  style: const TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w800,
-                    color: AppTheme.primaryForestGreen,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(
-                  Icons.keyboard_arrow_down,
-                  size: 20,
-                  color: AppTheme.primaryForestGreen,
-                ),
-              ],
-            ),
-          ],
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 7,
-          ),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEAF1EB),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: const Row(
-            children: [
-              Icon(
-                Icons.spa_outlined,
-                size: 14,
-                color: AppTheme.primaryForestGreen,
-              ),
-              SizedBox(width: 5),
-              Text(
-                'An yên',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.primaryForestGreen,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMindfulnessBanner() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEAF1EB),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: const Row(
-        children: [
-          _MindfulnessIconTile(),
-          SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Tâm niệm Kakeibo',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textCharcoal,
-                  ),
-                ),
-                SizedBox(height: 2),
-                Text(
-                  'Biết rõ dòng tiền là bước đầu tiên để tâm trí luôn an định giữa nhịp sống bận rộn.',
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    color: AppTheme.textMuted,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MindfulnessIconTile extends StatelessWidget {
-  const _MindfulnessIconTile();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 44,
-      height: 44,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: const Icon(
-        Icons.menu_book,
-        color: AppTheme.primaryForestGreen,
-        size: 22,
-      ),
-    );
-  }
+    ],
+  );
 }

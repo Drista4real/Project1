@@ -1,217 +1,204 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../finance/domain/usecases/finance_insights.dart';
 import '../widgets/cashflow_deficit_warning_card.dart';
 import '../widgets/cashflow_forecast_chart_card.dart';
+import '../widgets/finance_data_view.dart';
 import '../widgets/gemini_advice_card.dart';
+import '../widgets/kakeibo_ui.dart';
 import '../widgets/report_mode_bottom_toggle.dart';
+import 'management_screen.dart';
 
 class CashflowForecastScreen extends StatefulWidget {
+  const CashflowForecastScreen({
+    super.key,
+    this.onSwitchToHistory,
+    this.insights,
+    this.controller,
+  });
   final VoidCallback? onSwitchToHistory;
-
-  const CashflowForecastScreen({this.onSwitchToHistory, super.key});
-
+  final FinanceInsights? insights;
+  final FinanceDataController? controller;
   @override
   State<CashflowForecastScreen> createState() => _CashflowForecastScreenState();
 }
 
+class ForecastPage extends StatefulWidget {
+  const ForecastPage({super.key});
+  @override
+  State<ForecastPage> createState() => _ForecastPageState();
+}
+
+class _ForecastPageState extends State<ForecastPage> {
+  final _controller = FinanceDataController();
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: const AppScreenHeader(subtitle: 'Dự Báo'),
+    body: CashflowForecastScreen(controller: _controller),
+    bottomNavigationBar: AppScreenNavigation(
+      selectedIndex: 1,
+      onTransactionAdded: _controller.refresh,
+    ),
+  );
+}
+
 class _CashflowForecastScreenState extends State<CashflowForecastScreen> {
   int _selectedDays = 14;
+  final _saving = <int>{};
+  FinanceInsights get _insights =>
+      widget.insights ?? AppDependencies.financeInsights;
+
+  Future<void> _updateAlert(
+    FinanceRecord alert,
+    String field,
+    Future<void> Function() refresh,
+  ) async {
+    final id = alert['id'] as int;
+    if (_saving.contains(id)) return;
+    setState(() => _saving.add(id));
+    try {
+      await _insights.repository.save('cashflow_alerts', {
+        field: true,
+      }, key: '$id');
+      if (mounted) await refresh();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+      }
+    } finally {
+      if (mounted) setState(() => _saving.remove(id));
+    }
+  }
+
+  Future<void> _manage(String resource, Future<void> Function() refresh) async {
+    await openFinanceModule(
+      context,
+      resource,
+      repository: _insights.repository,
+    );
+    if (mounted) await refresh();
+  }
 
   @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      children: [
-        // Title & Accuracy Badge
-        _buildForecastHeader(),
-
-        const SizedBox(height: 14),
-
-        // Period filter (7 ngày, 14 ngày, 30 ngày)
-        _buildDaysFilter(),
-
-        const SizedBox(height: 16),
-
-        // CẢNH BÁO THÂM HỤT DÒNG TIỀN Card (Widget riêng)
-        const CashflowDeficitWarningCard(),
-
-        const SizedBox(height: 16),
-
-        // Biến động số dư khả dụng (Interactive chart card - Widget riêng)
-        const CashflowForecastChartCard(),
-
-        const SizedBox(height: 16),
-
-        // Lời khuyên Kakeibo từ Gemini (Zen AI Card - Widget riêng)
-        const GeminiAdviceCard(),
-
-        const SizedBox(height: 14),
-
-        // Quote chánh niệm
-        _buildMindfulnessQuote(),
-
-        const SizedBox(height: 18),
-
-        // Pill Switcher ở cuối: [Thống kê quá khứ] | [Dự báo AI Mới] (Widget riêng)
-        ReportModeBottomToggle(
-          activeTab: 'forecast',
-          onTabChanged: (tab) {
-            if (tab == 'history') {
-              widget.onSwitchToHistory?.call();
-            }
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildForecastHeader() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Dự báo dòng tiền AI',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
-                  color: AppTheme.primaryForestGreen,
-                  letterSpacing: -0.3,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                'Mô hình Darts / LightGBM • Gemini Pro',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: AppTheme.textMuted.withAlpha(220),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE5EDE7),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 7,
-                height: 7,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF5E8B75),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 5),
-              const Text(
-                'Độ chính xác 94.8%',
-                style: TextStyle(
-                  fontSize: 10.5,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF385746),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDaysFilter() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: const Color(0xFFE6EDE7),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Row(
-        children: [7, 14, 30].map((days) {
-          final isSelected = _selectedDays == days;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _selectedDays = days),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(vertical: 9),
-                decoration: BoxDecoration(
-                  color: isSelected ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: isSelected
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(15),
-                            blurRadius: 4,
-                            offset: const Offset(0, 1),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Text(
-                  '$days ngày',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                    color: isSelected
-                        ? AppTheme.primaryForestGreen
-                        : AppTheme.textMuted,
-                  ),
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildMindfulnessQuote() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEAF1EB),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) => FinanceDataView<ForecastData>(
+    controller: widget.controller,
+    load: _insights.forecasts,
+    builder: (context, data, refresh) {
+      final records = data.upcoming(DateTime.now(), _selectedDays);
+      final alerts = data.alerts
+          .where((item) => item['is_resolved'] != true)
+          .toList();
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(
-              Icons.spa_outlined,
-              size: 18,
+          const Text(
+            'Dự báo dòng tiền',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
               color: AppTheme.primaryForestGreen,
             ),
           ),
-          const SizedBox(width: 10),
-          const Expanded(
-            child: Text(
-              '“Tiền bạc là tấm gương phản chiếu tâm trí. Biết dừng lại trước một ham muốn nhỏ hôm nay là tự do tài chính cho ngày mai.”',
-              style: TextStyle(
-                fontSize: 11,
-                color: AppTheme.textMuted,
-                height: 1.45,
-                fontStyle: FontStyle.italic,
+          const Text(
+            'Dự báo và tư vấn đã lưu của bạn',
+            style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              for (final days in [7, 14, 30])
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: ChoiceChip(
+                      label: Text('$days ngày'),
+                      selected: _selectedDays == days,
+                      onSelected: (_) => setState(() => _selectedDays = days),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (alerts.isEmpty)
+            const KakeiboCard(child: Text('Không có cảnh báo chưa xử lý.')),
+          for (final alert in alerts)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: CashflowDeficitWarningCard(
+                alert: alert,
+                busy: _saving.contains(alert['id']),
+                onRead: () => _updateAlert(alert, 'is_read', refresh),
+                onResolve: () => _updateAlert(alert, 'is_resolved', refresh),
               ),
             ),
+          const SizedBox(height: 16),
+          CashflowForecastChartCard(
+            records: records,
+            currentBalance: financeAmount(data.profile['current_balance']),
+            days: _selectedDays,
           ),
+          const SizedBox(height: 12),
+          if (records.isNotEmpty)
+            KakeiboCard(
+              child: Column(
+                children: [
+                  for (final record in records)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('${record['forecast_date']}'),
+                      subtitle: Text(
+                        'Thu ${formatVnd(financeAmount(record['predicted_income']))} · Chi ${formatVnd(financeAmount(record['predicted_expense']))}',
+                      ),
+                      trailing: Text(
+                        formatVnd(financeAmount(record['predicted_balance'])),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          const SizedBox(height: 16),
+          GeminiAdviceCard(
+            consultation: data.consultations.isEmpty
+                ? null
+                : data.consultations.first,
+            onOpen: () => _manage('ai_consultations', refresh),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton(
+                onPressed: () => _manage('cashflow_forecasts', refresh),
+                child: const Text('Quản lý dự báo'),
+              ),
+              OutlinedButton(
+                onPressed: () => _manage('cashflow_alerts', refresh),
+                child: const Text('Quản lý cảnh báo'),
+              ),
+              OutlinedButton(
+                onPressed: () => _manage('ai_chat_sessions', refresh),
+                child: const Text('Cuộc trò chuyện'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          if (widget.onSwitchToHistory != null)
+            ReportModeBottomToggle(
+              activeTab: 'forecast',
+              onTabChanged: (tab) {
+                if (tab == 'history') widget.onSwitchToHistory!();
+              },
+            ),
         ],
-      ),
-    );
-  }
+      );
+    },
+  );
 }

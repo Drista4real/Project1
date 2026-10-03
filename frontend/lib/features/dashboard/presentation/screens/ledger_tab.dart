@@ -14,7 +14,7 @@ extension Ledgertab on _DashboardScreenState {
     final todayExpense = _transactions
         .where(
           (tx) =>
-              !tx.isIncome &&
+              tx.transactionType == 'expense' &&
               tx.transactionDate.year == today.year &&
               tx.transactionDate.month == today.month &&
               tx.transactionDate.day == today.day,
@@ -42,6 +42,30 @@ extension Ledgertab on _DashboardScreenState {
             ],
           ),
           const SizedBox(height: 16),
+          if (_loadError != null)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_loadError!),
+                    Row(
+                      children: [
+                        TextButton(
+                          onPressed: _signIn,
+                          child: const Text('Đăng nhập'),
+                        ),
+                        TextButton(
+                          onPressed: _loadAllData,
+                          child: const Text('Thử lại'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
           _buildHeroBalanceCard(),
           const SizedBox(height: 16),
           if (_showCalendar) _buildMonthCalendarCard(),
@@ -61,7 +85,7 @@ extension Ledgertab on _DashboardScreenState {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    'Hôm nay, ${DateTime.now().day} Tháng ${DateTime.now().month}',
+                    'Giao dịch Tháng ${_displayedMonth.month}',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -156,12 +180,16 @@ extension Ledgertab on _DashboardScreenState {
               color: selected ? Colors.white : AppTheme.textMuted,
             ),
             const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: selected ? Colors.white : AppTheme.textMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected ? Colors.white : AppTheme.textMuted,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ],
@@ -172,6 +200,17 @@ extension Ledgertab on _DashboardScreenState {
 
   Widget _buildHeroBalanceCard() {
     final now = _displayedMonth;
+    final monthly = _transactions.where(
+      (tx) =>
+          tx.transactionDate.year == now.year &&
+          tx.transactionDate.month == now.month,
+    );
+    final income = monthly
+        .where((tx) => tx.isIncome)
+        .fold<double>(0, (sum, tx) => sum + tx.amount);
+    final expense = monthly
+        .where((tx) => tx.transactionType == 'expense')
+        .fold<double>(0, (sum, tx) => sum + tx.amount);
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -198,7 +237,7 @@ extension Ledgertab on _DashboardScreenState {
               ),
               const SizedBox(width: 8),
               Text(
-                'Số dư Tháng ${now.month}, ${now.year}',
+                'Tổng quan Tháng ${now.month}, ${now.year}',
                 style: const TextStyle(fontSize: 13, color: AppTheme.textMuted),
               ),
             ],
@@ -217,7 +256,8 @@ extension Ledgertab on _DashboardScreenState {
           ),
           const SizedBox(height: 4),
           Text(
-            '+${_formatVND(_overview.currentBalance)}',
+            '${_overview.currentBalance < 0 ? '-' : '+'}${_formatVND(_overview.currentBalance)}',
+            key: const ValueKey('availableBalance'),
             style: const TextStyle(
               color: AppTheme.primaryForestGreen,
               fontSize: 29,
@@ -231,7 +271,7 @@ extension Ledgertab on _DashboardScreenState {
               Expanded(
                 child: _buildSummaryPill(
                   label: 'Tổng thu',
-                  amount: _overview.monthlyIncome,
+                  amount: income,
                   icon: Icons.arrow_downward,
                   income: true,
                 ),
@@ -240,7 +280,7 @@ extension Ledgertab on _DashboardScreenState {
               Expanded(
                 child: _buildSummaryPill(
                   label: 'Tổng chi',
-                  amount: _overview.monthlyExpense,
+                  amount: expense,
                   icon: Icons.arrow_upward,
                   income: false,
                 ),
@@ -431,7 +471,13 @@ extension Ledgertab on _DashboardScreenState {
         : const <Transaction>[];
     final dailyTotal = dayTransactions.fold<double>(
       0,
-      (sum, tx) => sum + (tx.isIncome ? tx.amount : -tx.amount),
+      (sum, tx) =>
+          sum +
+          (tx.transactionType == 'transfer'
+              ? 0
+              : tx.isIncome
+              ? tx.amount
+              : -tx.amount),
     );
     return Container(
       height: 40,
@@ -502,90 +548,102 @@ extension Ledgertab on _DashboardScreenState {
   }
 
   Widget _buildTransactionList() {
-    final today = DateTime.now();
+    final today = _displayedMonth;
     final todayTransactions = _transactions.where(
       (tx) =>
           tx.transactionDate.year == today.year &&
-          tx.transactionDate.month == today.month &&
-          tx.transactionDate.day == today.day,
+          tx.transactionDate.month == today.month,
     );
     if (todayTransactions.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(32),
         alignment: Alignment.center,
-        child: const Text('Hôm nay chưa có giao dịch nào.'),
+        child: const Text('Tháng này chưa có giao dịch nào.'),
       );
     }
 
     return Column(
       children: todayTransactions.map((tx) {
         final isIncome = tx.isIncome;
-        return Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.borderLight),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: isIncome
-                      ? AppTheme.lightMintBg
-                      : const Color(0xFFFEE2E2),
-                  borderRadius: BorderRadius.circular(12),
+        return GestureDetector(
+          onTap: () => _openTransaction(tx),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.borderLight),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: isIncome
+                        ? AppTheme.lightMintBg
+                        : const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    isIncome
+                        ? Icons.payments_outlined
+                        : Icons.restaurant_outlined,
+                    color: isIncome
+                        ? AppTheme.incomeEmerald
+                        : AppTheme.expenseCoral,
+                    size: 22,
+                  ),
                 ),
-                child: Icon(
-                  isIncome
-                      ? Icons.payments_outlined
-                      : Icons.restaurant_outlined,
-                  color: isIncome
-                      ? AppTheme.incomeEmerald
-                      : AppTheme.expenseCoral,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      tx.rawDescription ?? tx.cleanDescription ?? 'Giao dịch',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        color: AppTheme.textCharcoal,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tx.rawDescription ?? tx.cleanDescription ?? 'Giao dịch',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                          color: AppTheme.textCharcoal,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '${tx.categoryName ?? 'Chưa phân loại'} • ${tx.transactionDate.hour}:${tx.transactionDate.minute.toString().padLeft(2, '0')}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppTheme.textMuted,
+                      const SizedBox(height: 3),
+                      Text(
+                        '${tx.categoryName ?? 'Chưa phân loại'} • ${tx.transactionDate.hour}:${tx.transactionDate.minute.toString().padLeft(2, '0')}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textMuted,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              Text(
-                '${isIncome ? '+' : '-'}${_formatVND(tx.amount)}',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                  color: isIncome
-                      ? AppTheme.incomeEmerald
-                      : AppTheme.expenseCoral,
+                Text(
+                  '${tx.transactionType == 'transfer'
+                      ? '↔'
+                      : isIncome
+                      ? '+'
+                      : '-'}${_formatVND(tx.amount)}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                    color: isIncome
+                        ? AppTheme.incomeEmerald
+                        : AppTheme.expenseCoral,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.chevron_right,
+                  color: AppTheme.textMuted,
+                  size: 18,
+                ),
+              ],
+            ),
           ),
         );
       }).toList(),

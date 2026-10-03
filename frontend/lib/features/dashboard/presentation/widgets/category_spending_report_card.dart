@@ -1,99 +1,52 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_theme.dart';
-import '../widgets/kakeibo_ui.dart';
+import 'kakeibo_ui.dart';
 
 class CategorySpendingReportCard extends StatelessWidget {
-  final List<String> names;
-  final List<int> shares;
-  final List<int> amounts;
-  final List<Color> colors;
-
   const CategorySpendingReportCard({
+    super.key,
     required this.names,
     required this.shares,
     required this.amounts,
     required this.colors,
-    super.key,
   });
+  final List<String> names;
+  final List<num> shares;
+  final List<num> amounts;
+  final List<Color> colors;
 
   @override
-  Widget build(BuildContext context) {
-    return KakeiboCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                'Hạng mục chi nhiều nhất',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              Text(
-                '${names.length} mục lớn',
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: AppTheme.textMuted,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
+  Widget build(BuildContext context) => KakeiboCard(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Hạng mục chi nhiều nhất',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 14),
+        if (names.isEmpty)
+          const Text('Chưa có giao dịch chi tiêu trong kỳ này.'),
+        for (var index = 0; index < names.length; index++)
           _CategoryReportRow(
-            name: 'Ăn uống & Cà phê',
-            subtitle: 'Cần thiết & Gặp gỡ',
-            amount: amounts[0],
-            share: shares[0],
-            color: colors[0],
-            icon: Icons.restaurant,
+            name: names[index],
+            subtitle: 'Tỷ lệ trong tổng chi tiêu',
+            amount: amounts[index],
+            share: shares[index],
+            color: colors[index],
+            icon: Icons.category_outlined,
           ),
-          _CategoryReportRow(
-            name: 'Nhà ở & Hóa đơn',
-            subtitle: 'Cố định hàng tháng',
-            amount: amounts[1],
-            share: shares[1],
-            color: colors[1],
-            icon: Icons.home_outlined,
-          ),
-          _CategoryReportRow(
-            name: 'Mua sắm cá nhân',
-            subtitle: 'Ngẫu hứng & Sở thích',
-            amount: amounts[2],
-            share: shares[2],
-            color: colors[2],
-            icon: Icons.shopping_bag_outlined,
-          ),
-          _CategoryReportRow(
-            name: 'Di chuyển & Xăng xe',
-            subtitle: 'Đi lại công việc',
-            amount: amounts[3],
-            share: shares[3],
-            color: colors[3],
-            icon: Icons.local_gas_station_outlined,
-          ),
-          _CategoryReportRow(
-            name: 'Giải trí & Sở thích',
-            subtitle: 'Sách, phim & thư giãn',
-            amount: amounts[4],
-            share: shares[4],
-            color: colors[4],
-            icon: Icons.movie_outlined,
-          ),
-        ],
-      ),
-    );
-  }
+      ],
+    ),
+  );
 }
 
 class _CategoryReportRow extends StatelessWidget {
   final String name;
   final String subtitle;
   final num amount;
-  final int share;
+  final num share;
   final Color color;
   final IconData icon;
 
@@ -157,7 +110,7 @@ class _CategoryReportRow extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '$share%',
+                  '${share.toStringAsFixed(1)}%',
                   style: TextStyle(
                     fontSize: 9.5,
                     fontWeight: FontWeight.w700,
@@ -169,7 +122,7 @@ class _CategoryReportRow extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
-        KakeiboProgress(value: share / 50, color: color),
+        KakeiboProgress(value: share / 100, color: color),
       ],
     ),
   );

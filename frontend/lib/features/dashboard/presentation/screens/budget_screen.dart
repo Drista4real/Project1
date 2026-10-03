@@ -1,333 +1,253 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/di/injection.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../finance/domain/usecases/finance_insights.dart';
+import '../widgets/finance_data_view.dart';
 import '../widgets/kakeibo_ui.dart';
+import 'management_screen.dart';
 
 class BudgetScreen extends StatefulWidget {
-  const BudgetScreen({super.key});
+  const BudgetScreen({super.key, this.insights});
+  final FinanceInsights? insights;
   @override
   State<BudgetScreen> createState() => _BudgetScreenState();
 }
 
 class _BudgetScreenState extends State<BudgetScreen> {
-  DateTime _month = DateTime(2024, 10);
+  final _dataController = FinanceDataController();
+  DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+
+  Future<void> _manage(
+    Future<void> Function() refresh, {
+    FinanceRecord? record,
+    bool create = false,
+  }) async {
+    await openFinanceModule(
+      context,
+      'budgets',
+      record: record,
+      create: create,
+      defaults: {
+        'month_year':
+            '${_month.year.toString().padLeft(4, '0')}-${_month.month.toString().padLeft(2, '0')}-01',
+      },
+      repository: widget.insights?.repository,
+    );
+    if (mounted) await refresh();
+  }
+
   @override
-  Widget build(BuildContext context) {
-    const budget = 20000000.0;
-    const spent = 13550000.0;
-    const categories = [
-      (
-        'Thiết yếu (Needs)',
-        'Seikatsu',
-        'Ăn uống, Tiền nhà, Điện nước, Xe',
-        7200000.0,
-        10000000.0,
-        Color(0xFF285B45),
-        Icons.home_outlined,
-      ),
-      (
-        'Mong muốn (Wants)',
-        'Morau',
-        'Mua sắm, Cà phê, Tụ tập bạn bè',
-        3800000.0,
-        4000000.0,
-        Color(0xFFB64F2D),
-        Icons.local_cafe_outlined,
-      ),
-      (
-        'Văn hóa (Culture)',
-        'Kyoyo',
-        'Sách báo, Xem phim, Khóa học',
-        1250000.0,
-        3000000.0,
-        Color(0xFF15936D),
-        Icons.menu_book_outlined,
-      ),
-      (
-        'Dự phòng (Extra)',
-        'Yobi',
-        'Thuốc men, Hiếu hỷ, Sửa đồ gia dụng',
-        1300000.0,
-        3000000.0,
-        Color(0xFF717973),
-        Icons.medical_services_outlined,
-      ),
-    ];
-    final remaining = budget - spent;
-    return Scaffold(
-      appBar: const AppScreenHeader(subtitle: 'Ngân Sách'),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-        children: [
-          Row(
-            children: [
-              _roundButton(
-                Icons.chevron_left,
-                () => setState(
-                  () => _month = DateTime(_month.year, _month.month - 1),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 9),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8EDE8),
-                    borderRadius: BorderRadius.circular(22),
+  Widget build(BuildContext context) => Scaffold(
+    appBar: const AppScreenHeader(subtitle: 'Ngân Sách'),
+    body: FinanceDataView<BudgetData>(
+      controller: _dataController,
+      load: (widget.insights ?? AppDependencies.financeInsights).budgets,
+      builder: (context, data, refresh) {
+        final records = data.month(_month);
+        final budget = data.totalLimit(_month);
+        final spent = data.spending.total(
+          data.spending.month(_month),
+          'expense',
+        );
+        final remaining = budget == null ? null : budget - spent;
+        final progress = budget == null || budget <= 0 ? 0.0 : spent / budget;
+        final now = DateTime.now();
+        final currentMonth =
+            _month.year == now.year && _month.month == now.month;
+        final days =
+            DateTime(_month.year, _month.month + 1, 0).day -
+            (currentMonth ? now.day - 1 : 0);
+        final daily = currentMonth && remaining != null
+            ? (remaining / days).clamp(0, double.infinity)
+            : null;
+        return ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          children: [
+            Row(
+              children: [
+                IconButton(
+                  tooltip: 'Tháng trước',
+                  onPressed: () => setState(
+                    () => _month = DateTime(_month.year, _month.month - 1),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.calendar_month,
-                        size: 16,
-                        color: AppTheme.primaryForestGreen,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Tháng ${_month.month}, ${_month.year}',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.primaryForestGreen,
-                        ),
-                      ),
-                    ],
-                  ),
+                  icon: const Icon(Icons.chevron_left),
                 ),
-              ),
-              const SizedBox(width: 8),
-              _roundButton(
-                Icons.chevron_right,
-                () => setState(
-                  () => _month = DateTime(_month.year, _month.month + 1),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFC9EFD9),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.circle, size: 7, color: AppTheme.incomeEmerald),
-                    SizedBox(width: 4),
-                    Text(
-                      'Còn 7 ngày',
-                      style: TextStyle(
-                        fontSize: 10,
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      'Tháng ${_month.month}, ${_month.year}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
                         color: AppTheme.primaryForestGreen,
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          KakeiboCard(
-            padding: const EdgeInsets.fromLTRB(18, 24, 18, 18),
-            child: Column(
-              children: [
-                SizedBox(
-                  height: 230,
-                  width: 230,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      SizedBox(
-                        width: 208,
-                        height: 208,
-                        child: CircularProgressIndicator(
-                          value: spent / budget,
-                          strokeWidth: 14,
-                          strokeCap: StrokeCap.round,
-                          backgroundColor: const Color(0xFFE8EDE8),
-                          color: AppTheme.primaryForestGreen,
+                IconButton(
+                  tooltip: 'Tháng sau',
+                  onPressed: () => setState(
+                    () => _month = DateTime(_month.year, _month.month + 1),
+                  ),
+                  icon: const Icon(Icons.chevron_right),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            KakeiboCard(
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: 225,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        SizedBox(
+                          width: 205,
+                          height: 205,
+                          child: CircularProgressIndicator(
+                            value: progress.clamp(0, 1),
+                            strokeWidth: 14,
+                            strokeCap: StrokeCap.round,
+                            backgroundColor: const Color(0xFFE8EDE8),
+                            color: progress >= 1
+                                ? AppTheme.expenseCoral
+                                : AppTheme.primaryForestGreen,
+                          ),
                         ),
-                      ),
-                      Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Text(
-                            'KHẢ DỤNG CÒN LẠI',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppTheme.textMuted,
-                              letterSpacing: .5,
-                            ),
-                          ),
-                          Text(
-                            formatVnd(remaining),
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.primaryForestGreen,
-                            ),
-                          ),
-                          Container(
-                            margin: const EdgeInsets.only(top: 5),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFC9EFD9),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: const Text(
-                              'Đã dùng 67.8%',
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text(
+                              'KHẢ DỤNG CÒN LẠI',
                               style: TextStyle(
-                                fontSize: 10,
+                                fontSize: 11,
+                                color: AppTheme.textMuted,
+                              ),
+                            ),
+                            Text(
+                              remaining == null
+                                  ? 'Chưa đặt tổng'
+                                  : formatVnd(remaining),
+                              style: const TextStyle(
+                                fontSize: 23,
+                                fontWeight: FontWeight.w800,
                                 color: AppTheme.primaryForestGreen,
                               ),
                             ),
-                          ),
-                        ],
+                            if (budget != null)
+                              Text(
+                                'Đã dùng ${(progress * 100).toStringAsFixed(1)}%',
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _metric('Đã chi tiêu', formatVnd(spent)),
+                      _metric(
+                        'Ngân sách tổng',
+                        budget == null ? 'Chưa thiết lập' : formatVnd(budget),
                       ),
                     ],
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F0),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(child: _metric('Đã chi tiêu', formatVnd(spent))),
-                      Container(
-                        width: 1,
-                        height: 32,
-                        color: AppTheme.borderLight,
-                      ),
-                      Expanded(
-                        child: _metric('Tổng ngân sách', formatVnd(budget)),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE8EDE8),
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryForestGreen,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.savings_outlined,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 11),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Định mức an toàn mỗi ngày',
+                  if (budget == null)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 12),
+                      child: Text(
+                        'Tạo ngân sách không chọn danh mục hoặc trụ cột để đặt hạn mức tổng.',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 11,
                           color: AppTheme.textMuted,
                         ),
                       ),
-                      Text(
-                        '920.000 ₫',
-                        style: TextStyle(
-                          fontSize: 19,
-                          fontWeight: FontWeight.w800,
-                          color: AppTheme.primaryForestGreen,
-                        ),
-                      ),
-                    ],
+                    ),
+                ],
+              ),
+            ),
+            if (daily != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 14),
+                child: KakeiboCard(
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.savings_outlined),
+                    title: const Text('Định mức còn lại mỗi ngày'),
+                    subtitle: Text('$days ngày còn lại trong tháng'),
+                    trailing: Text(
+                      formatVnd(daily),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
-                const Text(
-                  '/ 7 ngày tới',
-                  style: TextStyle(fontSize: 10, color: AppTheme.textMuted),
+              ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Phong Bao Kakeibo',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                  ),
                 ),
-                const SizedBox(width: 8),
-                const CircleAvatar(
-                  radius: 15,
-                  backgroundColor: Colors.white,
-                  child: Icon(
-                    Icons.arrow_forward,
-                    size: 16,
-                    color: AppTheme.primaryForestGreen,
+                Text(
+                  '${records.length} hạn mức',
+                  style: const TextStyle(
+                    color: AppTheme.textMuted,
+                    fontSize: 11,
                   ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text(
-                '✉  4 Phong Bao Kakeibo',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-              ),
-              Text(
-                'Tháng ${_month.month}',
-                style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
-              ),
-            ],
-          ),
-          const SizedBox(height: 9),
-          for (final item in categories) _EnvelopeCard(item: item),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.tune, size: 16),
-                  label: const Text('Điều chỉnh tỷ lệ'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.textCharcoal,
-                    backgroundColor: const Color(0xFFE8EDE8),
-                    side: BorderSide.none,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
+            const SizedBox(height: 12),
+            if (records.isEmpty)
+              const KakeiboCard(
+                child: Text(
+                  'Chưa có ngân sách cho tháng này. Tạo phong bao để bắt đầu.',
                 ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.add_circle_outline, size: 17),
+            for (final record in records)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _EnvelopeCard(
+                  title: data.title(record),
+                  used: data.used(record, _month),
+                  limit: financeAmount(record['limit_amount']),
+                  threshold: financeAmount(record['alert_threshold_percent']),
+                  onEdit: () => _manage(refresh, record: record),
+                ),
+              ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => _manage(refresh),
+                  icon: const Icon(Icons.tune),
+                  label: const Text('Quản lý ngân sách'),
+                ),
+                FilledButton.icon(
+                  onPressed: () => _manage(refresh, create: true),
+                  icon: const Icon(Icons.add_circle_outline),
                   label: const Text('Tạo phong bao mới'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppTheme.primaryForestGreen,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      bottomNavigationBar: const AppScreenNavigation(selectedIndex: 2),
-    );
-  }
+              ],
+            ),
+          ],
+        );
+      },
+    ),
+    bottomNavigationBar: AppScreenNavigation(
+      selectedIndex: 2,
+      onTransactionAdded: _dataController.refresh,
+    ),
+  );
 
   Widget _metric(String label, String value) => Column(
     children: [
@@ -342,152 +262,68 @@ class _BudgetScreenState extends State<BudgetScreen> {
       ),
     ],
   );
-
-  Widget _roundButton(IconData icon, VoidCallback onPressed) => InkWell(
-    onTap: onPressed,
-    borderRadius: BorderRadius.circular(24),
-    child: Container(
-      width: 34,
-      height: 34,
-      decoration: const BoxDecoration(
-        color: Color(0xFFE8EDE8),
-        shape: BoxShape.circle,
-      ),
-      child: Icon(icon, size: 19, color: AppTheme.textCharcoal),
-    ),
-  );
 }
 
 class _EnvelopeCard extends StatelessWidget {
-  final (String, String, String, double, double, Color, IconData) item;
-  const _EnvelopeCard({required this.item});
+  const _EnvelopeCard({
+    required this.title,
+    required this.used,
+    required this.limit,
+    required this.threshold,
+    required this.onEdit,
+  });
+  final String title;
+  final double used, limit, threshold;
+  final VoidCallback onEdit;
+
   @override
   Widget build(BuildContext context) {
-    final (name, jp, description, used, limit, color, icon) = item;
-    final progress = used / limit;
-    final remaining = limit - used;
-    final warning = progress >= .95;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: KakeiboCard(
-        padding: const EdgeInsets.all(15),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: color.withAlpha(35),
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  child: Icon(icon, color: color),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '$name · $jp',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      Text(
-                        description,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 9,
-                          color: AppTheme.textMuted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      formatVnd(used),
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                        color: warning
-                            ? AppTheme.expenseCoral
-                            : AppTheme.textCharcoal,
-                      ),
-                    ),
-                    Text(
-                      '/ ${formatVnd(limit)}',
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: AppTheme.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            if (warning)
-              Container(
-                margin: const EdgeInsets.only(top: 10, bottom: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFDDDA),
-                  borderRadius: BorderRadius.circular(7),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(
-                      Icons.warning_amber,
-                      size: 14,
-                      color: AppTheme.expenseCoral,
-                    ),
-                    SizedBox(width: 5),
-                    Text(
-                      'Gần chạm hạn mức (chỉ còn lại 200.000 ₫)',
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: AppTheme.expenseCoral,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+    final progress = limit > 0 ? used / limit : 0.0;
+    final warning = progress * 100 >= threshold;
+    final color = warning ? AppTheme.expenseCoral : AppTheme.primaryForestGreen;
+    return KakeiboCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.account_balance_wallet_outlined, color: color),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),
-            const SizedBox(height: 10),
-            KakeiboProgress(
-              value: progress,
-              color: warning ? AppTheme.expenseCoral : color,
+              IconButton(
+                tooltip: 'Chỉnh sửa',
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined),
+              ),
+            ],
+          ),
+          Text(
+            '${formatVnd(used)} / ${formatVnd(limit)}',
+            style: TextStyle(color: color, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 10),
+          KakeiboProgress(value: progress, color: color),
+          const SizedBox(height: 8),
+          Text(
+            '${(progress * 100).toStringAsFixed(1)}% đã chi · Còn lại ${formatVnd(limit - used)}',
+            style: const TextStyle(fontSize: 11),
+          ),
+          if (warning)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                progress >= 1
+                    ? 'Đã vượt hoặc chạm hạn mức'
+                    : 'Đã tới ngưỡng cảnh báo ${threshold.toStringAsFixed(0)}%',
+                style: TextStyle(color: color, fontSize: 11),
+              ),
             ),
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '${(progress * 100).toStringAsFixed(progress * 100 % 1 == 0 ? 0 : 1)}% đã chi',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w600,
-                    color: warning ? AppTheme.expenseCoral : color,
-                  ),
-                ),
-                Text(
-                  warning ? 'Cần lưu tâm' : 'Còn lại: ${formatVnd(remaining)}',
-                  style: TextStyle(
-                    fontSize: 9,
-                    color: warning ? AppTheme.expenseCoral : AppTheme.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
