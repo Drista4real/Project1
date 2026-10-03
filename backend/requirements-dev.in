@@ -1,0 +1,4 @@
+-r requirements.in
+httpx2>=2,<3
+pytest>=8,<10
+ruff>=0.14,<1
