@@ -1,0 +1,18 @@
+[project]
+name = "kakeibo-backend"
+version = "0.1.0"
+description = "Layered API and background worker for Kakeibo finance features"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+exclude = [".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
