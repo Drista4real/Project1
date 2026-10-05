@@ -1,5 +1,5 @@
-import 'package:project_one/features/finance/domain/entities/transaction.dart';
-import 'package:project_one/features/finance/domain/repositories/finance_repository.dart';
+import '../entities/transaction.dart';
+import '../repositories/finance_repository.dart';
 
 class GetTransactions {
   final FinanceRepository repository;

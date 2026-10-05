@@ -1,4 +1,4 @@
-import 'package:project_one/features/finance/domain/entities/transaction.dart';
+import '../../domain/entities/transaction.dart';
 
 class TransactionModel extends Transaction {
   const TransactionModel({

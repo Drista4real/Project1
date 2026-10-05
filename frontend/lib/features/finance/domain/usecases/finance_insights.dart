@@ -1,4 +1,4 @@
-import 'package:project_one/features/finance/domain/repositories/management_repository.dart';
+import '../repositories/management_repository.dart';
 
 typedef FinanceRecord = Map<String, dynamic>;
 
