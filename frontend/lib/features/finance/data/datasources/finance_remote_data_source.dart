@@ -1,8 +1,8 @@
-import '../../../../core/network/backend_client.dart';
-import '../../domain/entities/account.dart';
-import '../models/category_model.dart';
-import '../models/financial_overview_model.dart';
-import '../models/transaction_model.dart';
+import 'package:project_one/core/network/backend_client.dart';
+import 'package:project_one/features/finance/domain/entities/account.dart';
+import 'package:project_one/features/finance/data/models/category_model.dart';
+import 'package:project_one/features/finance/data/models/financial_overview_model.dart';
+import 'package:project_one/features/finance/data/models/transaction_model.dart';
 
 class FinanceRemoteDataSource {
   final BackendClient api;
