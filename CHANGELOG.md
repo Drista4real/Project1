@@ -1,5 +1,14 @@
 # Changelog
 
+## Chưa phát hành
+
+- Tổ chức Flutter theo chức năng: auth, ledger, transactions, budget, reports,
+  forecast, ai, settings và management.
+- Tách khởi tạo ứng dụng/router/dependencies vào `app/`, thành phần dùng chung
+  vào `shared/`, và cấu hình Supabase vào `core/config/`.
+- Tách các màn CRUD quản lý và chia kiểm thử theo chức năng, dùng chung fixtures
+  trong `test/helpers/`.
+
 ## 1.0.0 — 2026-10-03
 
 - Flutter đăng nhập bằng Supabase Auth và gọi API với access token.

@@ -1,7 +1,7 @@
-import '../entities/category.dart';
-import '../entities/account.dart';
-import '../entities/financial_overview.dart';
-import '../entities/transaction.dart';
+import 'package:project_one/features/finance/domain/entities/category.dart';
+import 'package:project_one/features/finance/domain/entities/account.dart';
+import 'package:project_one/features/finance/domain/entities/financial_overview.dart';
+import 'package:project_one/features/finance/domain/entities/transaction.dart';
 
 abstract interface class FinanceRepository {
   Future<FinancialOverview> getOverview();
