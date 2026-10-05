@@ -1,9 +1,9 @@
-import '../../domain/entities/category.dart';
-import '../../domain/entities/account.dart';
-import '../../domain/entities/financial_overview.dart';
-import '../../domain/entities/transaction.dart';
-import '../../domain/repositories/finance_repository.dart';
-import '../datasources/finance_remote_data_source.dart';
+import 'package:project_one/features/finance/domain/entities/category.dart';
+import 'package:project_one/features/finance/domain/entities/account.dart';
+import 'package:project_one/features/finance/domain/entities/financial_overview.dart';
+import 'package:project_one/features/finance/domain/entities/transaction.dart';
+import 'package:project_one/features/finance/domain/repositories/finance_repository.dart';
+import 'package:project_one/features/finance/data/datasources/finance_remote_data_source.dart';
 
 class SupabaseFinanceRepository implements FinanceRepository {
   final FinanceRemoteDataSource remoteDataSource;
