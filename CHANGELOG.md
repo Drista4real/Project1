@@ -2,6 +2,11 @@
 
 ## Chưa phát hành
 
+- Thêm bộ Integration/API E2E bằng Java 21, JUnit 5 và REST Assured tại
+  `tests/backend-e2e/`, chạy trong Docker trên GitHub Actions.
+- Dựng Supabase Auth, PostgREST và database test dùng schema/migrations thật;
+  kiểm tra CRUD, số dư, validation và quyền dữ liệu theo người dùng.
+- Workflow sinh khóa tạm mỗi lần chạy, lưu báo cáo JUnit/log và dọn môi trường test.
 - Tổ chức Flutter theo chức năng: auth, ledger, transactions, budget, reports,
   forecast, ai, settings và management.
 - Tách khởi tạo ứng dụng/router/dependencies vào `app/`, thành phần dùng chung

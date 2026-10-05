@@ -252,3 +252,12 @@ the ledger to reload totals.
 
 Flutter edits the optional note within consultation/message context while
 preserving other stored context fields. The API supports the full context object.
+
+## Java integration and API E2E tests
+
+The Docker-only Java suite lives in [`tests/backend-e2e`](../tests/backend-e2e/README.md).
+GitHub Actions builds this backend and starts disposable Supabase Auth, PostgREST
+and PostgreSQL containers with the actual application schema and migrations.
+Tests use real user tokens and verify CRUD, financial balances and user isolation.
+Run it by pushing relevant changes or using the **Backend Java E2E** workflow;
+no local backend, Maven installation or production Supabase credentials are needed.
