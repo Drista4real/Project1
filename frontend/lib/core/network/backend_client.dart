@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 
-import 'package:project_one/core/config/supabase_config.dart';
+import '../constants/supabase_config.dart';
 
 class FinanceApiException implements Exception {
   final String message;

@@ -1,5 +1,5 @@
-import 'package:project_one/core/network/backend_client.dart';
-import 'package:project_one/features/finance/domain/repositories/management_repository.dart';
+import '../../../../core/network/backend_client.dart';
+import '../../domain/repositories/management_repository.dart';
 
 /// All operations use the signed-in user's backend session.
 class BackendManagementRepository implements ManagementRepository {

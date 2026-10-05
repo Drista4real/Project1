@@ -1,4 +1,4 @@
-import 'package:project_one/features/finance/domain/repositories/finance_repository.dart';
+import '../repositories/finance_repository.dart';
 
 class AddTransaction {
   final FinanceRepository repository;

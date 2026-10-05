@@ -1,4 +1,4 @@
-import 'package:project_one/features/finance/domain/entities/category.dart';
+import '../../domain/entities/category.dart';
 
 class CategoryModel extends Category {
   const CategoryModel({
