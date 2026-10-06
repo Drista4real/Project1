@@ -40,7 +40,9 @@ jobs:
       - name: Validate Compose configuration
         run: docker compose config --quiet
       - name: Build backend and Java runner
-        run: docker compose build --pull
+        run: docker compose build --pull api tests backend-checks
+      - name: Check backend lint and existing Python tests in Docker
+        run: docker compose run --name "${COMPOSE_PROJECT_NAME}-checks" --no-deps backend-checks
       - name: Start isolated backend and database
         run: docker compose up --detach --wait --wait-timeout 240 api
       - name: Run Java integration and API tests in Docker
@@ -55,6 +57,7 @@ jobs:
             docker inspect --format '{{.Name}} {{json .State.Health}}' "$container" || true
           done > artifacts/healthchecks.txt
           docker cp "${COMPOSE_PROJECT_NAME}-tests:/tests/target/failsafe-reports" artifacts/failsafe-reports || true
+          docker cp "${COMPOSE_PROJECT_NAME}-checks:/reports" artifacts/backend-reports || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:

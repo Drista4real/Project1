@@ -29,7 +29,11 @@ Workflow: [Backend Java E2E](../../.github/workflows/backend-java-e2e.yml).
 2. Vào repository trên GitHub → **Actions → Backend Java E2E**.
 3. Mở job `backend-e2e` để xem build, khởi tạo database và kết quả Maven.
 4. Tải artifact `backend-java-e2e-<run_id>-<attempt>` để xem
-   `failsafe-reports/TEST-*.xml`, báo cáo `.txt` và `containers.log`.
+   `failsafe-reports/TEST-*.xml`, báo cáo `.txt`, `backend-reports/backend.xml`
+   và `containers.log`.
+
+CI chạy Ruff và bộ pytest hiện có của backend trong container riêng trước E2E,
+để kiểm tra hồi quy khi sửa code Python. Bộ Java có 41 kịch bản sau tham số hóa.
 
 Workflow cũng hỗ trợ **Run workflow** khi file workflow đã có trên nhánh mặc định
 của repository. Sau đó có thể chọn nhánh cần test. Push trigger hoạt động ngay
@@ -77,6 +81,12 @@ PostgREST và RLS kiểm soát.
 Lỗi tại bước `Start isolated backend and database` thường cần xem log `db`, `auth`
 hoặc `migrate`. Lỗi biên dịch Java nằm ở bước chạy Maven; nếu Maven chưa vào pha test
 thì sẽ chưa có JUnit XML. Bước thu log không thay thế mã lỗi của bước build/test.
+
+Các lần chạy đầu tiên đã phát hiện lỗi SQL guard khi tạo danh mục và lỗi 503
+khi phân trang vượt cuối danh sách. Các ca này được giữ lại để kiểm tra hồi quy.
+Database đang sử dụng schema cũ cần áp dụng migration
+`202610060001_management_category_parent_guard.sql` sau các migrations trước đó;
+CI tự áp dụng theo thứ tự. Workflow này không thay đổi database đang deploy.
 
 ## Tài liệu tham chiếu
 

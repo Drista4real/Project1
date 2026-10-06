@@ -1,3 +1,4 @@
+from postgrest.exceptions import APIError
 from supabase import Client
 
 from app.domain.transactions import TransactionError
@@ -49,9 +50,18 @@ class SupabaseManagementRepository:
         query = self.query(resource, count=True).order(column, desc=True)
         if resource == "transaction_tags":
             query = query.order("tag_id", desc=True)
-        result = query.range(offset, offset + limit - 1).execute()
+        try:
+            result = query.range(offset, offset + limit - 1).execute()
+            items = result.data
+        except APIError as error:
+            if error.code != "PGRST103" or offset == 0:
+                raise
+            # Keep the same ownership scope, including parent joins, when
+            # counting an empty page beyond the end of the collection.
+            result = self.query(resource, count=True).limit(0).execute()
+            items = []
         return {
-            "items": result.data,
+            "items": items,
             "total": result.count or 0,
             "limit": limit,
             "offset": offset,

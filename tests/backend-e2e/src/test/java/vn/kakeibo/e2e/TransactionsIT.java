@@ -73,6 +73,9 @@ class TransactionsIT {
         var empty = expect(api.get(TRANSACTIONS + "?offset=99"), 200);
         assertTrue(empty.jsonPath().getList("items").isEmpty());
         assertEquals(3, empty.jsonPath().getInt("total"));
+        var filteredEmpty = expect(api.get(TRANSACTIONS + "?transaction_type=income&offset=99"), 200);
+        assertTrue(filteredEmpty.jsonPath().getList("items").isEmpty());
+        assertEquals(2, filteredEmpty.jsonPath().getInt("total"));
     }
 
     @Test

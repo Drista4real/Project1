@@ -1,5 +1,11 @@
 # Dedicated disposable CI stack. No host ports or production .env files.
 services:
+  backend-checks:
+    profiles: [checks]
+    build:
+      context: ../..
+      dockerfile: tests/backend-e2e/docker/backend-checks.Dockerfile
+
   db:
     image: supabase/postgres:17.6.1.136
     command: [postgres, -c, config_file=/etc/postgresql/postgresql.conf]

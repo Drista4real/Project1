@@ -1,0 +1,10 @@
+**
+!backend/
+!backend/requirements-dev.txt
+!backend/pyproject.toml
+!backend/app/
+!backend/app/**
+!backend/tests/
+!backend/tests/**
+**/__pycache__/
+**/*.pyc

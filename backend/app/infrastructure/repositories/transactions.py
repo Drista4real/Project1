@@ -1,3 +1,4 @@
+from postgrest.exceptions import APIError
 from supabase import Client
 
 from app.domain.transactions import Transaction, TransactionError, TransactionType
@@ -15,14 +16,30 @@ class SupabaseTransactionRepository:
         query = query.eq("user_id", self.user_id)
         if kind:
             query = query.eq("transaction_type", kind)
-        result = (
-            query.order("transaction_date", desc=True)
-            .order("id", desc=True)
-            .range(offset, offset + limit - 1)
-            .execute()
-        )
+        try:
+            result = (
+                query.order("transaction_date", desc=True)
+                .order("id", desc=True)
+                .range(offset, offset + limit - 1)
+                .execute()
+            )
+            items = result.data
+        except APIError as error:
+            if error.code != "PGRST103" or offset == 0:
+                raise
+            # PostgREST returns 416 for an offset past the last row. Recount
+            # with a fresh query: range() mutates the original query builder.
+            count_query = (
+                self.client.table("transactions")
+                .select("id", count="exact", head=True)
+                .eq("user_id", self.user_id)
+            )
+            if kind:
+                count_query = count_query.eq("transaction_type", kind)
+            result = count_query.execute()
+            items = []
         return {
-            "items": result.data,
+            "items": items,
             "total": result.count or 0,
             "limit": limit,
             "offset": offset,

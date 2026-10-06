@@ -42,7 +42,12 @@ class ManagementIT {
         long id = owner.create(test.resource(), test.input());
         String path = collection + "/" + id;
         assertEquals(owner.userId, expect(owner.get(path), 200).jsonPath().getString("user_id"));
-        assertTrue(expect(owner.get(collection), 200).jsonPath().getList("items.id", Long.class).contains(id));
+        var firstPage = expect(owner.get(collection), 200);
+        assertTrue(firstPage.jsonPath().getList("items.id", Long.class).contains(id));
+        var beyondEnd = expect(owner.get(collection + "?offset=999"), 200);
+        assertTrue(beyondEnd.jsonPath().getList("items").isEmpty());
+        assertEquals(firstPage.jsonPath().getInt("total"), beyondEnd.jsonPath().getInt("total"));
+        assertEquals(999, beyondEnd.jsonPath().getInt("offset"));
         assertFalse(expect(other.get(collection), 200).jsonPath().getList("items.id", Long.class).contains(id));
         expect(other.get(path), 404);
         expect(other.patch(path, Map.of(test.field(), test.updated())), 404);
@@ -119,6 +124,9 @@ class ManagementIT {
         String path = MANAGE + "transaction_tags/" + transaction + ":" + tag;
         expect(api.post(MANAGE + "transaction_tags", link), 201);
         expect(api.get(path), 200);
+        var beyondEnd = expect(api.get(MANAGE + "transaction_tags?offset=999"), 200);
+        assertEquals(1, beyondEnd.jsonPath().getInt("total"));
+        assertTrue(beyondEnd.jsonPath().getList("items").isEmpty());
         expect(api.post(MANAGE + "transaction_tags", link), 409);
         expect(api.patch(path, Map.of("tag_id", replacement)), 200);
         expect(api.get(path), 404);
@@ -138,6 +146,9 @@ class ManagementIT {
         long session = owner.create("ai_chat_sessions", Map.of("title", "Tư vấn"));
         Map<String, Object> message = Map.of("session_id", session, "sender", "user", "content", "Xin chào");
         long id = owner.create("ai_chat_messages", message);
+        var beyondEnd = expect(owner.get(MANAGE + "ai_chat_messages?offset=999"), 200);
+        assertEquals(1, beyondEnd.jsonPath().getInt("total"));
+        assertTrue(beyondEnd.jsonPath().getList("items").isEmpty());
         String path = MANAGE + "ai_chat_messages/" + id;
         expect(other.post(MANAGE + "ai_chat_messages", message), 422);
         expect(other.get(path), 404);
