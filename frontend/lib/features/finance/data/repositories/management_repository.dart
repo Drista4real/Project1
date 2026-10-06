@@ -1,5 +1,5 @@
-import '../../../../core/network/backend_client.dart';
-import '../../domain/repositories/management_repository.dart';
+import 'package:project_one/core/network/backend_client.dart';
+import 'package:project_one/features/finance/domain/repositories/management_repository.dart';
 
 /// All operations use the signed-in user's backend session.
 class BackendManagementRepository implements ManagementRepository {
@@ -69,6 +69,14 @@ class BackendManagementRepository implements ManagementRepository {
       body: values,
     );
   }
+
+  @override
+  Future<Map<String, dynamic>> create(
+    String resource,
+    Map<String, dynamic> values,
+  ) async => Map<String, dynamic>.from(
+    await _client.request('POST', '/manage/$resource', body: values) as Map,
+  );
 
   @override
   Future<void> delete(String resource, String key) async {

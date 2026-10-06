@@ -1,4 +1,4 @@
-import '../../domain/entities/financial_overview.dart';
+import 'package:project_one/features/finance/domain/entities/financial_overview.dart';
 
 class FinancialOverviewModel extends FinancialOverview {
   const FinancialOverviewModel({

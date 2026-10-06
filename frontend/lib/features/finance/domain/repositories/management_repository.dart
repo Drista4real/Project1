@@ -4,6 +4,10 @@ abstract class ManagementRepository {
   Future<List<Map<String, dynamic>>> references(String resource);
   String key(String resource, Map<String, dynamic> record);
   Future<Map<String, dynamic>> get(String resource, String key);
+  Future<Map<String, dynamic>> create(
+    String resource,
+    Map<String, dynamic> values,
+  );
   Future<void> save(
     String resource,
     Map<String, dynamic> values, {

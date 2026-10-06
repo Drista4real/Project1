@@ -1,5 +1,31 @@
 # Changelog
 
+## Chưa phát hành
+
+- Đồng bộ màn Ngân sách với giao diện quản lý phong bao: tổng quan tháng,
+  định mức mỗi ngày, 4 trụ cột và hạn mức danh mục có thể mở rộng.
+- Dùng chung form phân bổ/chỉnh hạn mức và làm rõ lối vào quản lý danh mục,
+  mục tiêu tiết kiệm và thiết lập ngân sách nâng cao.
+- Thiết kế lại quản lý danh mục và phong bao theo 4 trụ cột Kakeibo:
+  tìm kiếm, chọn tháng, thẻ hạn mức và form thêm/sửa dạng bottom sheet.
+- Cho phép sửa hạn mức riêng của danh mục hệ thống, tắt phong bao theo tháng,
+  và lưu tái cân bằng phần trăm vào ngân sách thật.
+- Sửa lỗi tạo danh mục do biến `parent_id` trùng tên cột trong SQL trigger;
+  bổ sung migration `202610060001_management_category_parent_guard.sql`.
+- Trang dữ liệu vượt cuối danh sách trả kết quả rỗng kèm tổng số bản ghi đúng,
+  thay vì lỗi 503; giữ bộ lọc và giới hạn quyền người dùng khi đếm.
+- Thêm bộ Integration/API E2E bằng Java 21, JUnit 5 và REST Assured tại
+  `tests/backend-e2e/`, chạy trong Docker trên GitHub Actions.
+- Dựng Supabase Auth, PostgREST và database test dùng schema/migrations thật;
+  kiểm tra CRUD, số dư, validation và quyền dữ liệu theo người dùng.
+- Workflow sinh khóa tạm mỗi lần chạy, lưu báo cáo JUnit/log và dọn môi trường test.
+- Tổ chức Flutter theo chức năng: auth, ledger, transactions, budget, reports,
+  forecast, ai, settings và management.
+- Tách khởi tạo ứng dụng/router/dependencies vào `app/`, thành phần dùng chung
+  vào `shared/`, và cấu hình Supabase vào `core/config/`.
+- Tách các màn CRUD quản lý và chia kiểm thử theo chức năng, dùng chung fixtures
+  trong `test/helpers/`.
+
 ## 1.0.0 — 2026-10-03
 
 - Flutter đăng nhập bằng Supabase Auth và gọi API với access token.
