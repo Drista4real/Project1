@@ -11,6 +11,7 @@ Future<void> openModule(
   MemoryManagementRepository repository,
   String resource, {
   bool create = false,
+  Map<String, dynamic>? record,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -22,6 +23,7 @@ Future<void> openModule(
               context,
               resource,
               create: create,
+              record: record,
               repository: repository,
             ),
             child: const Text('Mở'),
@@ -99,10 +101,13 @@ void main() {
 
   testWidgets('system category has viewing controls only', (tester) async {
     final repository = MemoryManagementRepository();
-    await openModule(tester, repository, 'categories');
+    await openModule(
+      tester,
+      repository,
+      'categories',
+      record: repository.records.first,
+    );
     expect(find.byType(PopupMenuButton<String>), findsNothing);
-    await tester.tap(find.text('Du lịch'));
-    await tester.pumpAndSettle();
     expect(find.byType(FinanceSaveBar), findsNothing);
     expect(
       tester.widget<TextFormField>(find.byKey(const ValueKey('name'))).enabled,

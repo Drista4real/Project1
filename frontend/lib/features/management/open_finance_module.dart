@@ -4,6 +4,7 @@ import 'package:project_one/features/finance/domain/repositories/management_repo
 import 'package:project_one/app/app_dependencies.dart';
 import 'package:project_one/features/management/screens/record_form_screen.dart';
 import 'package:project_one/features/management/screens/resource_list_screen.dart';
+import 'package:project_one/features/budget/screens/category_envelopes_screen.dart';
 
 /// Reuse the authenticated CRUD forms from the existing feature screens.
 Future<void> openFinanceModule(
@@ -15,6 +16,19 @@ Future<void> openFinanceModule(
   ManagementRepository? repository,
 }) async {
   final source = repository ?? AppDependencies.managementRepository;
+  if ((name == 'categories' || name == 'budgets') &&
+      !create &&
+      record == null) {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CategoryEnvelopesScreen(
+          repository: source,
+          month: DateTime.tryParse('${defaults['month_year']}'),
+        ),
+      ),
+    );
+    return;
+  }
   try {
     final resources = await source.resources();
     final resource = resources.firstWhere((item) => item['name'] == name);
