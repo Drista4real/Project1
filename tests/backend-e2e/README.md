@@ -35,6 +35,13 @@ Workflow: [Backend Java E2E](../../.github/workflows/backend-java-e2e.yml).
 CI chạy Ruff và bộ pytest hiện có của backend trong container riêng trước E2E,
 để kiểm tra hồi quy khi sửa code Python. Bộ Java có 41 kịch bản sau tham số hóa.
 
+Hai image kiểm thử chạy bằng user không phải root. Image Python dùng
+`docker/requirements.lock`, khóa phiên bản và SHA-256 của toàn bộ wheel cho
+Python 3.13/Linux amd64, cài với `--require-hashes --only-binary=:all:`.
+Sau khi cập nhật `backend/requirements-dev.txt`, chạy
+`python docker/lock_dependencies.py` từ thư mục này để tạo lại lockfile, rồi
+commit cả hai file. Lệnh này chỉ phân giải dependency, không cài thư viện.
+
 Workflow cũng hỗ trợ **Run workflow** khi file workflow đã có trên nhánh mặc định
 của repository. Sau đó có thể chọn nhánh cần test. Push trigger hoạt động ngay
 trên nhánh chứa workflow.

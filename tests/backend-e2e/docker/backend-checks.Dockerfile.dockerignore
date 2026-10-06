@@ -1,6 +1,9 @@
 **
 !backend/
-!backend/requirements-dev.txt
+!tests/
+!tests/backend-e2e/
+!tests/backend-e2e/docker/
+!tests/backend-e2e/docker/requirements.lock
 !backend/pyproject.toml
 !backend/app/
 !backend/app/**
