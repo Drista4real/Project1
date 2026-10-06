@@ -2,6 +2,14 @@
 
 ## Chưa phát hành
 
+- Đồng bộ màn Ngân sách với giao diện quản lý phong bao: tổng quan tháng,
+  định mức mỗi ngày, 4 trụ cột và hạn mức danh mục có thể mở rộng.
+- Dùng chung form phân bổ/chỉnh hạn mức và làm rõ lối vào quản lý danh mục,
+  mục tiêu tiết kiệm và thiết lập ngân sách nâng cao.
+- Thiết kế lại quản lý danh mục và phong bao theo 4 trụ cột Kakeibo:
+  tìm kiếm, chọn tháng, thẻ hạn mức và form thêm/sửa dạng bottom sheet.
+- Cho phép sửa hạn mức riêng của danh mục hệ thống, tắt phong bao theo tháng,
+  và lưu tái cân bằng phần trăm vào ngân sách thật.
 - Sửa lỗi tạo danh mục do biến `parent_id` trùng tên cột trong SQL trigger;
   bổ sung migration `202610060001_management_category_parent_guard.sql`.
 - Trang dữ liệu vượt cuối danh sách trả kết quả rỗng kèm tổng số bản ghi đúng,

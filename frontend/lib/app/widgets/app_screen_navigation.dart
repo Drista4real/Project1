@@ -7,10 +7,12 @@ import 'package:project_one/core/theme/app_theme.dart';
 class AppScreenNavigation extends StatelessWidget {
   final int selectedIndex;
   final Future<void> Function()? onTransactionAdded;
+  final VoidCallback? onSelectedTab;
 
   const AppScreenNavigation({
     required this.selectedIndex,
     this.onTransactionAdded,
+    this.onSelectedTab,
     super.key,
   });
 
@@ -77,6 +79,8 @@ class AppScreenNavigation extends StatelessWidget {
                           final routeIndex = i < 2 ? i : i - 1;
                           if (routeIndex != selectedIndex) {
                             context.go(routes[i]);
+                          } else {
+                            onSelectedTab?.call();
                           }
                         },
                         child: Column(

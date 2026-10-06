@@ -29,7 +29,12 @@ void main() {
       await tester.ensureVisible(find.text('Danh mục'));
       await tester.tap(find.text('Danh mục'));
       await tester.pumpAndSettle();
-      expect(find.text('Danh mục hệ thống · Chỉ xem'), findsOneWidget);
+      expect(find.text('Quản lý danh mục & phong bao'), findsOneWidget);
+      expect(find.text('Nhu cầu thiết yếu'), findsOneWidget);
+      expect(
+        find.widgetWithText(FilledButton, 'Thêm danh mục mới'),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     });
     testWidgets('negative wallet balance keeps its sign', (tester) async {

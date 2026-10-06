@@ -63,7 +63,9 @@ class _FinanceDataViewState<T> extends State<FinanceDataView<T>> {
   Future<void> _refresh() async {
     if (!mounted) return;
     final next = widget.load();
-    setState(() => _future = next);
+    setState(() {
+      _future = next;
+    });
     try {
       await next;
     } catch (_) {
