@@ -252,3 +252,18 @@ the ledger to reload totals.
 
 Flutter edits the optional note within consultation/message context while
 preserving other stored context fields. The API supports the full context object.
+
+## Java integration and API E2E tests
+
+The Docker-only Java suite lives in [`tests/backend-e2e`](../tests/backend-e2e/README.md).
+GitHub Actions builds this backend and starts disposable Supabase Auth, PostgREST
+and PostgreSQL containers with the actual application schema and migrations.
+Tests use real user tokens and verify CRUD, financial balances and user isolation.
+Run it by pushing relevant changes or using the **Backend Java E2E** workflow;
+no local backend, Maven installation or production Supabase credentials are needed.
+
+The Java suite exposed a category-trigger name collision. Apply
+`supabase/migrations/202610060001_management_category_parent_guard.sql` after
+the earlier migrations on existing databases. CI applies it automatically to
+its disposable database. Paginated API collections return an empty `items` list
+and the filtered, user-scoped `total` when the offset exceeds the last record.
