@@ -71,6 +71,14 @@ class BackendManagementRepository implements ManagementRepository {
   }
 
   @override
+  Future<Map<String, dynamic>> create(
+    String resource,
+    Map<String, dynamic> values,
+  ) async => Map<String, dynamic>.from(
+    await _client.request('POST', '/manage/$resource', body: values) as Map,
+  );
+
+  @override
   Future<void> delete(String resource, String key) async {
     await _client.request('DELETE', '/manage/$resource/$key');
   }

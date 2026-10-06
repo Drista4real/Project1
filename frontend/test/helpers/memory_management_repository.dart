@@ -91,4 +91,13 @@ class MemoryManagementRepository implements ManagementRepository {
     deleted = true;
     records.clear();
   }
+
+  @override
+  Future<Map<String, dynamic>> create(
+    String resource,
+    Map<String, dynamic> values,
+  ) async {
+    await save(resource, values);
+    return {'id': 2, ...values};
+  }
 }
