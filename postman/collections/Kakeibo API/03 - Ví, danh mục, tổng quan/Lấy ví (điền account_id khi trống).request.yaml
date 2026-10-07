@@ -1,0 +1,17 @@
+$kind: http-request
+description: Chọn ID ví mong muốn trong response hoặc để script lấy ví đầu tiên khi account_id trống.
+url: "{{base_url}}/api/v1/accounts"
+method: GET
+headers:
+  Accept: application/json
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 200", function () { pm.response.to.have.status(200); });
+      if (pm.response.code === 200) {
+        const items = pm.response.json();
+        pm.test("Danh sách ví", function () { pm.expect(items).to.be.an("array"); });
+        if (!pm.environment.get("account_id") && items.length) pm.environment.set("account_id", String(items[0].id));
+      }
+    language: text/javascript
+order: 1000

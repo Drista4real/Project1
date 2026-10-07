@@ -1,0 +1,24 @@
+$kind: http-request
+description: ""
+url: "{{base_url}}/api/v1/manage/transaction_tags"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "transaction_id": {{transaction_id}},
+      "tag_id": {{manage_tags_id}}
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 201", function () { pm.response.to.have.status(201); });
+      if (pm.response.code === 201) {
+        const data = pm.response.json();
+        pm.environment.set("manage_transaction_tags_id", String(data.transaction_id + ":" + data.tag_id));
+      }
+    language: text/javascript
+order: 2000

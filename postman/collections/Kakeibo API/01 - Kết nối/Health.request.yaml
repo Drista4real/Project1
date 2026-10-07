@@ -1,0 +1,15 @@
+$kind: http-request
+description: ""
+url: "{{base_url}}/health"
+method: GET
+headers:
+  Accept: application/json
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 200", function () { pm.response.to.have.status(200); });
+      pm.test("API đang chạy", function () { pm.expect(pm.response.json()).to.eql({status:"ok"}); });
+    language: text/javascript
+order: 1000
