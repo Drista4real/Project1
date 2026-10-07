@@ -1,0 +1,24 @@
+$kind: http-request
+description: ""
+url: "{{base_url}}/api/v1/manage/ai_consultations"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "user_query": "Câu hỏi thử Postman",
+      "ai_recommendation": "Nội dung mẫu; API này chỉ lưu bản ghi."
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 201", function () { pm.response.to.have.status(201); });
+      if (pm.response.code === 201) {
+        const data = pm.response.json();
+        pm.environment.set("manage_ai_consultations_id", String(data.id));
+      }
+    language: text/javascript
+order: 2000

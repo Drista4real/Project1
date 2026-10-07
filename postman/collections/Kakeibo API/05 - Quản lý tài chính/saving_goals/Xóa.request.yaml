@@ -1,0 +1,13 @@
+$kind: http-request
+description: ""
+url: "{{base_url}}/api/v1/manage/saving_goals/{{manage_saving_goals_id}}"
+method: DELETE
+headers:
+  Accept: application/json
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 204", function () { pm.response.to.have.status(204); });
+      if (pm.response.code === 204) pm.environment.unset("manage_saving_goals_id");
+    language: text/javascript
+order: 5000

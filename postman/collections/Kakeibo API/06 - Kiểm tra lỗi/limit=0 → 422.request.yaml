@@ -1,0 +1,12 @@
+$kind: http-request
+description: ""
+url: "{{base_url}}/api/v1/transactions?limit=0"
+method: GET
+headers:
+  Accept: application/json
+scripts:
+  - type: afterResponse
+    code: |
+      pm.test("HTTP 422", function () { pm.response.to.have.status(422); });
+    language: text/javascript
+order: 2000

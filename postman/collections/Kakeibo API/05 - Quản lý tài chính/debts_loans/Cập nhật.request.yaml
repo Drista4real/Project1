@@ -1,0 +1,20 @@
+$kind: http-request
+description: ""
+url: "{{base_url}}/api/v1/manage/debts_loans/{{manage_debts_loans_id}}"
+method: PATCH
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "paid_amount": "100000.00",
+      "status": "partial"
+    }
+scripts:
+  - type: afterResponse
+    code: |
+      pm.test("HTTP 200", function () { pm.response.to.have.status(200); });
+    language: text/javascript
+order: 4000

@@ -1,0 +1,20 @@
+$kind: http-request
+description: ""
+url: "{{base_url}}/api/v1/transactions"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "amount": "-1.00",
+      "transaction_type": "expense"
+    }
+scripts:
+  - type: afterResponse
+    code: |
+      pm.test("HTTP 422", function () { pm.response.to.have.status(422); });
+    language: text/javascript
+order: 3000

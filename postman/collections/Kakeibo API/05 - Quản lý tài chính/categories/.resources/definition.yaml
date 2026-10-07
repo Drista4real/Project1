@@ -1,0 +1,3 @@
+$kind: collection
+description: Gửi từng request; POST lưu ID để GET/PATCH/DELETE thao tác bản ghi vừa tạo.
+order: 3000

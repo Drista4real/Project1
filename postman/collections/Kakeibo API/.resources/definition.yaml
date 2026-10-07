@@ -1,0 +1,30 @@
+$kind: collection
+description: Bộ request cho FastAPI + Supabase Auth của Project1. Import environment mẫu, điền cấu hình và gửi từng request. Xem postman/README.md. Các request POST/PATCH/DELETE sửa dữ liệu của tài khoản đăng nhập; không chạy toàn collection như một bài kiểm thử.
+scripts:
+  - type: http:beforeRequest
+    code: |-
+      const now = new Date();
+      pm.variables.set("today", now.toISOString().slice(0, 10));
+      pm.variables.set("month_start", now.toISOString().slice(0, 7) + "-01");
+      const rawUrl = pm.request.url.toString();
+      const body = pm.request.body;
+      const bodyText = body ? (body.raw || (typeof body.content === "string" ? body.content : "")) : "";
+      const headerText = pm.request.headers ? pm.request.headers.toString() : "";
+      const inputs = rawUrl + bodyText + headerText;
+      const names = Array.from(inputs.matchAll(/\{\{([^}]+)\}\}/g), function (match) { return match[1]; });
+      // Let the API return 401 for missing/expired Bearer tokens. Collection
+      // scripts may not see the request's effective auth (including No Auth).
+      if (rawUrl.startsWith("{{supabase_url}}")) names.push("supabase_publishable_key");
+      Array.from(new Set(names)).forEach(function (name) {
+        const value = pm.variables.get(name);
+        if (value === undefined || value === null || value === "") {
+          throw new Error("Chọn environment và điền biến: " + name);
+        }
+      });
+    language: text/javascript
+auth:
+  - id: 389ecc49-7277-40f7-a101-0343a74ba064
+    type: bearer
+    name: bearer auth
+    credentials:
+      token: "{{access_token}}"
