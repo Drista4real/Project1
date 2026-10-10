@@ -1,3 +1,5 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:project_one/features/budget/cubit/envelope_form_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:project_one/shared/widgets/finance_form.dart';
@@ -32,39 +34,16 @@ class _EnvelopeRebalanceSheetState extends State<EnvelopeRebalanceSheet> {
     4,
     (i) => TextEditingController(text: '${widget.data.roundedPercentages[i]}'),
   );
-  bool _busy = false;
-  String? _error;
+  late final _cubit = EnvelopeFormCubit(widget.service, widget.data);
+  bool get _busy => _cubit.state.busy;
+  String? get _error => _cubit.state.error;
   List<int> get _values =>
       _percent.map((c) => int.tryParse(c.text) ?? 0).toList();
   int get _sum => _values.fold(0, (a, b) => a + b);
 
   Future<void> _save() async {
     if (_busy || !validateFinanceForm(_form)) return;
-    if (_sum != 100) {
-      setState(() => _error = 'Tổng phân bổ phải bằng 100%.');
-      return;
-    }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      final fresh = await widget.service.load(widget.data.month);
-      await widget.service.rebalance(
-        fresh,
-        envelopeAmount(_total.text)!,
-        _values,
-      );
-      if (mounted) Navigator.pop(context, true);
-    } catch (error) {
-      if (mounted) {
-        setState(
-          () => _error = 'Chưa lưu xong phân bổ. Vui lòng thử lại. $error',
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    await _cubit.rebalance(envelopeAmount(_total.text)!, _values);
   }
 
   @override
@@ -73,11 +52,20 @@ class _EnvelopeRebalanceSheetState extends State<EnvelopeRebalanceSheet> {
     for (final c in _percent) {
       c.dispose();
     }
+    _cubit.close();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => EnvelopeSheetFrame(
+  Widget build(BuildContext context) =>
+      BlocConsumer<EnvelopeFormCubit, EnvelopeFormState>(
+        bloc: _cubit,
+        listenWhen: (previous, current) => !previous.saved && current.saved,
+        listener: (context, state) => Navigator.pop(context, true),
+        builder: (context, state) => _buildContent(context),
+      );
+
+  Widget _buildContent(BuildContext context) => EnvelopeSheetFrame(
     title: 'Tái cân bằng phong bao',
     saveLabel: 'Lưu phân bổ',
     busy: _busy,

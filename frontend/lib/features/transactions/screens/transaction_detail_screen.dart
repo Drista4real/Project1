@@ -1,3 +1,5 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:project_one/features/transactions/cubit/transaction_detail_cubit.dart';
 import 'package:flutter/material.dart';
 
 import 'package:project_one/app/app_dependencies.dart';
@@ -22,30 +24,19 @@ class TransactionDetailScreen extends StatefulWidget {
 class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
   FinanceRepository get _repository =>
       widget.repository ?? AppDependencies.financeRepository;
-  Transaction? _transaction;
-  String? _error;
-  bool _busy = false;
+  late final _cubit = TransactionDetailCubit(_repository, widget.transactionId)
+    ..refresh();
+  Transaction? get _transaction => _cubit.state.transaction;
+  String? get _error => _cubit.state.error;
+  bool get _busy => _cubit.state.busy;
   bool _changed = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
+  Future<void> _load() => _cubit.refresh();
 
-  Future<void> _load() async {
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      final data = await _repository.getTransaction(widget.transactionId);
-      if (mounted) setState(() => _transaction = data);
-    } catch (error) {
-      if (mounted) setState(() => _error = '$error');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+  @override
+  void dispose() {
+    _cubit.close();
+    super.dispose();
   }
 
   Future<void> _edit() async {
@@ -87,22 +78,26 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    setState(() => _busy = true);
-    try {
-      await _repository.deleteTransaction(widget.transactionId);
-      if (mounted) Navigator.pop(context, true);
-    } catch (error) {
-      if (mounted) {
-        setState(() => _busy = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('$error')));
-      }
-    }
+    await _cubit.delete();
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      BlocConsumer<TransactionDetailCubit, TransactionDetailState>(
+        bloc: _cubit,
+        listenWhen: (previous, current) => previous.busy && !current.busy,
+        listener: (context, state) {
+          if (state.deleted) Navigator.pop(context, true);
+          if (state.deleteError != null) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(state.deleteError!)));
+          }
+        },
+        builder: (context, state) => _buildContent(context),
+      );
+
+  Widget _buildContent(BuildContext context) {
     final tx = _transaction;
     return PopScope<bool>(
       canPop: false,

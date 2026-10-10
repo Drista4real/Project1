@@ -1,3 +1,5 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:project_one/features/transactions/cubit/transaction_form_cubit.dart';
 import 'package:flutter/material.dart';
 
 import 'package:project_one/app/app_dependencies.dart';
@@ -30,16 +32,20 @@ class _QuickAddTransactionScreenState extends State<QuickAddTransactionScreen> {
   final _amount = TextEditingController();
   final _note = TextEditingController();
   final _form = GlobalKey<FormState>();
-  List<Category> _categories = [];
-  List<Account> _accounts = [];
-  int? _accountId;
-  int? _toAccountId;
-  DateTime _date = DateTime.now();
-  String? _loadError;
-  Category? _selected;
-  String _type = 'expense';
-  bool _loading = true;
-  bool _saving = false;
+  late final _cubit = TransactionFormCubit(
+    _repository,
+    transaction: widget.transaction,
+  );
+  List<Category> get _categories => _cubit.state.categories;
+  List<Account> get _accounts => _cubit.state.accounts;
+  int? get _accountId => _cubit.state.accountId;
+  int? get _toAccountId => _cubit.state.toAccountId;
+  DateTime get _date => _cubit.state.date;
+  String? get _loadError => _cubit.state.loadError;
+  Category? get _selected => _cubit.state.selected;
+  String get _type => _cubit.state.type;
+  bool get _loading => _cubit.state.loading;
+  bool get _saving => _cubit.state.saving;
 
   String? _validateAmount(String? text) {
     final input = (text ?? '').trim();
@@ -72,10 +78,6 @@ class _QuickAddTransactionScreenState extends State<QuickAddTransactionScreen> {
       _amount.text = transaction.amount.toStringAsFixed(2).replaceAll('.', ',');
       _note.text =
           transaction.rawDescription ?? transaction.cleanDescription ?? '';
-      _type = transaction.transactionType;
-      _accountId = transaction.accountId;
-      _toAccountId = transaction.toAccountId;
-      _date = transaction.transactionDate;
     }
     _loadCategories();
   }
@@ -84,39 +86,11 @@ class _QuickAddTransactionScreenState extends State<QuickAddTransactionScreen> {
   void dispose() {
     _amount.dispose();
     _note.dispose();
+    _cubit.close();
     super.dispose();
   }
 
-  Future<void> _loadCategories() async {
-    setState(() {
-      _loading = true;
-      _loadError = null;
-    });
-    try {
-      final values = await _repository.getCategories();
-      final accounts = await _repository.getAccounts();
-      if (mounted) {
-        setState(() {
-          _categories = values;
-          _accounts = accounts;
-          _accountId ??= accounts.isEmpty ? null : accounts.first.id;
-          for (final category in values) {
-            if (category.id == widget.transaction?.categoryId) {
-              _selected = category;
-            }
-          }
-          _loading = false;
-        });
-      }
-    } catch (error) {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-          _loadError = '$error';
-        });
-      }
-    }
-  }
+  Future<void> _loadCategories() => _cubit.loadReferences();
 
   Future<void> _save() async {
     if (_saving || !validateFinanceForm(_form)) return;
@@ -124,45 +98,28 @@ class _QuickAddTransactionScreenState extends State<QuickAddTransactionScreen> {
     final value = double.parse(
       _amount.text.replaceAll('.', '').replaceAll(',', '.').trim(),
     );
-    setState(() => _saving = true);
-    try {
-      if (widget.transaction != null) {
-        await _repository.updateTransaction(widget.transaction!.id, {
-          'amount': value.toStringAsFixed(2),
-          'transaction_type': _type,
-          'raw_description': _note.text.trim(),
-          'clean_description': _note.text.trim(),
-          'category_id': _type == 'transfer' ? null : _selected?.id,
-          'account_id': _accountId,
-          'to_account_id': _type == 'transfer' ? _toAccountId : null,
-          'transaction_date': _date.toUtc().toIso8601String(),
-        });
-      } else {
-        await _repository.addTransaction(
-          amount: value,
-          transactionType: _type,
-          description: _note.text.trim().isEmpty
-              ? 'Giao dịch'
-              : _note.text.trim(),
-          categoryId: _selected?.id,
-          categoryName: _selected?.name,
-          accountId: _accountId,
-          transactionDate: _date,
-        );
-      }
-      if (mounted) Navigator.of(context).pop(true);
-    } catch (error) {
-      if (mounted) {
-        setState(() => _saving = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không thể lưu giao dịch: $error')),
-        );
-      }
-    }
+    await _cubit.save(value, _note.text);
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      BlocConsumer<TransactionFormCubit, TransactionFormState>(
+        bloc: _cubit,
+        listenWhen: (previous, current) => previous.saving && !current.saving,
+        listener: (context, state) {
+          if (state.saved) Navigator.of(context).pop(true);
+          if (state.saveError != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Không thể lưu giao dịch: ${state.saveError}'),
+              ),
+            );
+          }
+        },
+        builder: (context, state) => _buildContent(context),
+      );
+
+  Widget _buildContent(BuildContext context) {
     final income = _type == 'income';
     final disabled = _saving || _loading || _loadError != null;
     final categories = _categories.where((c) => c.isIncome == income).toList();
@@ -247,10 +204,7 @@ class _QuickAddTransactionScreenState extends State<QuickAddTransactionScreen> {
                                         selected: _type == type,
                                         onTap: () {
                                           if (!disabled && _type != type) {
-                                            setState(() {
-                                              _type = type;
-                                              _selected = null;
-                                            });
+                                            _cubit.selectType(type);
                                           }
                                         },
                                       ),
@@ -318,7 +272,7 @@ class _QuickAddTransactionScreenState extends State<QuickAddTransactionScreen> {
                                 .toList(),
                             onChanged: disabled
                                 ? null
-                                : (value) => setState(() => _accountId = value),
+                                : (value) => _cubit.selectAccount(value),
                             validator: (value) =>
                                 value == null ? 'Vui lòng chọn ví' : null,
                           ),
@@ -363,8 +317,7 @@ class _QuickAddTransactionScreenState extends State<QuickAddTransactionScreen> {
                                   .toList(),
                               onChanged: disabled
                                   ? null
-                                  : (value) =>
-                                        setState(() => _toAccountId = value),
+                                  : (value) => _cubit.selectToAccount(value),
                               validator: (value) => value == null
                                   ? 'Vui lòng chọn ví nhận'
                                   : value == _accountId
@@ -385,15 +338,7 @@ class _QuickAddTransactionScreenState extends State<QuickAddTransactionScreen> {
                                       lastDate: DateTime(2200),
                                     );
                                     if (date != null && mounted) {
-                                      setState(
-                                        () => _date = DateTime(
-                                          date.year,
-                                          date.month,
-                                          date.day,
-                                          _date.hour,
-                                          _date.minute,
-                                        ),
-                                      );
+                                      _cubit.selectDate(date);
                                     }
                                   },
                             child: InputDecorator(
@@ -429,10 +374,8 @@ class _QuickAddTransactionScreenState extends State<QuickAddTransactionScreen> {
                                   selected: selected,
                                   onSelected: disabled
                                       ? null
-                                      : (_) => setState(
-                                          () => _selected = selected
-                                              ? null
-                                              : category,
+                                      : (_) => _cubit.selectCategory(
+                                          selected ? null : category,
                                         ),
                                   selectedColor: AppTheme.secondaryMint,
                                   backgroundColor: Colors.white,
