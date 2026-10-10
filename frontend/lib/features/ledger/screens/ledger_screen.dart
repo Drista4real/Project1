@@ -1,3 +1,5 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:project_one/features/ledger/cubit/ledger_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:project_one/app/app_dependencies.dart';
 import 'package:project_one/core/theme/app_theme.dart';
@@ -24,54 +26,20 @@ class LedgerScreen extends StatefulWidget {
 class _LedgerScreenState extends State<LedgerScreen> {
   FinanceRepository get _repository =>
       widget.repository ?? AppDependencies.financeRepository;
-  Future<FinancialOverview> _getOverview() => _repository.getOverview();
-  Future<List<Transaction>> _getTransactions() => _repository.getTransactions();
-  bool _showCalendar = true;
-  DateTime _displayedMonth = DateTime(
-    DateTime.now().year,
-    DateTime.now().month,
-  );
+  late final _cubit = LedgerCubit(_repository)..refresh();
+  bool get _showCalendar => _cubit.state.showCalendar;
+  DateTime get _displayedMonth => _cubit.state.month;
+  bool get _isLoading => _cubit.state.loading;
+  String? get _loadError => _cubit.state.error;
+  FinancialOverview get _overview => _cubit.state.overview;
+  List<Transaction> get _transactions => _cubit.state.transactions;
 
-  bool _isLoading = false;
-  String? _loadError;
-  FinancialOverview _overview = FinancialOverview(
-    currentBalance: 0,
-    monthlyIncome: 0,
-    monthlyExpense: 0,
-  );
-  List<Transaction> _transactions = [];
+  Future<void> _loadAllData() => _cubit.refresh();
 
   @override
-  void initState() {
-    super.initState();
-    _loadAllData();
-  }
-
-  Future<void> _loadAllData() async {
-    setState(() {
-      _isLoading = true;
-      _loadError = null;
-    });
-    try {
-      final overview = await _getOverview();
-      final txList = await _getTransactions();
-
-      if (mounted) {
-        setState(() {
-          _overview = overview;
-          _transactions = txList;
-        });
-      }
-    } catch (error) {
-      if (mounted) {
-        setState(() {
-          _loadError = '$error';
-          _transactions = [];
-        });
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+  void dispose() {
+    _cubit.close();
+    super.dispose();
   }
 
   Future<void> _openTransaction(Transaction transaction) async {
@@ -114,7 +82,12 @@ class _LedgerScreenState extends State<LedgerScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => BlocBuilder<LedgerCubit, LedgerState>(
+    bloc: _cubit,
+    builder: (context, state) => _buildContent(context),
+  );
+
+  Widget _buildContent(BuildContext context) {
     return Scaffold(
       appBar: _buildKakeiboAppBar(),
       body: _buildLedgerContent(),

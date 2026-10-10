@@ -172,7 +172,7 @@ extension LedgerContent on _LedgerScreenState {
               label: 'Tháng này',
               icon: Icons.format_list_bulleted,
               selected: !_showCalendar,
-              onTap: () => setState(() => _showCalendar = false),
+              onTap: () => _cubit.showCalendar(false),
             ),
           ),
           Expanded(
@@ -180,7 +180,7 @@ extension LedgerContent on _LedgerScreenState {
               label: 'Lịch',
               icon: Icons.calendar_month,
               selected: _showCalendar,
-              onTap: () => setState(() => _showCalendar = true),
+              onTap: () => _cubit.showCalendar(true),
             ),
           ),
         ],
@@ -410,9 +410,7 @@ extension LedgerContent on _LedgerScreenState {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
-                onPressed: () => setState(() {
-                  _displayedMonth = DateTime(month.year, month.month - 1);
-                }),
+                onPressed: () => _cubit.moveMonth(-1),
                 icon: const Icon(Icons.chevron_left),
                 visualDensity: VisualDensity.compact,
               ),
@@ -441,9 +439,7 @@ extension LedgerContent on _LedgerScreenState {
                 ),
               ),
               IconButton(
-                onPressed: () => setState(() {
-                  _displayedMonth = DateTime(month.year, month.month + 1);
-                }),
+                onPressed: () => _cubit.moveMonth(1),
                 icon: const Icon(Icons.chevron_right),
                 visualDensity: VisualDensity.compact,
               ),
