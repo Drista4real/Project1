@@ -1,0 +1,7 @@
+﻿# Optional CPU NLP stack; install alongside backend/requirements.txt.
+numpy>=1.26,<3
+torch>=2.6,<3
+transformers>=4.40,<6
+underthesea>=6.8,<9
+lightgbm>=4.3,<5
+scikit-learn>=1.4,<2

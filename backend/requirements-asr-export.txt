@@ -1,0 +1,7 @@
+﻿# One-time export tooling; runtime ASR needs only requirements-asr.txt.
+-r requirements-asr.txt
+torch>=2.6,<3
+transformers>=4.40,<6
+openai-whisper==20250625
+onnx>=1.16,<2
+onnxruntime>=1.18,<2

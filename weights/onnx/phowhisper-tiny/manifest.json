@@ -1,0 +1,21 @@
+{
+  "source": "vinai/PhoWhisper-tiny",
+  "source_revision": "cc51d32be916efebde04ff549854fa1741cb5c02",
+  "exporter_revision": "7be9a38e275ece9ee9a9277cc78295f2cbfd6673",
+  "exporter_sha256": "5e0ddabfac8330ee9aecaba4c1b4286d1cd9f88df4cd30e54706b011bf976e45",
+  "quantization": "dynamic INT8 MatMul",
+  "artifacts": {
+    "encoder.int8.onnx": {
+      "bytes": 12926470,
+      "sha256": "0253cc770212920c1e0623d0e248f74e62aa6a1b70efd51412f95d3edc888320"
+    },
+    "decoder.int8.onnx": {
+      "bytes": 89846458,
+      "sha256": "fe35a05c72b7957aad23f6555dd0ec0ba59f515deb754b7ec45d5451fe6bca97"
+    },
+    "tokens.txt": {
+      "bytes": 866987,
+      "sha256": "febeed8e568f92d9ca984580bc2e6b605b867dc5ba4486f9646de381b44a8226"
+    }
+  }
+}

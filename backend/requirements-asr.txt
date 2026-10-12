@@ -1,0 +1,3 @@
+﻿# Optional offline CPU ASR runtime; no network needed for inference.
+numpy>=1.26,<3
+sherpa-onnx>=1.12,<2

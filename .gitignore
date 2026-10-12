@@ -1,0 +1,46 @@
+# Local Python environments
+.venv*/
+venv/
+env/
+ENV/
+
+# Credentials and local configuration (keep shareable templates)
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.template
+**/.streamlit/secrets.toml
+
+# Python bytecode and tooling caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.pyright/
+.tox/
+.nox/
+.ipynb_checkpoints/
+
+# Coverage and Python packaging outputs
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.egg-info/
+/build/
+/dist/
+
+# Runtime logs and temporary editor/OS files
+*.log
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Downloaded model caches and exported ASR binaries
+weights/cache/
+weights/onnx/phowhisper-tiny/*.onnx

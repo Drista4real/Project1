@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "model_name": "vinai/phobert-base",
+  "revision": "main",
+  "max_length": 256,
+  "embedding_dim": 768,
+  "pooling": "cls",
+  "preprocessing": "lower_whitespace_underthesea_text_v1",
+  "confidence_threshold": 0.8
+}
