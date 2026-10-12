@@ -12,6 +12,7 @@ class CategoryEnvelopeContent extends StatelessWidget {
     super.key,
     required this.data,
     required this.search,
+    required this.query,
     required this.onSearch,
     required this.onMonth,
     required this.onAdd,
@@ -23,6 +24,7 @@ class CategoryEnvelopeContent extends StatelessWidget {
   });
   final CategoryEnvelopeData data;
   final TextEditingController search;
+  final String query;
   final VoidCallback onSearch, onRebalance;
   final ValueChanged<String> onAdvanced;
   final ValueChanged<int> onMonth;
@@ -33,7 +35,7 @@ class CategoryEnvelopeContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final query = search.text.trim().toLowerCase();
+    final query = this.query.trim().toLowerCase();
     final categories = data.expenses
         .where((c) => '${c['name']}'.toLowerCase().contains(query))
         .toList();

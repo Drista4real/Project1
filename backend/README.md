@@ -137,6 +137,11 @@ Swagger UI: `http://127.0.0.1:8000/docs`. Use **Authorize** with a signed-in use
 access token to exercise protected endpoints. Local automated API tests use a
 mock HTTP transport for Supabase and do not modify a live project.
 
+For Postman, open the local collection and copy the environment template from
+[`../postman`](../postman/README.md).
+The Vietnamese guide covers Supabase login, automatic token storage, transaction
+CRUD and management requests. Sample environment files contain no credentials.
+
 Opening `http://127.0.0.1:8000/` redirects to Swagger. Registration and login
 currently run through the Flutter Supabase Auth SDK, not FastAPI routes;
 `/register` and `/api/v1/auth/register` are not defined in this API.

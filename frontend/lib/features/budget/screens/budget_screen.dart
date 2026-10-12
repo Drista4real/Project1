@@ -1,3 +1,5 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:project_one/features/budget/cubit/budget_month_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:project_one/app/app_dependencies.dart';
 import 'package:project_one/app/widgets/app_screen_navigation.dart';
@@ -26,7 +28,14 @@ class _BudgetScreenState extends State<BudgetScreen> {
   late final _insights = widget.insights ?? AppDependencies.financeInsights;
   late final _load = _insights.budgets;
   late final _service = CategoryEnvelopesService(_insights.repository);
-  DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+  final _cubit = BudgetMonthCubit();
+  DateTime get _month => _cubit.state;
+
+  @override
+  void dispose() {
+    _cubit.close();
+    super.dispose();
+  }
 
   Future<void> _manage() async {
     await openFinanceModule(
@@ -109,7 +118,12 @@ class _BudgetScreenState extends State<BudgetScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Theme(
+  Widget build(BuildContext context) => BlocBuilder<BudgetMonthCubit, DateTime>(
+    bloc: _cubit,
+    builder: (context, state) => _buildContent(context),
+  );
+
+  Widget _buildContent(BuildContext context) => Theme(
     data: envelopeTheme(Theme.of(context)),
     child: Scaffold(
       backgroundColor: EnvelopeStyle.canvas,
@@ -149,9 +163,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
             children: [
               BudgetOverviewContent(
                 overview: overview,
-                onMonth: (delta) => setState(
-                  () => _month = DateTime(_month.year, _month.month + delta),
-                ),
+                onMonth: (delta) => _cubit.move(delta),
                 onManage: _manage,
                 onRebalance: () => _rebalance(overview),
                 onSavingGoals: _savingGoals,

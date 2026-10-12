@@ -1,3 +1,6 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:project_one/features/budget/cubit/category_envelopes_cubit.dart';
+import 'package:project_one/shared/state/async_data_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:project_one/app/app_dependencies.dart';
@@ -29,30 +32,14 @@ class _CategoryEnvelopesScreenState extends State<CategoryEnvelopesScreen> {
   late final _service = CategoryEnvelopesService(
     widget.repository ?? AppDependencies.managementRepository,
   );
-  late DateTime _month =
-      widget.month ?? DateTime(DateTime.now().year, DateTime.now().month);
-  late Future<CategoryEnvelopeData> _future = _service.load(_month);
+  late final _cubit = CategoryEnvelopesCubit(_service, month: widget.month)
+    ..refresh();
+  DateTime get _month => _cubit.state.month;
+  bool get _mutating => _cubit.state.mutating;
   final _search = TextEditingController();
-  bool _mutating = false;
-  void _reload() => setState(() {
-    _future = _service.load(_month);
-  });
-  Future<void> _refresh() async {
-    if (!mounted) return;
-    _reload();
-    try {
-      await _future;
-    } catch (_) {
-      // The FutureBuilder renders the load error and its retry action.
-    }
-  }
-
-  void _moveMonth(int delta) {
-    setState(() {
-      _month = DateTime(_month.year, _month.month + delta);
-      _future = _service.load(_month);
-    });
-  }
+  Future<void> _reload() => _cubit.refresh();
+  Future<void> _refresh() => _cubit.refresh();
+  void _moveMonth(int delta) => _cubit.moveMonth(delta);
 
   Future<void> _sheet(Widget child) async {
     final saved = await showEnvelopeSheet(context, child);
@@ -84,14 +71,10 @@ class _CategoryEnvelopesScreenState extends State<CategoryEnvelopesScreen> {
       'Tắt phong bao',
     );
     if (confirmed != true || !mounted) return;
-    setState(() => _mutating = true);
     try {
-      await _service.saveLimit(data, category['id'] as int, null);
-      if (mounted) _reload();
+      await _cubit.disable(data, category);
     } catch (error) {
       if (mounted) _notice('Không thể tắt phong bao: $error');
-    } finally {
-      if (mounted) setState(() => _mutating = false);
     }
   }
 
@@ -119,17 +102,10 @@ class _CategoryEnvelopesScreenState extends State<CategoryEnvelopesScreen> {
       'Xóa danh mục',
     );
     if (confirmed != true || !mounted) return;
-    setState(() => _mutating = true);
     try {
-      await _service.repository.delete(
-        'categories',
-        _service.repository.key('categories', category),
-      );
-      if (mounted) _reload();
+      await _cubit.deleteCategory(category);
     } catch (error) {
       if (mounted) _notice('Chưa thể xóa danh mục: $error');
-    } finally {
-      if (mounted) setState(() => _mutating = false);
     }
   }
 
@@ -177,11 +153,21 @@ class _CategoryEnvelopesScreenState extends State<CategoryEnvelopesScreen> {
   @override
   void dispose() {
     _search.dispose();
+    _cubit.close();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => Theme(
+  Widget build(BuildContext context) =>
+      BlocBuilder<CategoryEnvelopesCubit, CategoryEnvelopesState>(
+        bloc: _cubit,
+        builder: (context, state) => _buildContent(context, state),
+      );
+
+  Widget _buildContent(
+    BuildContext context,
+    CategoryEnvelopesState state,
+  ) => Theme(
     data: envelopeTheme(Theme.of(context)),
     child: Scaffold(
       backgroundColor: EnvelopeStyle.canvas,
@@ -208,16 +194,12 @@ class _CategoryEnvelopesScreenState extends State<CategoryEnvelopesScreen> {
             tooltip: 'Thêm danh mục mới',
             onPressed: _mutating
                 ? null
-                : () async {
-                    try {
-                      final data = await _future;
-                      if (mounted) _edit(data);
-                    } catch (_) {
-                      if (mounted) {
-                        _notice(
-                          'Vui lòng tải lại danh mục trước khi thêm mới.',
-                        );
-                      }
+                : () {
+                    if (state.status == DataStatus.success &&
+                        state.data != null) {
+                      _edit(state.data!);
+                    } else {
+                      _notice('Vui lòng tải lại danh mục trước khi thêm mới.');
                     }
                   },
             style: IconButton.styleFrom(
@@ -228,20 +210,19 @@ class _CategoryEnvelopesScreenState extends State<CategoryEnvelopesScreen> {
           const SizedBox(width: 12),
         ],
       ),
-      body: FutureBuilder<CategoryEnvelopeData>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return ManagementErrorPanel(error: snapshot.error!, retry: _reload);
+      body: Builder(
+        builder: (context) {
+          if (state.status == DataStatus.failure) {
+            return ManagementErrorPanel(error: state.error!, retry: _reload);
           }
-          if (!snapshot.hasData) {
+          if (state.status != DataStatus.success) {
             return const Center(
               child: CircularProgressIndicator(
                 semanticsLabel: 'Đang tải danh mục và phong bao',
               ),
             );
           }
-          final data = snapshot.data!;
+          final data = state.data!;
           return AbsorbPointer(
             absorbing: _mutating,
             child: RefreshIndicator(
@@ -254,7 +235,8 @@ class _CategoryEnvelopesScreenState extends State<CategoryEnvelopesScreen> {
                   CategoryEnvelopeContent(
                     data: data,
                     search: _search,
-                    onSearch: () => setState(() {}),
+                    query: state.query,
+                    onSearch: () => _cubit.search(_search.text),
                     onMonth: _moveMonth,
                     onAdd: (pillar) => _edit(data, pillar: pillar),
                     onRebalance: () => _sheet(

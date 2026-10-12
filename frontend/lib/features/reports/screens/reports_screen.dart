@@ -1,3 +1,5 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:project_one/features/reports/cubit/reports_cubit.dart';
 import 'package:flutter/material.dart';
 
 import 'package:project_one/app/app_dependencies.dart';
@@ -23,38 +25,32 @@ class ReportsScreen extends StatefulWidget {
 
 class _ReportsScreenState extends State<ReportsScreen> {
   final _dataController = FinanceDataController();
-  String _period = 'Tháng';
-  String _activeTab = 'history';
-  DateTime _anchor = DateTime.now();
-
-  (DateTime, DateTime) get _range => switch (_period) {
-    'Tuần' => (
-      DateTime(_anchor.year, _anchor.month, _anchor.day - _anchor.weekday + 1),
-      DateTime(_anchor.year, _anchor.month, _anchor.day - _anchor.weekday + 8),
-    ),
-    'Năm' => (DateTime(_anchor.year), DateTime(_anchor.year + 1)),
-    _ => (
-      DateTime(_anchor.year, _anchor.month),
-      DateTime(_anchor.year, _anchor.month + 1),
-    ),
-  };
-
-  void _move(int step) => setState(
-    () => _anchor = switch (_period) {
-      'Tuần' => DateTime(_anchor.year, _anchor.month, _anchor.day + step * 7),
-      'Năm' => DateTime(_anchor.year + step, _anchor.month),
-      _ => DateTime(_anchor.year, _anchor.month + step),
-    },
-  );
+  final _cubit = ReportsCubit();
+  String get _period => _cubit.state.period;
+  String get _activeTab => _cubit.state.activeTab;
+  DateTime get _anchor => _cubit.state.anchor;
+  (DateTime, DateTime) get _range => _cubit.state.range;
+  void _move(int step) => _cubit.move(step);
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  void dispose() {
+    _cubit.close();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => BlocBuilder<ReportsCubit, ReportsState>(
+    bloc: _cubit,
+    builder: (context, state) => _buildContent(context),
+  );
+
+  Widget _buildContent(BuildContext context) => Scaffold(
     appBar: const AppScreenHeader(subtitle: 'Báo Cáo'),
     body: _activeTab == 'forecast'
         ? CashflowForecastScreen(
             insights: widget.insights,
             controller: _dataController,
-            onSwitchToHistory: () => setState(() => _activeTab = 'history'),
+            onSwitchToHistory: () => _cubit.selectTab('history'),
           )
         : FinanceDataView<SpendingData>(
             controller: _dataController,
@@ -106,7 +102,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               for (final period in ['Tuần', 'Tháng', 'Năm'])
                 Expanded(
                   child: TextButton(
-                    onPressed: () => setState(() => _period = period),
+                    onPressed: () => _cubit.selectPeriod(period),
                     style: TextButton.styleFrom(
                       backgroundColor: _period == period
                           ? Colors.white
@@ -185,7 +181,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         const SizedBox(height: 18),
         ReportModeBottomToggle(
           activeTab: _activeTab,
-          onTabChanged: (tab) => setState(() => _activeTab = tab),
+          onTabChanged: (tab) => _cubit.selectTab(tab),
         ),
       ],
     );

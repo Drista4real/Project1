@@ -1,3 +1,5 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:project_one/features/budget/cubit/envelope_form_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:project_one/features/finance/domain/usecases/finance_insights.dart';
 import 'package:project_one/shared/widgets/finance_form.dart';
@@ -32,8 +34,9 @@ class _CategoryEnvelopeSheetState extends State<CategoryEnvelopeSheet> {
   late EnvelopePillar _pillar =
       EnvelopePillar.fromKey(widget.category?['pillar']) ??
       widget.initialPillar;
-  bool _busy = false;
-  String? _error;
+  late final _cubit = EnvelopeFormCubit(widget.service, widget.data);
+  bool get _busy => _cubit.state.busy;
+  String? get _error => _cubit.state.error;
   bool get _system =>
       widget.category != null && widget.category!['user_id'] == null;
 
@@ -47,38 +50,34 @@ class _CategoryEnvelopeSheetState extends State<CategoryEnvelopeSheet> {
 
   Future<void> _save() async {
     if (_busy || !validateFinanceForm(_form)) return;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      final fresh = await widget.service.load(widget.data.month);
-      await widget.service.saveCategory(
-        data: fresh,
-        category: widget.category,
-        name: _name.text.trim(),
-        pillar: _pillar,
-        limit: _limit.text.trim().isEmpty
-            ? null
-            : '${envelopeAmount(_limit.text)}',
-      );
-      if (mounted) Navigator.pop(context, true);
-    } catch (error) {
-      if (mounted) setState(() => _error = 'Không thể lưu. $error');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    await _cubit.saveCategory(
+      category: widget.category,
+      name: _name.text.trim(),
+      pillar: _pillar,
+      limit: _limit.text.trim().isEmpty
+          ? null
+          : '${envelopeAmount(_limit.text)}',
+    );
   }
 
   @override
   void dispose() {
     _name.dispose();
     _limit.dispose();
+    _cubit.close();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => EnvelopeSheetFrame(
+  Widget build(BuildContext context) =>
+      BlocConsumer<EnvelopeFormCubit, EnvelopeFormState>(
+        bloc: _cubit,
+        listenWhen: (previous, current) => !previous.saved && current.saved,
+        listener: (context, state) => Navigator.pop(context, true),
+        builder: (context, state) => _buildContent(context),
+      );
+
+  Widget _buildContent(BuildContext context) => EnvelopeSheetFrame(
     title: widget.category == null
         ? 'Tạo danh mục mới'
         : _system

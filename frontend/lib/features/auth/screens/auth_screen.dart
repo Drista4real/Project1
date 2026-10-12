@@ -1,8 +1,8 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:project_one/features/auth/cubit/auth_cubit.dart';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:project_one/core/config/supabase_config.dart';
-import 'package:project_one/core/network/auth_error_message.dart';
 import 'package:project_one/core/theme/app_theme.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -15,61 +15,35 @@ class _AuthScreenState extends State<AuthScreen> {
   final _form = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
-  bool _register = false;
-  bool _busy = false;
-  String? _message;
+  late final _cubit = AuthCubit(SupabaseConfig.client.auth);
+  bool get _register => _cubit.state.register;
+  bool get _busy => _cubit.state.busy;
+  String? get _message => _cubit.state.message;
 
   @override
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _cubit.close();
     super.dispose();
   }
 
   Future<void> _submit() async {
-    if (_busy) return;
-    if (!_form.currentState!.validate()) return;
-    setState(() {
-      _busy = true;
-      _message = null;
-    });
-    try {
-      final response = _register
-          ? await SupabaseConfig.client.auth.signUp(
-              email: _email.text.trim(),
-              password: _password.text,
-            )
-          : await SupabaseConfig.client.auth.signInWithPassword(
-              email: _email.text.trim(),
-              password: _password.text,
-            );
-      if (!mounted) return;
-      if (response.session != null) {
-        Navigator.pop(context, true);
-      } else {
-        setState(
-          () => _message =
-              'Kiểm tra email để xác nhận tài khoản, sau đó đăng nhập.',
-        );
-      }
-    } on AuthException catch (error) {
-      debugPrint(
-        'Supabase Auth failed: status=${error.statusCode}, code=${error.code}',
-      );
-      if (mounted) {
-        setState(() => _message = authErrorMessage(error));
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _message = 'Không thể kết nối. Vui lòng thử lại.');
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
+    if (!_busy && _form.currentState!.validate()) {
+      await _cubit.submit(_email.text, _password.text);
     }
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => BlocConsumer<AuthCubit, AuthState>(
+    bloc: _cubit,
+    listenWhen: (previous, current) =>
+        !previous.authenticated && current.authenticated,
+    listener: (context, state) => Navigator.pop(context, true),
+    builder: (context, state) => _buildContent(context),
+  );
+
+  Widget _buildContent(BuildContext context) => Scaffold(
     appBar: AppBar(title: Text(_register ? 'Tạo tài khoản' : 'Đăng nhập')),
     body: Center(
       child: ConstrainedBox(
@@ -142,12 +116,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
               ),
               TextButton(
-                onPressed: _busy
-                    ? null
-                    : () => setState(() {
-                        _register = !_register;
-                        _message = null;
-                      }),
+                onPressed: _busy ? null : () => _cubit.toggleMode(),
                 child: Text(
                   _register
                       ? 'Đã có tài khoản? Đăng nhập'

@@ -1,0 +1,14 @@
+$kind: http-request
+description: ""
+url: "{{base_url}}/openapi.json"
+method: GET
+headers:
+  Accept: application/json
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    code: |
+      pm.test("HTTP 200", function () { pm.response.to.have.status(200); });
+    language: text/javascript
+order: 2000

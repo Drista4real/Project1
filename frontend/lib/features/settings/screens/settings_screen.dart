@@ -1,3 +1,5 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:project_one/features/settings/cubit/settings_cubit.dart';
 import 'package:flutter/material.dart';
 
 import 'package:project_one/core/theme/app_theme.dart';
@@ -24,20 +26,20 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final _search = TextEditingController();
-  final Set<String> _tags = {};
-  String _range = 'Tháng 10';
-  bool _reminders = true;
-  bool _biometrics = true;
-  bool _darkMode = false;
-  bool _loading = false;
-  bool _saving = false;
-  String? _error;
-  int _generation = 0;
-  FinanceRecord? _profile;
-  List<FinanceRecord> _tagRecords = [];
-  List<FinanceRecord> _transactions = [];
-  List<FinanceRecord> _transactionTags = [];
-  DateTimeRange? _customRange;
+  late final _cubit = SettingsCubit(_repository)..refresh();
+  Set<String> get _tags => _cubit.state.tags;
+  String get _range => _cubit.state.range;
+  bool get _reminders => _profile?['reminder_time'] != null;
+  bool get _biometrics => _profile?['biometrics_enabled'] == true;
+  bool get _darkMode => _profile?['dark_mode_enabled'] == true;
+  bool get _loading => _cubit.state.loading;
+  bool get _saving => _cubit.state.saving;
+  String? get _error => _cubit.state.error;
+  FinanceRecord? get _profile => _cubit.state.data?.profile;
+  List<FinanceRecord> get _tagRecords => _cubit.state.data?.tags ?? [];
+  List<FinanceRecord> get _transactions =>
+      _cubit.state.data?.transactions ?? [];
+  DateTimeRange? get _customRange => _cubit.state.customRange;
   ManagementRepository get _repository =>
       widget.repository ?? AppDependencies.managementRepository;
 
@@ -46,66 +48,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) await _loadSettings();
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _range = 'Tháng này';
-    _loadSettings();
-  }
-
-  Future<void> _loadSettings() async {
-    final generation = ++_generation;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
-    try {
-      final values = await Future.wait([
-        _repository.get('profile', 'me'),
-        _repository.references('tags'),
-        _repository.references('transactions'),
-        _repository.references('transaction_tags'),
-      ]);
-      if (!mounted || generation != _generation) return;
-      setState(() {
-        _profile = values[0] as FinanceRecord;
-        _tagRecords = values[1] as List<FinanceRecord>;
-        _transactions = values[2] as List<FinanceRecord>;
-        _transactionTags = values[3] as List<FinanceRecord>;
-        _reminders = _profile!['reminder_time'] != null;
-        _biometrics = _profile!['biometrics_enabled'] == true;
-        _darkMode = _profile!['dark_mode_enabled'] == true;
-        _tags.removeWhere(
-          (name) => !_tagRecords.any((tag) => tag['name'] == name),
-        );
-      });
-    } catch (error) {
-      if (mounted && generation == _generation) {
-        setState(() {
-          _error = '$error';
-          _profile = null;
-          _transactions = [];
-          _tagRecords = [];
-          _transactionTags = [];
-        });
-      }
-    } finally {
-      if (mounted && generation == _generation) {
-        setState(() => _loading = false);
-      }
-    }
-  }
+  Future<void> _loadSettings() => _cubit.refresh();
 
   Future<void> _savePreference(String field, dynamic value) async {
-    if (_saving || _profile == null) return;
-    setState(() => _saving = true);
     try {
-      await _repository.save('profile', {field: value}, key: 'me');
-      if (mounted) await _loadSettings();
+      await _cubit.savePreference(field, value);
     } catch (error) {
       if (mounted) _notice('$error');
-    } finally {
-      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -118,68 +67,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
         initialDateRange: _customRange,
       );
       if (selected == null || !mounted) return;
-      setState(() {
-        _customRange = selected;
-        _range = range;
-      });
+      _cubit.selectRange(range, customRange: selected);
     } else {
-      setState(() => _range = range);
+      _cubit.selectRange(range);
     }
   }
 
-  List<FinanceRecord> get _filteredTransactions {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final start = switch (_range) {
-      'Hôm nay' => today,
-      'Tuần này' => DateTime(now.year, now.month, now.day - now.weekday + 1),
-      'Tùy chọn' => _customRange?.start ?? today,
-      _ => DateTime(now.year, now.month),
-    };
-    final end = switch (_range) {
-      'Hôm nay' => DateTime(now.year, now.month, now.day + 1),
-      'Tuần này' => DateTime(now.year, now.month, now.day - now.weekday + 8),
-      'Tùy chọn' =>
-        _customRange == null
-            ? DateTime(now.year, now.month, now.day + 1)
-            : DateTime(
-                _customRange!.end.year,
-                _customRange!.end.month,
-                _customRange!.end.day + 1,
-              ),
-      _ => DateTime(now.year, now.month + 1),
-    };
-    final query = _search.text.trim().toLowerCase();
-    final tagIds = _tagRecords
-        .where((tag) => _tags.contains(tag['name']))
-        .map((tag) => tag['id'])
-        .toSet();
-    final taggedIds = _transactionTags
-        .where((item) => tagIds.contains(item['tag_id']))
-        .map((item) => item['transaction_id'])
-        .toSet();
-    return _transactions.where((item) {
-      final date = financeDate(item['transaction_date']);
-      if (date == null || date.isBefore(start) || !date.isBefore(end)) {
-        return false;
-      }
-      if (_tags.isNotEmpty && !taggedIds.contains(item['id'])) return false;
-      final category = item['categories'];
-      final relatedNames = _transactionTags
-          .where((link) => link['transaction_id'] == item['id'])
-          .map(
-            (link) => _tagRecords
-                .where((tag) => tag['id'] == link['tag_id'])
-                .map((tag) => tag['name'])
-                .join(' '),
-          )
-          .join(' ');
-      final text =
-          '${item['clean_description'] ?? ''} ${item['raw_description'] ?? ''} ${item['amount']} ${category is Map ? category['name'] : ''} $relatedNames'
-              .toLowerCase();
-      return query.isEmpty || text.contains(query.replaceFirst('#', ''));
-    }).toList();
-  }
+  List<FinanceRecord> get _filteredTransactions =>
+      _cubit.state.filteredTransactions(DateTime.now());
 
   String _dateLabel(FinanceRecord item) {
     final date = financeDate(item['transaction_date']);
@@ -189,11 +84,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void dispose() {
     _search.dispose();
+    _cubit.close();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) =>
+      BlocBuilder<SettingsCubit, SettingsState>(
+        bloc: _cubit,
+        builder: (context, state) => _buildContent(context),
+      );
+
+  Widget _buildContent(BuildContext context) {
     final matches = _filteredTransactions;
     return Scaffold(
       appBar: const AppScreenHeader(subtitle: 'Tiện Ích và Cài Đặt'),
@@ -285,7 +187,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           TextField(
             controller: _search,
-            onChanged: (_) => setState(() {}),
+            onChanged: _cubit.search,
             decoration: InputDecoration(
               hintText: 'Tìm theo ghi chú, số tiền, #hashtag...',
               prefixIcon: const Icon(Icons.search, color: AppTheme.textMuted),
@@ -345,13 +247,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: FilterChip(
                       label: Text('# $tag'),
                       selected: _tags.contains(tag),
-                      onSelected: (selected) => setState(() {
-                        if (selected) {
-                          _tags.add(tag);
-                        } else {
-                          _tags.remove(tag);
-                        }
-                      }),
+                      onSelected: (selected) => _cubit.selectTag(tag, selected),
                       showCheckmark: false,
                       backgroundColor: const Color(0xFFEAF0E9),
                       selectedColor: const Color(0xFFD2E5D8),

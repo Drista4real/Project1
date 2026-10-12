@@ -1,0 +1,36 @@
+$kind: http-request
+description: Lưu lại cả access token và refresh token mới.
+url: "{{supabase_url}}/auth/v1/token?grant_type=refresh_token"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+  apikey: "{{supabase_publishable_key}}"
+body:
+  type: json
+  content: |-
+    {
+      "refresh_token": "{{refresh_token}}"
+    }
+auth:
+  type: noauth
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 200", function () { pm.response.to.have.status(200); });
+      if (pm.response.code === 200) {
+        const data = pm.response.json();
+        pm.test("Có access token và refresh token", function () {
+          pm.expect(data.access_token).to.be.a("string").and.not.empty;
+          pm.expect(data.refresh_token).to.be.a("string").and.not.empty;
+        });
+        if (data.access_token && data.refresh_token) {
+          pm.environment.set("access_token", data.access_token);
+          pm.environment.set("refresh_token", data.refresh_token);
+          if (data.user) pm.environment.set("user_id", data.user.id);
+        }
+      } else {
+        pm.environment.unset("access_token");
+      }
+    language: text/javascript
+order: 2000

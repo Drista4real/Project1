@@ -1,0 +1,25 @@
+$kind: http-request
+description: ""
+url: "{{base_url}}/api/v1/manage/debts_loans"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "type": "debt",
+      "person_name": "Người thử Postman",
+      "amount": "500000.00"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 201", function () { pm.response.to.have.status(201); });
+      if (pm.response.code === 201) {
+        const data = pm.response.json();
+        pm.environment.set("manage_debts_loans_id", String(data.id));
+      }
+    language: text/javascript
+order: 2000

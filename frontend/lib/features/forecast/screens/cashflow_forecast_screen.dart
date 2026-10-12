@@ -1,3 +1,5 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:project_one/features/forecast/cubit/forecast_cubit.dart';
 import 'package:flutter/material.dart';
 
 import 'package:project_one/app/app_dependencies.dart';
@@ -48,8 +50,16 @@ class _ForecastPageState extends State<ForecastPage> {
 }
 
 class _CashflowForecastScreenState extends State<CashflowForecastScreen> {
-  int _selectedDays = 14;
-  final _saving = <int>{};
+  late final _cubit = ForecastCubit(_insights.repository);
+  int get _selectedDays => _cubit.state.days;
+  Set<int> get _saving => _cubit.state.saving;
+
+  @override
+  void dispose() {
+    _cubit.close();
+    super.dispose();
+  }
+
   FinanceInsights get _insights =>
       widget.insights ?? AppDependencies.financeInsights;
 
@@ -60,20 +70,15 @@ class _CashflowForecastScreenState extends State<CashflowForecastScreen> {
   ) async {
     final id = alert['id'] as int;
     if (_saving.contains(id)) return;
-    setState(() => _saving.add(id));
     try {
-      await _insights.repository.save('cashflow_alerts', {
-        field: true,
-      }, key: '$id');
-      if (mounted) await refresh();
+      final saved = await _cubit.updateAlert(id, field);
+      if (saved && mounted) await refresh();
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('$error')));
       }
-    } finally {
-      if (mounted) setState(() => _saving.remove(id));
     }
   }
 
@@ -87,7 +92,13 @@ class _CashflowForecastScreenState extends State<CashflowForecastScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => FinanceDataView<ForecastData>(
+  Widget build(BuildContext context) =>
+      BlocBuilder<ForecastCubit, ForecastState>(
+        bloc: _cubit,
+        builder: (context, state) => _buildContent(context),
+      );
+
+  Widget _buildContent(BuildContext context) => FinanceDataView<ForecastData>(
     controller: widget.controller,
     load: _insights.forecasts,
     builder: (context, data, refresh) {
@@ -121,7 +132,7 @@ class _CashflowForecastScreenState extends State<CashflowForecastScreen> {
                     child: ChoiceChip(
                       label: Text('$days ngày'),
                       selected: _selectedDays == days,
-                      onSelected: (_) => setState(() => _selectedDays = days),
+                      onSelected: (_) => _cubit.selectDays(days),
                     ),
                   ),
                 ),

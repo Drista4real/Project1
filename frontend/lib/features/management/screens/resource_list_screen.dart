@@ -1,3 +1,6 @@
+import 'package:project_one/shared/state/async_data_cubit.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:project_one/features/management/cubit/resource_list_cubit.dart';
 import 'package:flutter/material.dart';
 
 import 'package:project_one/features/finance/domain/repositories/management_repository.dart';
@@ -23,11 +26,16 @@ class ResourceListScreen extends StatefulWidget {
 class _ResourceListScreenState extends State<ResourceListScreen> {
   String get name => widget.resource['name'] as String;
   bool get singleton => widget.resource['singleton'] == true;
-  int _offset = 0;
-  late Future<Map<String, dynamic>> _page = widget.repository.page(name);
-  bool _deleting = false;
-  void _load() =>
-      setState(() => _page = widget.repository.page(name, offset: _offset));
+  late final _cubit = ResourceListCubit(widget.repository, name)..refresh();
+  int get _offset => _cubit.state.offset;
+  bool get _deleting => _cubit.state.deleting;
+  Future<void> _load() => _cubit.refresh();
+
+  @override
+  void dispose() {
+    _cubit.close();
+    super.dispose();
+  }
 
   Future<void> _edit([Map<String, dynamic>? record]) async {
     try {
@@ -86,26 +94,28 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    setState(() => _deleting = true);
     try {
-      await widget.repository.delete(name, widget.repository.key(name, item));
-      if (mounted) {
-        if (_offset > 0) _offset -= 30;
-        _load();
-      }
+      await _cubit.delete(item);
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('$error')));
       }
-    } finally {
-      if (mounted) setState(() => _deleting = false);
     }
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) =>
+      BlocBuilder<ResourceListCubit, ResourceListState>(
+        bloc: _cubit,
+        builder: (context, state) => _buildContent(context, state),
+      );
+
+  Widget _buildContent(
+    BuildContext context,
+    ResourceListState state,
+  ) => Scaffold(
     appBar: AppBar(
       title: Text(widget.resource['title'] as String),
       actions: [
@@ -123,18 +133,17 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
             icon: const Icon(Icons.add),
             label: Text(managementCreateLabels[name] ?? 'Thêm mới'),
           ),
-    body: FutureBuilder<Map<String, dynamic>>(
-      future: _page,
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return ManagementErrorPanel(error: snapshot.error!, retry: _load);
+    body: Builder(
+      builder: (context) {
+        if (state.status == DataStatus.failure) {
+          return ManagementErrorPanel(error: state.error!, retry: _load);
         }
-        if (snapshot.connectionState != ConnectionState.done) {
+        if (state.status != DataStatus.success) {
           return const Center(child: CircularProgressIndicator());
         }
-        final items = (snapshot.data!['items'] as List)
+        final items = (state.page!['items'] as List)
             .cast<Map<String, dynamic>>();
-        final total = (snapshot.data!['total'] as num).toInt();
+        final total = (state.page!['total'] as num).toInt();
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
           children: [
@@ -230,10 +239,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                 IconButton(
                   onPressed: _offset == 0 || _deleting
                       ? null
-                      : () {
-                          _offset -= 30;
-                          _load();
-                        },
+                      : () => _cubit.movePage(-1),
                   icon: const Icon(Icons.chevron_left),
                 ),
                 Text(
@@ -242,10 +248,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                 IconButton(
                   onPressed: _offset + items.length >= total || _deleting
                       ? null
-                      : () {
-                          _offset += 30;
-                          _load();
-                        },
+                      : () => _cubit.movePage(1),
                   icon: const Icon(Icons.chevron_right),
                 ),
               ],

@@ -1,0 +1,19 @@
+$kind: http-request
+description: ""
+url: "{{base_url}}/api/v1/manage/cashflow_forecasts/{{manage_cashflow_forecasts_id}}"
+method: PATCH
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "predicted_balance": "1100000.00"
+    }
+scripts:
+  - type: afterResponse
+    code: |
+      pm.test("HTTP 200", function () { pm.response.to.have.status(200); });
+    language: text/javascript
+order: 4000
