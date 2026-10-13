@@ -5,6 +5,7 @@ class Category {
   final String? icon;
   final String color;
   final bool isIncome;
+  final String? pillar;
 
   const Category({
     required this.id,
@@ -13,5 +14,6 @@ class Category {
     this.icon,
     this.color = '#3ECF8E',
     this.isIncome = false,
+    this.pillar,
   });
 }

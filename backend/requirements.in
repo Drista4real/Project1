@@ -4,3 +4,4 @@ python-dotenv>=1,<2
 celery[redis]>=5.6,<6
 supabase>=2,<3
 httpx>=0.28,<1
+google-genai>=1.30,<3

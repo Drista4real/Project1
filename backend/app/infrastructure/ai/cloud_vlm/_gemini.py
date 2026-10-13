@@ -43,6 +43,11 @@ def configured_model_name() -> str:
     return _configured_value("GEMINI_MODEL") or "gemini-2.5-flash"
 
 
+def configured_input_model_name() -> str:
+    """Use a separately configurable fast model for transaction classification."""
+    return _configured_value("GEMINI_INPUT_MODEL") or "gemini-3.1-flash-lite"
+
+
 def create_client(
     api_key: str | SecretStr | None,
     test_mode: bool | None,
@@ -87,6 +92,8 @@ async def generate_structured(  # noqa: UP047 -- Python 3.10+ per RULES.md
     contents: Any,
     schema: type[Schema],
     timeout_seconds: float,
+    *,
+    fast: bool = False,
 ) -> Schema:
     """Await Gemini JSON-schema output, then independently validate its payload."""
     from google.genai import errors, types
@@ -101,6 +108,12 @@ async def generate_structured(  # noqa: UP047 -- Python 3.10+ per RULES.md
                     response_mime_type="application/json",
                     response_json_schema=schema.model_json_schema(),
                     temperature=0,
+                    thinking_config=(
+                        types.ThinkingConfig(thinking_level="low")
+                        if fast and model_name.startswith("gemini-3")
+                        else None
+                    ),
+                    max_output_tokens=512 if fast else None,
                 ),
             ),
             timeout=timeout_seconds,

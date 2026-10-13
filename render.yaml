@@ -20,3 +20,9 @@ services:
         sync: false
       - key: CORS_ORIGINS
         value: '[]'
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+      - key: GEMINI_INPUT_MODEL
+        value: gemini-3.1-flash-lite

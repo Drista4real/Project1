@@ -13,8 +13,10 @@ The receipt parser strips a complete JSON Markdown fence and converts Vietnamese
 day/month/year dates (with `/`, `-`, or `.` separators and a four-digit year) to
 ISO dates before validation. Invalid dates, two-digit years, incorrect money
 types, extra fields, and unsupported categories remain rejected.
-Gemini is also the designated provider for NLP fallback; the demo currently
-shows the Model 1 routing hint without making that additional NLP call.
+Gemini also categorizes text in the authenticated `/api/v1/ingestion/text`
+endpoint when the local classifier is unavailable or below its confidence
+threshold. Money normalization remains deterministic and local. The Streamlit
+demo still shows the Model 1 routing hint without that additional NLP call.
 
 Configure `OPENROUTER_API_KEY`, `QWEN_BASE_URL` (default
 `https://openrouter.ai/api/v1`) and `QWEN_MODEL` (default
@@ -23,7 +25,9 @@ provider. Route availability must be checked independently of key validity.
 DashScope uses its compatible-mode base URL, `DASHSCOPE_API_KEY`, and native
 `qwen2.5-vl-7b-instruct` model ID. No automatic provider/model substitution occurs.
 Advisor credentials remain separate: `GEMINI_API_KEY`, with
-`GEMINI_MODEL=gemini-2.5-flash` for the demo. Receipt calls never use that key.
+`GEMINI_MODEL=gemini-3.8-flash` in the current environment template. The original
+specification used 2.5 Flash; newer accounts may receive a model-unavailable
+response for that version. Receipt calls never use the Gemini key.
 
 FPT Cloud is also supported: set `FPT_API_KEY`,
 `QWEN_BASE_URL=https://mkp-api.fptcloud.com/v1`, and

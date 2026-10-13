@@ -38,6 +38,11 @@ dependencies:
   supabase_flutter: ^2.17.2
   http: ^1.6.0
   flutter_bloc: ^9.1.1
+  record: ^6.2.1
+  sherpa_onnx: ^1.13.8
+  path_provider: ^2.1.6
+  crypto: ^3.0.7
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:
@@ -62,6 +67,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/envelope_zen_header.jpg
+    - assets/models/phowhisper-tiny/
   fonts:
     - family: BeVietnamPro
       fonts:

@@ -37,6 +37,110 @@ before the existing balance trigger executes. These scripts are not applied
 automatically. Existing users need an account in `public.accounts`; the base
 schema creates a cash account when a new user signs up.
 
+### API AI (Model 4)
+
+Khi pull code mới, bổ sung các biến còn thiếu từ `.env.example` vào `.env`;
+giữ nguyên cấu hình Supabase, Redis và CORS đang dùng.
+
+```dotenv
+# Qwen: bóc tách ảnh hóa đơn qua FPT Cloud
+FPT_API_KEY=
+QWEN_BASE_URL=https://mkp-api.fptcloud.com/v1
+QWEN_MODEL=Qwen2.5-VL-7B-Instruct
+
+# Gemini: diễn giải chỉ số và sinh lời khuyên tài chính
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3.8-flash
+```
+
+Điền `FPT_API_KEY` từ tài khoản [FPT Cloud Marketplace](https://marketplace.fptcloud.com/en/models/qwen2.5-vl-7b-instruct)
+và tạo `GEMINI_API_KEY` tại [Google AI Studio](https://aistudio.google.com/apikey).
+Không điền key thật vào `.env.example`. Key trống giữ adapter tương ứng ở chế độ
+mock. Biến môi trường của tiến trình, kể cả giá trị rỗng, được ưu tiên hơn `.env`.
+Khởi động lại tiến trình sau khi sửa cấu hình.
+
+Cài các thư viện cloud AI từ thư mục `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-cloud-vlm.txt
+```
+
+Adapter AI tự đọc `backend/.env` khi chạy local. Có thể thử qua demo Streamlit
+`frontend/app.py` sau khi cài `frontend/requirements-demo.txt`, từ thư mục gốc:
+
+```powershell
+.\backend\.venv\Scripts\python.exe -m pip install -r frontend/requirements-demo.txt
+.\backend\.venv\Scripts\python.exe -m streamlit run frontend/app.py
+```
+
+Cấu hình này phục vụ adapter, demo và API nhập văn bản
+`POST /api/v1/ingestion/text`. API yêu cầu Supabase access token, trả danh sách
+giao dịch nháp và không ghi vào database. Tối đa 5 khoản mỗi lần; có thể bỏ dấu
+phẩy khi mỗi khoản có nội dung và số tiền, ví dụ `cơm 30k momo sửa xe 100k tiền mặt`.
+Các câu tổng tiền, giảm giá hoặc khoảng giá vẫn cần kiểm tra để tránh ghi trùng.
+Model local được ưu tiên khi có checkpoint/cache. Quy tắc ngữ nghĩa gán các
+khoản quen thuộc vào danh mục hiện có ngay cả khi cloud lỗi (source `RULES`,
+không hiển thị như độ tin cậy của model). Các khoản chưa rõ được gửi Gemini
+trong một batch, chọn cả loại thu/chi và danh mục; `GEMINI_INPUT_MODEL` mặc định
+`gemini-3.1-flash-lite`, độc lập model tư vấn, timeout 20 giây.
+Số tiền luôn được chuẩn hóa bằng Python, không giao LLM tính số tiền, số dư
+hoặc dự báo. Chỉ các khoản chưa thể phân loại mới yêu cầu chọn danh mục.
+Phong bao tự theo danh mục đã chọn. Ví ghi rõ trong câu phải khớp ví hiện có;
+ví dụ chưa có MoMo thì ứng dụng yêu cầu chọn ví, không tự đổi thành tiền mặt.
+Flutter gửi tên danh mục thu/chi hiện có để Gemini chọn đúng nhãn của bạn;
+schema giới hạn kết quả trong các tên đã gửi. Khi lưu, API giao dịch vẫn kiểm
+tra danh mục/ví và quyền sở hữu qua Supabase, không dùng ID do LLM sinh ra.
+
+Flutter: nhấn **+ → Nhập nhanh AI**, gõ hoặc nói, nhấn **Phân tích**, kiểm tra
+từng thẻ rồi **Xác nhận & Lưu vào Sổ Thu Chi**. Có thể sửa số tiền, ngày, ví,
+danh mục hoặc vuốt bỏ khoản. Ngân sách dùng dữ liệu đang lưu; danh mục ghi nhớ
+được giới hạn theo người dùng và chỉ ghi nhớ sau khi lưu thành công. Nếu một
+yêu cầu lưu bị mất kết nối, kiểm tra sổ trước khi nhập lại để tránh lưu trùng.
+
+Model 1/2 và nhận dạng giọng nói offline không dùng hai API key này. Hóa đơn
+và dự báo không được triển khai thêm trong đợt nhập liệu này. Demo Streamlit
+vẫn chỉ hiển thị tín hiệu routing cho NLP; luồng fallback mới nằm ở API.
+Xem [tài liệu adapter Model 4](app/infrastructure/ai/cloud_vlm/README.md).
+
+### Chuẩn bị giọng nói Android offline
+
+Từ thư mục gốc, chuẩn bị model và đóng gói asset trước khi build APK:
+
+```powershell
+.\backend\.venv\Scripts\python.exe -m pip install -r backend/requirements-asr-export.txt
+.\backend\.venv\Scripts\python.exe backend/scripts/prepare_asr_model.py
+.\backend\.venv\Scripts\python.exe frontend/scripts/prepare_voice_assets.py
+```
+
+Hai script kiểm tra checkpoint, ONNX INT8 và checksum trước khi cài asset.
+Model tải một lần lúc chuẩn bị; ứng dụng phiên âm tiếng Việt trên thiết bị
+bằng sherpa-onnx, không tải âm thanh lên backend. Bấm **Nói nhanh**, cấp quyền
+micro, chờ thông báo micro đã bật và thanh âm lượng rồi nói tối đa 20 giây.
+Ngừng nói khoảng 2 giây hoặc bấm **Dừng ghi âm** để phiên âm. Văn bản có thể sửa
+trước khi nhấn Phân tích. Chuyển app sang nền sẽ dừng thu âm.
+Web vẫn hỗ trợ nhập văn bản; giọng nói offline ở bản này dành cho Android.
+Trên Android Emulator, bật **Extended Controls → Microphone → Virtual microphone
+uses host audio input** (hoặc `adb emu avd hostmicon`). Nếu thanh âm lượng không
+chuyển động, kiểm tra đầu vào micro Windows và quyền micro. Hộp thoại cấp quyền
+không hủy phiên ghi âm; khi ứng dụng thật sự xuống nền thì phiên bị hủy.
+
+Để chạy backend cho điện thoại cùng mạng Wi-Fi, từ `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Từ `frontend/`, thay địa chỉ ví dụ bằng IP LAN của máy chạy backend:
+
+```powershell
+flutter run -d <android-device-id> --dart-define=API_BASE_URL=http://192.168.1.10:8000
+```
+
+APK debug mặc định dùng `http://10.0.2.2:8000` cho Android Emulator. Điện thoại
+thật cần build với IP LAN hoặc URL backend đã cập nhật code mới. Với Docker
+Compose, `GEMINI_API_KEY` và `GEMINI_MODEL` được chuyển vào container API; trên
+Render, điền key ở Environment rồi deploy phiên bản mới khi sẵn sàng.
+
 For the remaining management modules, also apply
 [the management guards](supabase/migrations/202610030002_management_guards.sql)
 in the SQL editor after the transaction guard. This migration validates foreign
@@ -177,6 +281,23 @@ web origins, set `CORS_ORIGINS` to a JSON array in `.env`. On the Android emulat
 use `--dart-define=API_BASE_URL=http://10.0.2.2:8000`; debug builds allow local HTTP.
 Production mobile builds need an HTTPS API URL. Compose forwards Supabase and
 CORS settings from `.env` to the API container.
+
+Nếu Android build dừng với `What went wrong: 25.0.3`, kiểm tra Java mà Flutter
+đang dùng bằng `flutter doctor -v`. Cấu hình Gradle hiện tại chạy được với JDK 17.
+Trên máy đã có JDK 17, chọn thư mục cài đặt bằng
+`flutter config --jdk-dir="<đường dẫn JDK 17>"`, rồi khởi động lại IDE.
+Với giả lập đã mở, chạy từ `frontend/`:
+
+```powershell
+flutter run -d emulator-5554 --dart-define=API_BASE_URL=http://10.0.2.2:8000
+```
+
+Giữ backend chạy ở cổng 8000 trong lúc thử. `GET http://localhost:8000/health`
+phải trả `{"status":"ok"}`.
+
+Android project tắt Kotlin incremental compilation để tránh lỗi
+`this and base files have different roots` khi Pub cache ở ổ C: và repo ở ổ D:.
+Thay đổi này chỉ ảnh hưởng thời gian biên dịch Kotlin.
 
 Sign in (or register and confirm email) from the ledger prompt or Settings.
 Use the add button to create, tap a ledger row to view/edit, and confirm deletion

@@ -8,6 +8,7 @@ class CategoryModel extends Category {
     super.icon,
     super.color,
     super.isIncome,
+    super.pillar,
   });
 
   factory CategoryModel.fromJson(Map<String, dynamic> json) {
@@ -18,6 +19,7 @@ class CategoryModel extends Category {
       icon: json['icon'] as String?,
       color: json['color'] as String? ?? '#3ECF8E',
       isIncome: json['is_income'] as bool? ?? false,
+      pillar: json['pillar'] as String?,
     );
   }
 }
