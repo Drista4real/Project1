@@ -17,7 +17,36 @@ class AppScreenNavigation extends StatelessWidget {
   });
 
   Future<void> _addTransaction(BuildContext context) async {
-    final saved = await context.push<bool>(AppRoutes.addTransaction);
+    final route = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(
+                Icons.auto_fix_high,
+                color: AppTheme.primaryForestGreen,
+              ),
+              title: const Text('Nhập nhanh AI'),
+              subtitle: const Text('Gõ hoặc nói nội dung thu chi'),
+              onTap: () => Navigator.pop(sheetContext, AppRoutes.aiQuickInput),
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Nhập thủ công'),
+              subtitle: const Text('Tự chọn số tiền, ví và danh mục'),
+              onTap: () =>
+                  Navigator.pop(sheetContext, AppRoutes.addTransaction),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (route == null || !context.mounted) return;
+    final saved = await context.push<bool>(route);
     if (saved == true) await onTransactionAdded?.call();
   }
 

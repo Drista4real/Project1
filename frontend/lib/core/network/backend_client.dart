@@ -46,6 +46,7 @@ class BackendClient {
       throw const FinanceApiException('Vui lòng đăng nhập lại.');
     }
     final client = http.Client();
+    final timeout = Duration(seconds: path.startsWith('/ingestion/') ? 30 : 15);
     try {
       final request = http.Request(method, Uri.parse('$baseUrl/api/v1$path'));
       request.headers.addAll({
@@ -54,8 +55,8 @@ class BackendClient {
       });
       if (body != null) request.body = jsonEncode(body);
       final response = await http.Response.fromStream(
-        await client.send(request).timeout(const Duration(seconds: 15)),
-      ).timeout(const Duration(seconds: 15));
+        await client.send(request).timeout(timeout),
+      ).timeout(timeout);
       if (response.statusCode >= 400) {
         final message = switch (response.statusCode) {
           401 => 'Phiên đã hết hạn. Vui lòng đăng nhập lại.',

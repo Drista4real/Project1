@@ -9,13 +9,15 @@ Không commit `backend/.env`, keystore hoặc `key.properties`.
 Trên Render Dashboard, chọn **New → Blueprint**, kết nối repository
 `Drista4real/Project1`, chọn nhánh `app_CRUD`, dùng `render.yaml` ở thư mục gốc.
 Blueprint tạo Web Service `kakeibo-api`, Docker runtime, Singapore, Free.
-Điền hai biến từ cấu hình Supabase đang dùng:
+Điền cấu hình Supabase đang dùng và Gemini cho nhập liệu:
 
 | Biến | Giá trị |
 | --- | --- |
 | `SUPABASE_URL` | URL project Supabase giống Flutter |
 | `SUPABASE_PUBLISHABLE_KEY` | Publishable key của project đó |
 | `CORS_ORIGINS` | `[]` cho bản Android |
+| `GEMINI_API_KEY` | Key Gemini cho phân loại nhập liệu; nhập trong Render Environment |
+| `GEMINI_MODEL` | `gemini-3.8-flash` |
 
 Nếu tạo **New → Web Service** thủ công, dùng:
 
@@ -59,6 +61,11 @@ riêng tư, dùng cùng khóa cho mọi phiên bản cập nhật. Không chạy
 Đây là bản cài APK trực tiếp; trước khi lên Play Store cần chốt application ID.
 
 ## 3. Build APK với URL thật
+
+Nếu dùng nhập giọng nói offline, chuẩn bị PhoWhisper và chạy
+`frontend/scripts/prepare_voice_assets.py` theo README backend trước khi build.
+Các file ONNX không nằm trong Git. API nhập liệu yêu cầu deploy code backend mới;
+chỉ thay APK sẽ không tạo endpoint trên bản backend cũ.
 
 Sau khi có URL HTTPS của Render, chạy từ `frontend` (thay URL ví dụ):
 
