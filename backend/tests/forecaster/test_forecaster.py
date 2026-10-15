@@ -9,6 +9,7 @@ from unittest.mock import Mock
 
 import numpy as np
 import pytest
+
 from app.domain.interfaces.forecaster_interface import BalancePoint
 from app.infrastructure.ai.forecaster.features import (
     DailyCashflow,
