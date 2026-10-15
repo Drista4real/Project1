@@ -38,10 +38,14 @@ CI chạy Ruff và bộ pytest hiện có của backend trong container riêng t
 Hai image kiểm thử chạy bằng user không phải root. Image Python dùng
 `docker/requirements.lock`, khóa phiên bản và SHA-256 của toàn bộ wheel cho
 Python 3.13/Linux amd64, cài với `--require-hashes --only-binary=:all:`.
-Sau khi cập nhật `backend/requirements-dev.txt`, chạy
+Nguồn dependency là `docker/requirements.in`, gồm backend dev, classifier và
+forecaster; PyTorch dùng wheel CPU cố định cho Python 3.13/Linux amd64.
+Image có `libgomp1` cho LightGBM và giữ cấu trúc `backend/` cùng `data/taxonomy/`
+để các test import training scripts và đọc taxonomy được như trong repo.
+Sau khi cập nhật các requirements nguồn hoặc phiên bản PyTorch CPU, chạy
 `python docker/lock_dependencies.py` từ thư mục này để tạo lại lockfile, rồi
-commit cả hai file. Lệnh này cần Docker và phân giải dependency bên trong image
-`python:3.13-slim` Linux, chỉ đọc source và không cài thư viện lên máy cá nhân.
+commit các file nguồn cùng lockfile. Lệnh này cần Docker, phân giải dependency
+trong image `python:3.13-slim` Linux, chỉ đọc source và không cài thư viện lên máy cá nhân.
 Không tạo lockfile bằng pip trên Windows với `--platform`: tùy chọn đó chỉ chọn
 wheel, vẫn đánh giá điều kiện dependency theo Windows và có thể bỏ sót `uvloop`.
 

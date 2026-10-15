@@ -5,12 +5,14 @@ on:
   push:
     paths:
       - 'backend/**'
+      - 'data/taxonomy/**'
       - 'frontend/supabase/**'
       - 'tests/backend-e2e/**'
       - '.github/workflows/backend-java-e2e.yml'
   pull_request:
     paths:
       - 'backend/**'
+      - 'data/taxonomy/**'
       - 'frontend/supabase/**'
       - 'tests/backend-e2e/**'
       - '.github/workflows/backend-java-e2e.yml'
