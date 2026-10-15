@@ -2,6 +2,7 @@
 
 import csv
 import pickle
+import random
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -19,6 +20,7 @@ from app.infrastructure.ai.classifier.lgbm_inference import (
 )
 from app.infrastructure.ai.classifier.phobert_embedder import PhoBERTEmbedder
 from scripts import train_classifier
+from scripts.dataset_pipeline import Source, prepare_dataset, verify_bundle
 
 
 @pytest.fixture
@@ -231,3 +233,55 @@ def test_invalid_dataset(tmp_path: Path) -> None:
     path.write_text("text,category\nĂn trưa,food\n", encoding="utf-8")
     with pytest.raises(ValueError, match="row 2"):
         train_classifier.load_dataset(path)
+
+
+def test_training_preserves_verified_splits(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Prepared training never re-splits or fits validation/test examples."""
+    data = tmp_path / "source.csv"
+    rng = random.Random(42)
+    with data.open("w", encoding="utf-8", newline="") as stream:
+        writer = csv.writer(stream)
+        writer.writerow(["text", "category"])
+        for category in CATEGORIES:
+            for _ in range(15):
+                writer.writerow(
+                    [
+                        "".join(rng.choices("abcdefghijklmnopqrstuvwxyz", k=20)),
+                        category,
+                    ]
+                )
+    dataset_dir = tmp_path / "dataset"
+    taxonomy = (
+        Path(__file__).resolve().parents[3] / "data/taxonomy/expense_categories.v1.json"
+    )
+    prepare_dataset(
+        [Source(data, "fixture", "synthetic", "test fixture")],
+        taxonomy,
+        dataset_dir,
+        ambiguity_policy="quarantine",
+    )
+    splits = verify_bundle(dataset_dir)
+    embedder = Mock(spec=PhoBERTEmbedder)
+    embedder.config = ClassifierConfig()
+    embedder.embed_batch.side_effect = lambda texts, **kwargs: np.zeros(
+        (len(texts), 768), dtype=np.float32
+    )
+    embedder.embed.return_value = np.zeros(768, dtype=np.float32)
+    monkeypatch.setattr(
+        train_classifier, "PhoBERTEmbedder", Mock(return_value=embedder)
+    )
+    random_split = Mock(side_effect=AssertionError("Prepared data cannot be re-split"))
+    monkeypatch.setattr(train_classifier, "train_test_split", random_split)
+    output = tmp_path / "trained"
+    train_classifier.train(data, output, dataset_dir=dataset_dir)
+    calls = embedder.embed_batch.call_args_list
+    assert calls[0].args[0] == [row["text"] for row in splits["train"]]
+    assert calls[1].args[0] == [row["text"] for row in splits["test"]]
+    assert calls[2].args[0] == [row["text"] for row in splits["validation"]]
+    assert (output / "training_data_manifest.json").read_bytes() == (
+        dataset_dir / "manifest.json"
+    ).read_bytes()
+    random_split.assert_not_called()

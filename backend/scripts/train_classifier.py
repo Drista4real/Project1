@@ -5,6 +5,7 @@
 
 import argparse
 import csv
+import json
 import logging
 import pickle
 import sys
@@ -31,6 +32,7 @@ from app.infrastructure.ai.classifier.config import (
     MODEL_CACHE_DIR,
 )
 from app.infrastructure.ai.classifier.phobert_embedder import PhoBERTEmbedder
+from scripts.dataset_pipeline import Taxonomy, verify_bundle
 
 logger = logging.getLogger(__name__)
 
@@ -76,21 +78,36 @@ def train(
     batch_size: int = 16,
     cache_dir: Path = MODEL_CACHE_DIR,
     local_files_only: bool = False,
+    dataset_dir: Path | None = None,
 ) -> None:
-    """Train on a stratified 80/20 split, evaluate, and save three artifacts."""
+    """Use a verified frozen bundle, or the legacy 80/20 split for old callers."""
     if batch_size < 1:
         raise ValueError("batch_size must be positive")
-    texts, categories = load_dataset(data_path)
     encoder = LabelEncoder().fit(list(CATEGORIES))
-    labels = encoder.transform(categories)
-    try:
-        train_texts, test_texts, y_train, y_test = train_test_split(
-            texts, labels, test_size=0.2, stratify=labels, random_state=42
+    validation_rows: list[dict[str, str]] = []
+    if dataset_dir is not None:
+        splits = verify_bundle(dataset_dir)
+        if set(Taxonomy.load(dataset_dir / "taxonomy.json").labels) != set(CATEGORIES):
+            raise ValueError("This legacy classifier requires the six agreed labels")
+        train_texts = [row["text"] for row in splits["train"]]
+        test_texts = [row["text"] for row in splits["test"]]
+        y_train = encoder.transform([row["category"] for row in splits["train"]])
+        y_test = encoder.transform([row["category"] for row in splits["test"]])
+        validation_rows = splits["validation"]
+    else:
+        logger.warning(
+            "Legacy random 80/20 split; use --dataset-dir for grouped frozen splits"
         )
-    except ValueError as exc:
-        raise ValueError(
-            "Dataset is too small for a six-class stratified 80/20 split"
-        ) from exc
+        texts, categories = load_dataset(data_path)
+        labels = encoder.transform(categories)
+        try:
+            train_texts, test_texts, y_train, y_test = train_test_split(
+                texts, labels, test_size=0.2, stratify=labels, random_state=42
+            )
+        except ValueError as exc:
+            raise ValueError(
+                "Dataset is too small for a six-class stratified 80/20 split"
+            ) from exc
     embedder = PhoBERTEmbedder(cache_dir=cache_dir, local_files_only=local_files_only)
     logger.info(
         "Extracting CPU CLS features: train=%d test=%d", len(y_train), len(y_test)
@@ -107,6 +124,16 @@ def train(
     model.fit(x_train, y_train)
     # One thread avoids OpenMP overhead for individual transaction predictions.
     model.set_params(n_jobs=1)
+    if validation_rows:
+        x_validation = embedder.embed_batch(
+            [row["text"] for row in validation_rows], batch_size=batch_size
+        )
+        y_validation = encoder.transform([row["category"] for row in validation_rows])
+        validation_f1 = f1_score(
+            y_validation, model.predict(x_validation), average="macro", zero_division=0
+        )
+        print(f"Validation Macro F1-Score: {validation_f1:.4f}")
+        print("Test metrics (fixed parameters; validation/test are never fitted):")
     predictions = model.predict(x_test)
     probabilities = model.predict_proba(x_test)
     macro_f1 = float(f1_score(y_test, predictions, average="macro", zero_division=0))
@@ -143,6 +170,14 @@ def train(
             with (output_dir / filename).open("wb") as stream:
                 pickle.dump(artifact, stream, protocol=pickle.HIGHEST_PROTOCOL)
         embedder.config.save(output_dir / "classifier_config.json")
+        if dataset_dir is not None:
+            metadata = json.loads(
+                (dataset_dir / "manifest.json").read_text(encoding="utf-8")
+            )
+            (output_dir / "training_data_manifest.json").write_text(
+                json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
     except OSError as exc:
         raise RuntimeError(f"Cannot save classifier artifacts to {output_dir}") from exc
     logger.info("Saved classifier, label encoder, and feature config to %s", output_dir)
@@ -156,8 +191,14 @@ def main() -> None:
     if isinstance(sys.stderr, TextIOWrapper):
         sys.stderr.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
+    input_options = parser.add_mutually_exclusive_group()
+    input_options.add_argument(
         "--data", type=Path, default=ROOT / "data/processed/data_transactions.csv"
+    )
+    input_options.add_argument(
+        "--dataset-dir",
+        type=Path,
+        help="Prepared bundle; verifies hashes and preserves train/validation/test",
     )
     parser.add_argument("--output-dir", type=Path, default=ROOT / "weights/checkpoints")
     parser.add_argument("--cache-dir", type=Path, default=MODEL_CACHE_DIR)
@@ -172,6 +213,7 @@ def main() -> None:
             batch_size=args.batch_size,
             cache_dir=args.cache_dir,
             local_files_only=args.local_files_only,
+            dataset_dir=args.dataset_dir,
         )
     except (OSError, ValueError, RuntimeError, TypeError, LightGBMError) as exc:
         logger.error("Training failed: %s", exc)

@@ -1,0 +1,330 @@
+{
+  "audit_date": "2026-10-14",
+  "scope": "D:\\Project1_TPN\\Project1",
+  "evaluation_note": "Re-evaluation of existing checkpoints; no retraining. Splits reconstructed from current scripts; original split provenance not stored. CPU torch threads explicitly 1.",
+  "datasets": [
+    {
+      "path": "data\\processed\\balance_fixed.csv",
+      "rows": 180,
+      "columns": [
+        "date",
+        "income",
+        "expense",
+        "balance"
+      ],
+      "sha256": "0a77ac799f6c71eb1064fa2025cf71fe779dd056348b0f5dcf316d3529beec24",
+      "unique_rows": 180,
+      "missing_cells": 0,
+      "date_start": "2026-01-01",
+      "date_end": "2026-06-29",
+      "matches_default_seed42_generator": true
+    },
+    {
+      "path": "data\\processed\\balance_flexible.csv",
+      "rows": 180,
+      "columns": [
+        "date",
+        "income",
+        "expense",
+        "balance"
+      ],
+      "sha256": "0aa6a95455f36717ec53f4376c8a7b3cacc6016ac0be3f334b9a690c8b10a459",
+      "unique_rows": 180,
+      "missing_cells": 0,
+      "date_start": "2026-01-01",
+      "date_end": "2026-06-29",
+      "matches_default_seed42_generator": true
+    },
+    {
+      "path": "data\\processed\\data_transactions.csv",
+      "rows": 1500,
+      "columns": [
+        "text",
+        "category"
+      ],
+      "sha256": "0cadb05bae8822c4bb11e74a9940523baa7e600d174c9f1a67c6ce572c6a8bc6",
+      "unique_rows": 1488,
+      "missing_cells": 0,
+      "categories": {
+        "Ăn uống": 250,
+        "Hóa đơn/Nhà ở": 250,
+        "Đi lại": 250,
+        "Khác": 250,
+        "Mua sắm": 250,
+        "Y tế": 250
+      },
+      "matches_default_seed42_generator": true
+    }
+  ],
+  "checkpoints": [
+    {
+      "path": "weights\\checkpoints\\label_encoder.pkl",
+      "bytes": 528,
+      "sha256": "e465c71125402e709ddd1a833881f21eb24dbc5484aec0198d16c9992f541399",
+      "type": "LabelEncoder",
+      "params": {}
+    },
+    {
+      "path": "weights\\checkpoints\\lgbm_classifier.pkl",
+      "bytes": 2174192,
+      "sha256": "6119023d515b17322aec11cadd63029cbfb7edeab6da44e7d16d5199824e58d0",
+      "type": "LGBMClassifier",
+      "params": {
+        "boosting_type": "gbdt",
+        "class_weight": null,
+        "colsample_bytree": 1.0,
+        "importance_type": "split",
+        "learning_rate": 0.05,
+        "max_depth": -1,
+        "min_child_samples": 20,
+        "min_child_weight": 0.001,
+        "min_split_gain": 0.0,
+        "n_estimators": 100,
+        "n_jobs": 1,
+        "num_leaves": 31,
+        "objective": "multiclass",
+        "random_state": 42,
+        "reg_alpha": 0.0,
+        "reg_lambda": 0.0,
+        "subsample": 1.0,
+        "subsample_for_bin": 200000,
+        "subsample_freq": 0,
+        "verbosity": -1
+      },
+      "features": 768,
+      "iterations": 100,
+      "trees": 600,
+      "train_samples_first_tree": 1200
+    },
+    {
+      "path": "weights\\checkpoints\\lgbm_forecaster.pkl",
+      "bytes": 163777,
+      "sha256": "3fa96aed335cbd97c0d0d002fa3e22095afc1630c7b8d501477408866767d545",
+      "type": "LGBMRegressor",
+      "params": {
+        "boosting_type": "gbdt",
+        "class_weight": null,
+        "colsample_bytree": 1.0,
+        "importance_type": "split",
+        "learning_rate": 0.05,
+        "max_depth": -1,
+        "min_child_samples": 2,
+        "min_child_weight": 0.001,
+        "min_split_gain": 0.0,
+        "n_estimators": 100,
+        "n_jobs": 1,
+        "num_leaves": 15,
+        "objective": null,
+        "random_state": 42,
+        "reg_alpha": 0.0,
+        "reg_lambda": 0.0,
+        "subsample": 1.0,
+        "subsample_for_bin": 200000,
+        "subsample_freq": 0,
+        "verbosity": -1
+      },
+      "features": 6,
+      "iterations": 100,
+      "trees": 100,
+      "train_samples_first_tree": 138
+    }
+  ],
+  "asr_manifest": {
+    "source": "vinai/PhoWhisper-tiny",
+    "source_revision": "cc51d32be916efebde04ff549854fa1741cb5c02",
+    "exporter_revision": "7be9a38e275ece9ee9a9277cc78295f2cbfd6673",
+    "exporter_sha256": "5e0ddabfac8330ee9aecaba4c1b4286d1cd9f88df4cd30e54706b011bf976e45",
+    "quantization": "dynamic INT8 MatMul",
+    "artifacts": {
+      "encoder.int8.onnx": {
+        "bytes": 12926470,
+        "sha256": "0253cc770212920c1e0623d0e248f74e62aa6a1b70efd51412f95d3edc888320"
+      },
+      "decoder.int8.onnx": {
+        "bytes": 89846458,
+        "sha256": "fe35a05c72b7957aad23f6555dd0ec0ba59f515deb754b7ec45d5451fe6bca97"
+      },
+      "tokens.txt": {
+        "bytes": 866987,
+        "sha256": "febeed8e568f92d9ca984580bc2e6b605b867dc5ba4486f9646de381b44a8226"
+      }
+    }
+  },
+  "asr_hash_checks": {
+    "encoder.int8.onnx": true,
+    "decoder.int8.onnx": true,
+    "tokens.txt": true
+  },
+  "classifier_evaluation": {
+    "train_rows": 1200,
+    "test_rows": 300,
+    "cross_split_duplicate_unique_texts": 7,
+    "test_rows_with_text_seen_in_train": 8,
+    "accuracy": 0.9533333333333334,
+    "macro_f1": 0.9533153266307023,
+    "local_rate_p_ge_0_8": 0.8366666666666667,
+    "report": {
+      "Hóa đơn/Nhà ở": {
+        "precision": 0.9615384615384616,
+        "recall": 1.0,
+        "f1-score": 0.9803921568627451,
+        "support": 50.0
+      },
+      "Khác": {
+        "precision": 0.9230769230769231,
+        "recall": 0.96,
+        "f1-score": 0.9411764705882353,
+        "support": 50.0
+      },
+      "Mua sắm": {
+        "precision": 0.9591836734693877,
+        "recall": 0.94,
+        "f1-score": 0.9494949494949495,
+        "support": 50.0
+      },
+      "Y tế": {
+        "precision": 1.0,
+        "recall": 0.92,
+        "f1-score": 0.9583333333333334,
+        "support": 50.0
+      },
+      "Ăn uống": {
+        "precision": 0.9411764705882353,
+        "recall": 0.96,
+        "f1-score": 0.9504950495049505,
+        "support": 50.0
+      },
+      "Đi lại": {
+        "precision": 0.94,
+        "recall": 0.94,
+        "f1-score": 0.94,
+        "support": 50.0
+      },
+      "accuracy": 0.9533333333333334,
+      "macro avg": {
+        "precision": 0.954162588112168,
+        "recall": 0.9533333333333331,
+        "f1-score": 0.9533153266307023,
+        "support": 300.0
+      },
+      "weighted avg": {
+        "precision": 0.9541625881121679,
+        "recall": 0.9533333333333334,
+        "f1-score": 0.9533153266307022,
+        "support": 300.0
+      }
+    },
+    "confusion_matrix": [
+      [
+        50,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        1,
+        48,
+        0,
+        0,
+        0,
+        1
+      ],
+      [
+        0,
+        0,
+        47,
+        0,
+        3,
+        0
+      ],
+      [
+        0,
+        2,
+        0,
+        46,
+        0,
+        2
+      ],
+      [
+        1,
+        0,
+        1,
+        0,
+        48,
+        0
+      ],
+      [
+        0,
+        2,
+        1,
+        0,
+        0,
+        47
+      ]
+    ],
+    "class_order": [
+      "Hóa đơn/Nhà ở",
+      "Khác",
+      "Mua sắm",
+      "Y tế",
+      "Ăn uống",
+      "Đi lại"
+    ],
+    "latency_warm_samples": 50,
+    "latency_mean_ms": 76.56051000005391,
+    "latency_p95_ms": 92.140295000263,
+    "resolved_phobert_revision": "main"
+  },
+  "forecaster_evaluation": {
+    "warmup_days": 7,
+    "feature_rows": 173,
+    "train_rows": 138,
+    "test_rows": 35,
+    "train_start": "2026-01-08",
+    "train_end": "2026-05-25",
+    "test_start": "2026-05-26",
+    "test_end": "2026-06-29",
+    "one_day_ahead": {
+      "rows": 35,
+      "mae_vnd": 63528.90403251978,
+      "rmse_vnd": 77177.85533820998,
+      "mape_percent": 0.1550915162137882
+    },
+    "autoregressive_holdout": {
+      "rows": 35,
+      "mae_vnd": 213457.63598159977,
+      "rmse_vnd": 243126.6002255589,
+      "mape_percent": 0.5138659584627193
+    },
+    "autoregressive_30_day": {
+      "rows": 30,
+      "mae_vnd": 231674.19405732254,
+      "rmse_vnd": 258458.90777646762,
+      "mape_percent": 0.5584810076781286
+    }
+  },
+  "environment": {
+    "python": "3.11.4",
+    "platform": "Windows-10-10.0.26300-SP0",
+    "torch_threads": 1,
+    "versions": {
+      "numpy": "2.4.6",
+      "torch": "2.14.1",
+      "transformers": "5.19.0",
+      "underthesea": "8.3.0",
+      "lightgbm": "4.7.0",
+      "scikit-learn": "1.9.1",
+      "sherpa-onnx": "1.13.8",
+      "onnxruntime": "1.31.0",
+      "google-genai": "2.29.0"
+    }
+  },
+  "asr_runtime_load": {
+    "loaded": true,
+    "is_mock": false,
+    "audio_evaluation_performed": false
+  },
+  "phobert_cached_main_revision": "01daacda68afe13d83023d16ec647239e344a1e6"
+}

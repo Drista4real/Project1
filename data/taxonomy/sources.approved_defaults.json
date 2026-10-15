@@ -1,0 +1,8 @@
+[
+  {
+    "path": "../prepared/expense_six_v2_defaults_20261015_annotations/annotation_approved.csv",
+    "source_id": "project_synthetic_reviewed_defaults_20261015",
+    "kind": "synthetic",
+    "usage_rights": "Project-generated synthetic examples; labels approved by the user under explicit default policy on 2026-10-15."
+  }
+]
