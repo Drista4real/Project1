@@ -7,7 +7,12 @@
 !backend/pyproject.toml
 !backend/app/
 !backend/app/**
+!backend/scripts/
+!backend/scripts/**
 !backend/tests/
 !backend/tests/**
+!data/
+!data/taxonomy/
+!data/taxonomy/**
 **/__pycache__/
 **/*.pyc
