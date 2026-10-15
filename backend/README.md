@@ -8,6 +8,14 @@ FastAPI and Celery foundation for the Kakeibo finance app. Flutter remains in
 Android APK + Render Docker: xem [hướng dẫn phát hành](../docs/release-v1.md).
 Blueprint ở `../render.yaml`; Docker CMD dùng `PORT` do Render cấp.
 
+## Classifier dataset preparation
+
+Taxonomy, annotation rules and grouped train/validation/test preparation are
+documented in [DATA_TAXONOMY_AND_ANNOTATION.md](../docs/DATA_TAXONOMY_AND_ANNOTATION.md).
+The preparation CLI only needs the Python standard library; it does not train
+models or modify the source CSV. Use `--dataset-dir` in `scripts/train_classifier.py`
+for verified fixed splits instead of the legacy random 80/20 mode.
+
 ## Requirements
 
 - Python 3.12 or newer

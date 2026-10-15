@@ -1,0 +1,8 @@
+[
+  {
+    "path": "../processed/data_transactions.csv",
+    "source_id": "project_synthetic_seed42_v1",
+    "kind": "synthetic",
+    "usage_rights": "Project-generated synthetic examples; generator seed 42."
+  }
+]

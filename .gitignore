@@ -44,3 +44,11 @@ Desktop.ini
 # Downloaded model caches and exported ASR binaries
 weights/cache/
 weights/onnx/phowhisper-tiny/*.onnx
+
+# Dataset bundles/review exports can contain private financial text.
+/data/prepared/*
+# Explicitly share only the synthetic examples approved under the v2 policy.
+!/data/prepared/expense_six_v2_defaults_20261015_annotations/
+/data/prepared/expense_six_v2_defaults_20261015_annotations/*
+!/data/prepared/expense_six_v2_defaults_20261015_annotations/annotation_approved.csv
+/data/private/
