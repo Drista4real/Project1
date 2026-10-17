@@ -15,6 +15,7 @@ Tài liệu này hướng dẫn chạy và giải thích phạm vi các bộ tes
 | Postman thủ công | `postman/collections/Kakeibo API` | Thư viện request Native Git; thêm thư mục `07 - Nhập liệu AI`; gửi từng request, không chạy cả thư viện bằng Runner |
 | Postman regression mới | `postman/ci/regression.postman_collection.json` | 28 request có thứ tự, user/ví riêng, đăng nhập/refresh, contract bản nháp, 401/404/422, tạo/sửa/xóa và đối soát tiền; chạy trong stack tạm bằng Postman CLI |
 | Flutter unit/widget | `frontend/test` | Cubit, repository mapping, form, review AI, lỗi và retry; dùng fake dữ liệu, chưa phải E2E trên điện thoại với backend thật |
+| Selenium browser smoke mới | `tests/browser`, `.github/workflows/selenium-web.yml` | Build Flutter web một lần → Chrome/Edge/Firefox → gate tổng hợp; tải app, navigation/reload, login/register và validation; chưa có backend/Auth thật. Xem [hướng dẫn pipeline](../tests/browser/README.md), [issue #22](https://github.com/Drista4real/Project1/issues/22) |
 | Dataset integrity | `tests/datasets` | Taxonomy, chia nhóm, chống rò rỉ train/validation/test; không thay thế đánh giá model trên dữ liệu thật |
 | Android build mới trong CI | `.github/workflows/frontend.yml` | Build debug kiểm tra Dart/Gradle/plugin; checkout CI không có model ASR sinh cục bộ, nên build này không chứng minh voice offline hoạt động |
 

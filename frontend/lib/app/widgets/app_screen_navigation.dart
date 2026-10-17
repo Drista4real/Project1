@@ -70,6 +70,13 @@ class AppScreenNavigation extends StatelessWidget {
       ),
       (Icons.tune_outlined, Icons.tune, 'Cài đặt'),
     ];
+    const identifiers = [
+      'nav-ledger',
+      'nav-reports',
+      'nav-add',
+      'nav-budget',
+      'nav-settings',
+    ];
     return BottomAppBar(
       color: const Color(0xFFF6FBF5),
       elevation: 0,
@@ -80,66 +87,71 @@ class AppScreenNavigation extends StatelessWidget {
           children: [
             for (var i = 0; i < items.length; i++)
               Expanded(
-                child: i == 2
-                    ? Align(
-                        alignment: Alignment.topCenter,
-                        child: Transform.translate(
-                          offset: const Offset(0, -12),
-                          child: SizedBox(
-                            width: 54,
-                            height: 54,
-                            child: FloatingActionButton(
-                              heroTag: 'quick-add-navigation',
-                              onPressed: () => _addTransaction(context),
-                              backgroundColor: AppTheme.primaryForestGreen,
-                              elevation: 3,
-                              shape: const CircleBorder(),
-                              child: const Icon(
-                                Icons.add,
-                                color: Colors.white,
-                                size: 29,
+                child: Semantics(
+                  container: true,
+                  identifier: identifiers[i],
+                  child: i == 2
+                      ? Align(
+                          alignment: Alignment.topCenter,
+                          child: Transform.translate(
+                            offset: const Offset(0, -12),
+                            child: SizedBox(
+                              width: 54,
+                              height: 54,
+                              child: FloatingActionButton(
+                                heroTag: 'quick-add-navigation',
+                                onPressed: () => _addTransaction(context),
+                                backgroundColor: AppTheme.primaryForestGreen,
+                                elevation: 3,
+                                shape: const CircleBorder(),
+                                child: const Icon(
+                                  Icons.add,
+                                  color: Colors.white,
+                                  size: 29,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      )
-                    : InkWell(
-                        onTap: () {
-                          final routeIndex = i < 2 ? i : i - 1;
-                          if (routeIndex != selectedIndex) {
-                            context.go(routes[i]);
-                          } else {
-                            onSelectedTab?.call();
-                          }
-                        },
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              selectedIndex == (i < 2 ? i : i - 1)
-                                  ? items[i].$2
-                                  : items[i].$1,
-                              color: selectedIndex == (i < 2 ? i : i - 1)
-                                  ? AppTheme.primaryForestGreen
-                                  : AppTheme.textMuted,
-                              size: 21,
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              items[i].$3,
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: selectedIndex == (i < 2 ? i : i - 1)
-                                    ? FontWeight.w700
-                                    : FontWeight.normal,
+                        )
+                      : InkWell(
+                          onTap: () {
+                            final routeIndex = i < 2 ? i : i - 1;
+                            if (routeIndex != selectedIndex) {
+                              context.go(routes[i]);
+                            } else {
+                              onSelectedTab?.call();
+                            }
+                          },
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                selectedIndex == (i < 2 ? i : i - 1)
+                                    ? items[i].$2
+                                    : items[i].$1,
                                 color: selectedIndex == (i < 2 ? i : i - 1)
                                     ? AppTheme.primaryForestGreen
                                     : AppTheme.textMuted,
+                                size: 21,
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 3),
+                              Text(
+                                items[i].$3,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight:
+                                      selectedIndex == (i < 2 ? i : i - 1)
+                                      ? FontWeight.w700
+                                      : FontWeight.normal,
+                                  color: selectedIndex == (i < 2 ? i : i - 1)
+                                      ? AppTheme.primaryForestGreen
+                                      : AppTheme.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+                ),
               ),
           ],
         ),

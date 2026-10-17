@@ -54,9 +54,13 @@ extension LedgerContent on _LedgerScreenState {
                     Text(_loadError!),
                     Row(
                       children: [
-                        TextButton(
-                          onPressed: _signIn,
-                          child: const Text('Đăng nhập'),
+                        Semantics(
+                          container: true,
+                          identifier: 'ledger-sign-in',
+                          child: TextButton(
+                            onPressed: _signIn,
+                            child: const Text('Đăng nhập'),
+                          ),
                         ),
                         TextButton(
                           onPressed: _loadAllData,
