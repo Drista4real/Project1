@@ -177,6 +177,8 @@ Luồng đích: **văn bản → model local → đạt ngưỡng: LOCAL; dướ
 
 ## 14. Kiểm thử, benchmark và tiêu chí nghiệm thu
 
+Rà soát 17/10/2026: đã bổ sung Postman regression, Java `IngestionIT` và workflow Flutter analyze/test/build debug; xem [hướng dẫn và khoảng trống kiểm thử](TESTING.md), [issue #21](https://github.com/Drista4real/Project1/issues/21). Chưa đánh dấu hoàn tất T01–T06 vì còn device E2E, queue/model/load và kết quả chạy integration trên Actions.
+
 - [ ] **T01** Kế thừa test hiện có; bổ sung unit cho parser/tiền/lịch, lựa chọn model, fallback state machine và quy tắc forecast; integration với database/queue cho idempotency, cân bằng số dư và cách ly người dùng.
 - [ ] **T02** Contract/API/Flutter tests cho AI; E2E thực sự từ nhập liệu → review → lưu → số dư/báo cáo → forecast → cảnh báo. Mock xác minh logic, benchmark model và smoke test cloud thật xác minh tích hợp/chất lượng riêng.
 - [ ] **T03** Kiểm thử mất mạng, token hết hạn, worker chết giữa task, Redis/cloud unavailable, request trùng và phản hồi lệch thứ tự; không mất giao dịch hoặc ghi đè sửa tay.

@@ -1,0 +1,973 @@
+{
+  "info": {
+    "name": "Kakeibo disposable CI regression",
+    "description": "Ordered regression against tests/backend-e2e disposable services only. Run with postman/ci/run.mjs; never supply a deployed API or production Supabase. No Postman cloud ID or login.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (pm.variables.get(\"base_url\") !== \"http://api:8000\" || pm.variables.get(\"supabase_url\") !== \"http://gateway:8000\" || pm.variables.get(\"test_scope\") !== \"disposable-ci\") { throw new Error(\"Use disposable CI services only\"); }",
+          "if (!pm.collectionVariables.get(\"email\")) {",
+          " const id = pm.variables.replaceIn(\"{{$guid}}\");",
+          " pm.collectionVariables.set(\"email\", \"postman-\" + id + \"@example.com\");",
+          " pm.collectionVariables.set(\"password\", \"Ci!\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Public health",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/health",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Process is healthy\", () => pm.expect(pm.response.json()).to.deep.equal({status: \"ok\"}));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 OpenAPI exposes implemented operations",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/openapi.json",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"API contract\", () => {",
+              " const paths = pm.response.json().paths;",
+              " pm.expect(paths[\"/api/v1/ingestion/text\"]).to.have.property(\"post\");",
+              " pm.expect(paths[\"/api/v1/transactions\"]).to.have.property(\"post\");",
+              " pm.expect(paths[\"/api/v1/transactions/{transaction_id}\"]).to.include.keys(\"get\", \"patch\", \"delete\");",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Missing token is rejected",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/transactions",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));",
+              "pm.test(\"Bearer challenge\", () => pm.expect(pm.response.headers.get(\"WWW-Authenticate\")).to.equal(\"Bearer\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Invalid token is rejected",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/transactions",
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "invalid-token",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Sign up isolated user",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "apikey",
+            "value": "{{supabase_publishable_key}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{supabase_url}}/auth/v1/signup",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"User created\", () => pm.expect(pm.response.json().user.id).to.be.a(\"string\").and.not.empty);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Password login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "apikey",
+            "value": "{{supabase_publishable_key}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{supabase_url}}/auth/v1/token?grant_type=password",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "const data = pm.response.json();",
+              "pm.test(\"User session issued\", () => {",
+              " pm.expect(Boolean(data.access_token && data.refresh_token && data.user.id)).to.equal(true);",
+              "});",
+              "pm.collectionVariables.set(\"access_token\", data.access_token);",
+              "pm.collectionVariables.set(\"refresh_token\", data.refresh_token);",
+              "pm.collectionVariables.set(\"user_id\", data.user.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 Refresh session",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "apikey",
+            "value": "{{supabase_publishable_key}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{supabase_url}}/auth/v1/token?grant_type=refresh_token",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "const data = pm.response.json();",
+              "pm.test(\"Refresh preserves user\", () => pm.expect(data.user.id).to.equal(pm.collectionVariables.get(\"user_id\")));",
+              "pm.test(\"New session issued\", () => pm.expect(Boolean(data.access_token && data.refresh_token)).to.equal(true));",
+              "pm.collectionVariables.set(\"access_token\", data.access_token);",
+              "pm.collectionVariables.set(\"refresh_token\", data.refresh_token);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 Create dedicated wallet",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/manage/accounts",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Postman regression\",\n  \"account_type\": \"cash\",\n  \"balance\": \"100000.10\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+              "const data = pm.response.json();",
+              "pm.test(\"Wallet belongs to user\", () => pm.expect(data.user_id).to.equal(pm.collectionVariables.get(\"user_id\")));",
+              "pm.collectionVariables.set(\"wallet_id\", String(data.id));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 Read starting balance",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/manage/accounts/{{wallet_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Wallet balance 100000.1\", () => pm.expect(Math.round(Number(pm.response.json().balance) * 100)).to.equal(10000010));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 Analyze Vietnamese input without saving",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/ingestion/text",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"ăn trưa 65k\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Editable draft contract\", () => pm.response.to.have.jsonSchema({",
+              " type: \"object\", required: [\"drafts\"], properties: {drafts: {type: \"array\", minItems: 1, maxItems: 5, items: {",
+              " type: \"object\", required: [\"text\", \"normalized_text\", \"amount\", \"transaction_type\", \"category\", \"confidence\", \"source\", \"warnings\"],",
+              " properties: {text: {type: \"string\"}, normalized_text: {type: \"string\"}, amount: {type: [\"integer\", \"null\"]},",
+              " transaction_type: {enum: [\"income\", \"expense\", \"transfer\"]}, category: {type: [\"string\", \"null\"]},",
+              " confidence: {type: \"number\", minimum: 0, maximum: 1}, source: {enum: [\"LOCAL\", \"GEMINI\", \"RULES\", \"UNAVAILABLE\"]},",
+              " warnings: {type: \"array\", items: {type: \"string\"}}}",
+              " }}}}));",
+              "pm.test(\"Deterministic money extraction\", () => {",
+              " const draft = pm.response.json().drafts[0];",
+              " pm.expect(draft.amount).to.equal(65000);",
+              " pm.expect(draft.transaction_type).to.equal(\"expense\");",
+              " pm.expect(draft).not.to.have.property(\"id\");",
+              " pm.collectionVariables.set(\"draft_amount\", String(draft.amount));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 Analysis did not create transactions",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/transactions"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"No implicit save\", () => {",
+              " pm.expect(pm.response.json().total).to.equal(0);",
+              " pm.expect(pm.response.json().items).to.deep.equal([]);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 Analysis did not change wallet",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/manage/accounts/{{wallet_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Wallet balance 100000.1\", () => pm.expect(Math.round(Number(pm.response.json().balance) * 100)).to.equal(10000010));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 Ambiguous amount requires review",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/ingestion/text",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"cà phê 40k giảm còn 20k\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Editable draft contract\", () => pm.response.to.have.jsonSchema({",
+              " type: \"object\", required: [\"drafts\"], properties: {drafts: {type: \"array\", minItems: 1, maxItems: 5, items: {",
+              " type: \"object\", required: [\"text\", \"normalized_text\", \"amount\", \"transaction_type\", \"category\", \"confidence\", \"source\", \"warnings\"],",
+              " properties: {text: {type: \"string\"}, normalized_text: {type: \"string\"}, amount: {type: [\"integer\", \"null\"]},",
+              " transaction_type: {enum: [\"income\", \"expense\", \"transfer\"]}, category: {type: [\"string\", \"null\"]},",
+              " confidence: {type: \"number\", minimum: 0, maximum: 1}, source: {enum: [\"LOCAL\", \"GEMINI\", \"RULES\", \"UNAVAILABLE\"]},",
+              " warnings: {type: \"array\", items: {type: \"string\"}}}",
+              " }}}}));",
+              "pm.test(\"No guessed amount\", () => {",
+              " const draft = pm.response.json().drafts[0];",
+              " pm.expect(draft.amount).to.equal(null);",
+              " pm.expect(draft.warnings.length).to.be.greaterThan(0);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 Empty input fails validation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/ingestion/text",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"text\": \"   \"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "15 Invalid money fails validation",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/transactions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": \"-1\",\n  \"transaction_type\": \"expense\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "16 Invalid pagination fails validation",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/transactions?limit=0"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "17 Explicitly confirm and save draft",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/transactions",
+        "body": {
+          "mode": "raw",
+          "raw": "{\"account_id\": {{wallet_id}}, \"amount\": \"{{draft_amount}}\", \"transaction_type\": \"expense\", \"raw_description\": \"ăn trưa 65k\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+              "const data = pm.response.json();",
+              "pm.test(\"Saved money and owner\", () => {",
+              " pm.expect(Number(data.amount)).to.equal(65000);",
+              " pm.expect(data.user_id).to.equal(pm.collectionVariables.get(\"user_id\"));",
+              "});",
+              "pm.collectionVariables.set(\"transaction_id\", String(data.id));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "18 Saved expense changes wallet",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/manage/accounts/{{wallet_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Wallet balance 35000.1\", () => pm.expect(Math.round(Number(pm.response.json().balance) * 100)).to.equal(3500010));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "19 Read persisted transaction",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/transactions/{{transaction_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Transaction contract and precision\", () => {",
+              " const data = pm.response.json();",
+              " pm.expect(String(data.id)).to.equal(pm.collectionVariables.get(\"transaction_id\"));",
+              " pm.expect(String(data.account_id)).to.equal(pm.collectionVariables.get(\"wallet_id\"));",
+              " pm.expect(data.raw_description).to.equal(\"ăn trưa 65k\");",
+              " pm.expect(Number(data.amount)).to.equal(65000);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "20 Correct expense with decimal amount",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/transactions/{{transaction_id}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"amount\": \"60000.25\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Correction accepted\", () => pm.expect(Number(pm.response.json().amount)).to.equal(60000.25));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "21 Correction reverses old balance effect",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/manage/accounts/{{wallet_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Wallet balance 39999.85\", () => pm.expect(Math.round(Number(pm.response.json().balance) * 100)).to.equal(3999985));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "22 Overview reflects saved expense",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/overview"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Overview reconciles\", () => {",
+              " const data = pm.response.json();",
+              " pm.expect(Math.round(Number(data.current_balance) * 100)).to.equal(3999985);",
+              " pm.expect(Number(data.monthly_income)).to.equal(0);",
+              " pm.expect(Number(data.monthly_expense)).to.equal(60000.25);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "23 Reject unexpected ownership field",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/transactions/{{transaction_id}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"user_id\": \"00000000-0000-0000-0000-000000000000\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "24 Rejected update leaves amount intact",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/transactions/{{transaction_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Unchanged after rejection\", () => pm.expect(Number(pm.response.json().amount)).to.equal(60000.25));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "25 Delete saved transaction",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/transactions/{{transaction_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));",
+              "pm.test(\"Empty deletion response\", () => pm.expect(pm.response.text()).to.equal(\"\"));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "26 Deletion restores original wallet balance",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/manage/accounts/{{wallet_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+              "pm.test(\"Wallet balance 100000.1\", () => pm.expect(Math.round(Number(pm.response.json().balance) * 100)).to.equal(10000010));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "27 Deleted transaction is absent",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/transactions/{{transaction_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "28 Remove dedicated wallet",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/api/v1/manage/accounts/{{wallet_id}}"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

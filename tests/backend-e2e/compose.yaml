@@ -135,5 +135,17 @@ services:
       SUPABASE_URL: http://gateway:8000
       SUPABASE_ANON_KEY: ${TEST_ANON_KEY:?}
 
+  postman:
+    profiles: [postman]
+    build:
+      context: ../..
+      dockerfile: postman/ci/Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      GITHUB_ACTIONS: ${GITHUB_ACTIONS:?This suite runs on GitHub Actions only}
+      TEST_ANON_KEY: ${TEST_ANON_KEY:?}
+
 volumes:
   db-data:

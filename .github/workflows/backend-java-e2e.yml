@@ -8,6 +8,7 @@ on:
       - 'data/taxonomy/**'
       - 'frontend/supabase/**'
       - 'tests/backend-e2e/**'
+      - 'postman/ci/**'
       - '.github/workflows/backend-java-e2e.yml'
   pull_request:
     paths:
@@ -15,6 +16,7 @@ on:
       - 'data/taxonomy/**'
       - 'frontend/supabase/**'
       - 'tests/backend-e2e/**'
+      - 'postman/ci/**'
       - '.github/workflows/backend-java-e2e.yml'
 
 permissions:
@@ -41,14 +43,18 @@ jobs:
         run: python3 docker/generate_env.py
       - name: Validate Compose configuration
         run: docker compose config --quiet
-      - name: Build backend and Java runner
-        run: docker compose build --pull api tests backend-checks
+      - name: Build backend and test runners
+        run: docker compose build --pull api tests backend-checks postman
       - name: Check backend lint and existing Python tests in Docker
         run: docker compose run --name "${COMPOSE_PROJECT_NAME}-checks" --no-deps backend-checks
       - name: Start isolated backend and database
+        id: stack
         run: docker compose up --detach --wait --wait-timeout 240 api
       - name: Run Java integration and API tests in Docker
         run: docker compose run --name "${COMPOSE_PROJECT_NAME}-tests" --no-deps tests
+      - name: Run Postman API regression in Docker
+        if: ${{ !cancelled() && steps.stack.outcome == 'success' }}
+        run: docker compose run --name "${COMPOSE_PROJECT_NAME}-postman" --no-deps postman
       - name: Collect test reports and container logs
         if: always()
         run: |
@@ -60,6 +66,7 @@ jobs:
           done > artifacts/healthchecks.txt
           docker cp "${COMPOSE_PROJECT_NAME}-tests:/tests/target/failsafe-reports" artifacts/failsafe-reports || true
           docker cp "${COMPOSE_PROJECT_NAME}-checks:/reports" artifacts/backend-reports || true
+          docker cp "${COMPOSE_PROJECT_NAME}-postman:/reports" artifacts/postman-reports || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:

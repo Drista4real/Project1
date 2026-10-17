@@ -33,7 +33,12 @@ Workflow: [Backend Java E2E](../../.github/workflows/backend-java-e2e.yml).
    và `containers.log`.
 
 CI chạy Ruff và bộ pytest hiện có của backend trong container riêng trước E2E,
-để kiểm tra hồi quy khi sửa code Python. Bộ Java có 41 kịch bản sau tham số hóa.
+để kiểm tra hồi quy khi sửa code Python. Bộ Java có thêm `IngestionIT` cho luồng
+phân tích → review → lưu và kiểm tra dữ liệu qua Auth/database thật.
+Sau Java, Postman CLI chạy [28 request regression](../../postman/README.md)
+trong container riêng, xuất `postman-reports/postman.xml` cùng artifact.
+Postman vẫn chạy nếu Java test thất bại nhưng stack đã khởi động thành công;
+lỗi ở một bộ không che mã lỗi của bộ còn lại.
 
 Hai image kiểm thử chạy bằng user không phải root. Image Python dùng
 `docker/requirements.lock`, khóa phiên bản và SHA-256 của toàn bộ wheel cho
@@ -72,13 +77,15 @@ không chạy `mvn test` trên máy cá nhân (`test` cũng chưa đến pha Fai
 | `TransactionsIT` | CRUD; tiền có phần thập phân; hoàn số dư khi sửa/xóa; chuyển ví; tổng tháng UTC; phân trang/lọc/sắp xếp; dữ liệu không hợp lệ |
 | `ManagementIT` | CRUD 11 tài nguyên độc lập; profile; composite key của thẻ giao dịch; tin nhắn; cascade; dữ liệu đang được sử dụng; danh mục hệ thống; validation |
 | `IsolationIT` | Chặn đọc/sửa/xóa và liên kết chéo người dùng; kiểm tra RLS và migration guard qua PostgREST thật |
+| `IngestionIT` | JWT thật; tiền tiếng Việt; phân tích không lưu; review sửa tiền trước lưu; đối soát số dư; người dùng khác không sửa/xóa được; input lỗi không thay đổi dữ liệu |
 
 Mỗi kịch bản tạo người dùng với email UUID và đăng nhập bằng password để nhận JWT.
 Dữ liệu của các test độc lập, không phụ thuộc ID cố định hay thứ tự chạy. Cleanup
 toàn bộ database sau job, thay vì dùng admin credential để xóa từng người dùng.
 Assertions kiểm tra cả dữ liệu đọc lại và số dư, không chỉ HTTP status.
 
-Các màn AI/dự báo hiện quản lý bản ghi đã lưu; bộ test không gọi mô hình AI,
+Các màn quản lý AI/dự báo xử lý bản ghi đã lưu; test text ingestion chạy parser
+và nhánh không có model/cloud credential, không đánh giá chất lượng mô hình AI,
 không kiểm tra Celery job, Flutter UI, email delivery, OAuth hoặc cấu hình gateway
 production. Gateway Nginx ở đây chỉ định tuyến nội bộ; quyền dữ liệu vẫn do Auth,
 PostgREST và RLS kiểm soát.
