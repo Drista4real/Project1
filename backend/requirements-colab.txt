@@ -1,0 +1,5 @@
+# ML notebook only; the API/database stack is not required.
+-r requirements-classifier.txt
+-r requirements-forecaster.txt
+# Stay on Transformers 4 for the existing PhoBERT baseline.
+transformers>=4.44,<5
