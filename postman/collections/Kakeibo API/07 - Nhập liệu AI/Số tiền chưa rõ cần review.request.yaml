@@ -1,0 +1,23 @@
+$kind: http-request
+description: Không suy đoán số tiền khi câu có mức giá và điều chỉnh giá chưa rõ.
+url: "{{base_url}}/api/v1/ingestion/text"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {"text": "cà phê 40k giảm còn 20k"}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 200", function () { pm.response.to.have.status(200); });
+      if (pm.response.code === 200) {
+        pm.test("Cần người dùng nhập lại tiền", function () {
+          const draft = pm.response.json().drafts[0];
+          pm.expect(draft.amount).to.equal(null);
+          pm.expect(draft.warnings.length).to.be.above(0);
+        });
+      }
+    language: text/javascript
+order: 2000

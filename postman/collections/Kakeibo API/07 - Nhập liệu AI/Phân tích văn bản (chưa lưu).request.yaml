@@ -1,0 +1,30 @@
+$kind: http-request
+description: Chỉ phân tích thành bản nháp để review; không ghi giao dịch hoặc thay đổi số dư. Cần token người dùng. Model/cloud tùy cấu hình backend; phản hồi RULES hoặc UNAVAILABLE không chứng minh model hoạt động.
+url: "{{base_url}}/api/v1/ingestion/text"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "text": "ăn trưa 65k tiền mặt; trà sữa 35k",
+      "categories": [{"name": "Ăn uống", "is_income": false}]
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 200", function () { pm.response.to.have.status(200); });
+      if (pm.response.code === 200) {
+        pm.test("Hai bản nháp, tiền được trích xuất đúng", function () {
+          const drafts = pm.response.json().drafts;
+          pm.expect(drafts.map(function (draft) { return draft.amount; })).to.eql([65000, 35000]);
+          drafts.forEach(function (draft) {
+            pm.expect(draft.transaction_type).to.equal("expense");
+            pm.expect(draft).not.to.have.property("id");
+          });
+        });
+      }
+    language: text/javascript
+order: 1000

@@ -1,9 +1,14 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseConfig {
-  static const String supabaseUrl = 'https://syjigvtyxfkmmqipxufm.supabase.co';
-  static const String supabaseAnonKey =
-      'sb_publishable_gexOlWlrEdiPuyda9jixOA_cujZIIOX';
+  static const String supabaseUrl = String.fromEnvironment(
+    'SUPABASE_URL',
+    defaultValue: 'https://syjigvtyxfkmmqipxufm.supabase.co',
+  );
+  static const String supabaseAnonKey = String.fromEnvironment(
+    'SUPABASE_ANON_KEY',
+    defaultValue: 'sb_publishable_gexOlWlrEdiPuyda9jixOA_cujZIIOX',
+  );
 
   static Future<void> initialize() async {
     if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {

@@ -32,6 +32,7 @@ migrate_working_dir/
 .pub/
 /build/
 /coverage/
+/test-reports/
 
 # Generated offline speech assets; prepare_voice_assets.py recreates these.
 /assets/models/phowhisper-tiny/*.onnx

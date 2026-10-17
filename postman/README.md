@@ -59,6 +59,18 @@ Collection tự gửi `Authorization: Bearer {{access_token}}` cho API tài chí
 
 Gửi từng request trong quá trình làm quen. Các request POST/PATCH/DELETE thay đổi dữ liệu thật của tài khoản đăng nhập. Toàn collection là bộ ví dụ, không phải một kịch bản để chạy toàn bộ bằng Runner: tạo thu/chuyển ví sẽ thay `transaction_id`, cập nhật hồ sơ đổi tên người dùng, và một số module phụ thuộc bản ghi của module khác. Mỗi request có kiểm tra HTTP status trong kết quả script.
 
+**07 - Nhập liệu AI** kiểm tra `POST /api/v1/ingestion/text`: phân tích tiếng Việt thành bản nháp, tách hai khoản chi và yêu cầu review khi số tiền chưa rõ. Phân tích không lưu giao dịch; sau khi review mới dùng request tạo giao dịch. Endpoint chạy receipt, forecast và job status chưa được đăng ký nên chưa có ví dụ gọi chúng.
+
+## Regression tự động trên CI
+
+[Collection regression riêng](ci/regression.postman_collection.json) có **28 request chạy theo thứ tự** trên stack Supabase tạm của [Backend Java E2E](../.github/workflows/backend-java-e2e.yml). Bộ này tự đăng ký/đăng nhập/làm mới phiên, tạo ví riêng, phân tích → xác nhận lưu → sửa → xóa, đối soát số dư và kiểm tra lỗi 401/404/422. Không cần tài khoản Postman hoặc khóa production.
+
+Runner [ci/run.mjs](ci/run.mjs) cố định URL `https://postman-gateway:8443`, nhận anon key sinh riêng cho mỗi job và xóa environment tạm sau khi chạy. Gateway TLS 1.3 định tuyến Auth và API; CLI xác minh hostname/chứng chỉ với CA riêng được tạo cho job, không dùng `--insecure`. CA key bị xóa sau khi ký; server key và certificate được xóa khi teardown, không đưa vào artifact. CI dùng **Postman CLI 1.75.0**, xuất JUnit `postman-reports/postman.xml` trong artifact backend; test lỗi làm workflow thất bại. Chạy bằng GitHub Actions, không đổi URL sang hệ thống đang deploy.
+
+Dependency CLI được ghim phiên bản và integrity trong [package-lock.json](ci/package-lock.json), cài bằng `npm ci --ignore-scripts`. Binary đã có sẵn trong package platform tương ứng; runner dùng đường dẫn tuyệt đối trong image Linux amd64, không tìm lệnh theo `PATH`. Image và dependencies do root sở hữu, runner dùng user `node`. Hai workflow Flutter ghim action bên thứ ba bằng commit SHA đầy đủ. Các thay đổi xử lý cảnh báo Sonar tại [issue #26](https://github.com/Drista4real/Project1/issues/26).
+
+JSON v2.1 được giữ riêng để xuất JUnit. [Postman CLI hỗ trợ JUnit cho JSON v2, còn YAML v3 chỉ có CLI reporter](https://learning.postman.com/docs/postman-cli/postman-cli-reporters). [Newman không hỗ trợ Native Git v3 và đã ngừng duy trì](https://learning.postman.com/docs/reference/newman-cli/command-line-integration-with-newman), vì vậy pipeline mới dùng Postman CLI. Không chạy thư viện YAML thủ công như collection regression này.
+
 ## 4. Các module quản lý
 
 **05 - Quản lý tài chính** có danh sách module/schema và CRUD cho ví, danh mục, thẻ, gắn thẻ giao dịch, ngân sách, mục tiêu tiết kiệm, nợ/cho vay, lịch giao dịch định kỳ, bản ghi dự báo/cảnh báo và bản ghi tư vấn/chat. Hồ sơ chỉ có xem và cập nhật.

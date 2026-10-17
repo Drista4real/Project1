@@ -135,5 +135,39 @@ services:
       SUPABASE_URL: http://gateway:8000
       SUPABASE_ANON_KEY: ${TEST_ANON_KEY:?}
 
+  postman-gateway:
+    profiles: [postman]
+    image: nginx:1.28.0-alpine
+    depends_on:
+      api:
+        condition: service_healthy
+      gateway:
+        condition: service_healthy
+    volumes:
+      - ./docker/postman-tls.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./.certs.ci/server.crt:/certs/server.crt:ro
+      - ./.certs.ci/server.key:/certs/server.key:ro
+    healthcheck:
+      # Check configuration and certificate loading; Postman's first request
+      # verifies the TLS listener and already-healthy upstream API over HTTPS.
+      test: [CMD, nginx, -t]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  postman:
+    profiles: [postman]
+    build:
+      context: ../..
+      dockerfile: postman/ci/Dockerfile
+    depends_on:
+      postman-gateway:
+        condition: service_healthy
+    volumes:
+      - ./.certs.ci/ca.crt:/certs/ca.crt:ro
+    environment:
+      GITHUB_ACTIONS: ${GITHUB_ACTIONS:?This suite runs on GitHub Actions only}
+      TEST_ANON_KEY: ${TEST_ANON_KEY:?}
+
 volumes:
   db-data:

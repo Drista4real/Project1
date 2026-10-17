@@ -1,0 +1,8 @@
+{
+  "name": "kakeibo-postman-ci",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "postman-cli": "1.75.0"
+  }
+}

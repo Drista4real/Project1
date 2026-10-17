@@ -70,34 +70,42 @@ class _AuthScreenState extends State<AuthScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-              TextFormField(
-                controller: _email,
-                enabled: !_busy,
-                keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  prefixIcon: Icon(Icons.mail_outline),
+              Semantics(
+                container: true,
+                identifier: 'auth-email',
+                child: TextFormField(
+                  controller: _email,
+                  enabled: !_busy,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(
+                    labelText: 'Email',
+                    prefixIcon: Icon(Icons.mail_outline),
+                  ),
+                  validator: (value) =>
+                      value != null &&
+                          RegExp(
+                            r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
+                          ).hasMatch(value.trim())
+                      ? null
+                      : 'Nhập email hợp lệ',
                 ),
-                validator: (value) =>
-                    value != null &&
-                        RegExp(
-                          r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
-                        ).hasMatch(value.trim())
-                    ? null
-                    : 'Nhập email hợp lệ',
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _password,
-                enabled: !_busy,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'Mật khẩu',
-                  prefixIcon: Icon(Icons.lock_outline),
+              Semantics(
+                container: true,
+                identifier: 'auth-password',
+                child: TextFormField(
+                  controller: _password,
+                  enabled: !_busy,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Mật khẩu',
+                    prefixIcon: Icon(Icons.lock_outline),
+                  ),
+                  validator: (value) => value != null && value.length >= 6
+                      ? null
+                      : 'Nhập mật khẩu ít nhất 6 ký tự',
                 ),
-                validator: (value) => value != null && value.length >= 6
-                    ? null
-                    : 'Nhập mật khẩu ít nhất 6 ký tự',
               ),
               const SizedBox(height: 16),
               if (_message != null)
@@ -105,22 +113,30 @@ class _AuthScreenState extends State<AuthScreen> {
                   padding: const EdgeInsets.only(bottom: 16),
                   child: Text(_message!),
                 ),
-              FilledButton(
-                onPressed: _busy ? null : _submit,
-                child: Text(
-                  _busy
-                      ? 'Đang xử lý...'
-                      : _register
-                      ? 'Đăng ký'
-                      : 'Đăng nhập',
+              Semantics(
+                container: true,
+                identifier: 'auth-submit',
+                child: FilledButton(
+                  onPressed: _busy ? null : _submit,
+                  child: Text(
+                    _busy
+                        ? 'Đang xử lý...'
+                        : _register
+                        ? 'Đăng ký'
+                        : 'Đăng nhập',
+                  ),
                 ),
               ),
-              TextButton(
-                onPressed: _busy ? null : () => _cubit.toggleMode(),
-                child: Text(
-                  _register
-                      ? 'Đã có tài khoản? Đăng nhập'
-                      : 'Chưa có tài khoản? Đăng ký',
+              Semantics(
+                container: true,
+                identifier: 'auth-toggle-mode',
+                child: TextButton(
+                  onPressed: _busy ? null : () => _cubit.toggleMode(),
+                  child: Text(
+                    _register
+                        ? 'Đã có tài khoản? Đăng nhập'
+                        : 'Chưa có tài khoản? Đăng ký',
+                  ),
                 ),
               ),
             ],
