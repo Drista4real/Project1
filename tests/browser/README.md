@@ -115,6 +115,12 @@ Nếu không thấy semantics, kiểm tra đã build bằng `build_web.py`, buil
 xem lỗi Selenium Manager, version thực tế, quyền chạy browser và truy cập mạng
 tới vendor; lỗi setup phải giữ CI thất bại.
 
+Test reload phải đợi cả URL `/settings` và tiêu đề riêng của màn Cài đặt trước
+khi refresh, rồi kiểm tra lại cả hai sau refresh. Click WebDriver có thể kết thúc
+trước khi Flutter cập nhật browser history; chỉ tìm `nav-settings` chưa đủ vì
+nút này xuất hiện ở mọi màn. Regression này được theo dõi tại
+[issue #24](https://github.com/Drista4real/Project1/issues/24).
+
 ## Mở rộng sau pipeline nền
 
 Thêm các file `test_*.py` trong `scenarios/` và dùng fixture `browser` để có
@@ -139,5 +145,5 @@ Tài liệu chính thức: [Flutter web accessibility](https://docs.flutter.dev/
 Đã kiểm tra build Flutter web release, `flutter analyze`, Ruff và `actionlint`.
 85 Flutter unit/widget test đạt; sau chỉnh ranh giới semantics đã chạy lại 8 test
 app/ledger/transaction liên quan và đều đạt. Local dùng Python 3.13.7; workflow
-ghim Python 3.12. Chưa chạy workflow trên GitHub Actions, nên kết quả local
-không phải xác nhận toàn pipeline trên runner GitHub đã đạt.
+ghim Python 3.12. Đây là kết quả local khi dựng pipeline; xem kết quả Actions
+tương ứng từng commit để xác nhận pipeline trên runner GitHub.

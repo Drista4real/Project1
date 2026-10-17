@@ -59,6 +59,13 @@ def see(browser, text):
     )
 
 
+def wait_for_route(browser, route):
+    WebDriverWait(browser, 15).until(
+        lambda driver: (urlsplit(driver.current_url).fragment or "/") == route,
+        message=f"Expected browser route {route}",
+    )
+
+
 def login_form(browser):
     click(browser, "ledger-sign-in")
     element(browser, "auth-email")
@@ -88,15 +95,15 @@ def test_navigation_changes_routes_and_survives_reload(browser):
         ("nav-ledger", "/"),
     ]:
         click(browser, identifier)
-        WebDriverWait(browser, 15).until(
-            lambda driver, expected=route: (
-                (urlsplit(driver.current_url).fragment or "/") == expected
-            )
-        )
+        wait_for_route(browser, route)
     click(browser, "nav-settings")
+    # Flutter updates browser history asynchronously after the WebDriver click.
+    # Reload only once the destination URL and its page content are present.
+    wait_for_route(browser, "/settings")
+    see(browser, "Tiện Ích và Cài Đặt")
     browser.refresh()
-    element(browser, "nav-settings")
-    assert browser.current_url.endswith("#/settings")
+    wait_for_route(browser, "/settings")
+    see(browser, "Tiện Ích và Cài Đặt")
 
 
 def test_empty_login_validates_without_auth_request(browser):
