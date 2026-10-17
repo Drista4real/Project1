@@ -20,7 +20,7 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "if (pm.variables.get(\"base_url\") !== \"http://api:8000\" || pm.variables.get(\"supabase_url\") !== \"http://gateway:8000\" || pm.variables.get(\"test_scope\") !== \"disposable-ci\") { throw new Error(\"Use disposable CI services only\"); }",
+          "if (pm.variables.get(\"base_url\") !== \"https://postman-gateway:8443\" || pm.variables.get(\"supabase_url\") !== \"https://postman-gateway:8443\" || pm.variables.get(\"test_scope\") !== \"disposable-ci\") { throw new Error(\"Use disposable CI services only\"); }",
           "if (!pm.collectionVariables.get(\"email\")) {",
           " const id = pm.variables.replaceIn(\"{{$guid}}\");",
           " pm.collectionVariables.set(\"email\", \"postman-\" + id + \"@example.com\");",

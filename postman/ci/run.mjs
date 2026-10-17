@@ -14,20 +14,21 @@ try {
   writeFileSync(environment, JSON.stringify({
     name: 'Disposable CI only',
     values: Object.entries({
-      base_url: 'http://api:8000',
-      supabase_url: 'http://gateway:8000',
+      base_url: 'https://postman-gateway:8443',
+      supabase_url: 'https://postman-gateway:8443',
       supabase_publishable_key: process.env.TEST_ANON_KEY,
       test_scope: 'disposable-ci',
     }).map(([key, value]) => ({ key, value, enabled: true })),
   }), { mode: 0o600 });
 
-  const result = spawnSync('postman', [
+  const result = spawnSync('/opt/postman/node_modules/@postman/pm-bin-linux-x64/bin/postman', [
     'collection', 'run', 'regression.postman_collection.json',
     '--environment', environment,
     '--bail', 'failure',
     '--timeout', '180000',
     '--timeout-request', '20000',
     '--timeout-script', '5000',
+    '--ssl-extra-ca-certs', '/certs/ca.crt',
     '--no-report-events',
     '--reporters', 'cli,junit',
     '--reporter-junit-export', '/reports/postman.xml',

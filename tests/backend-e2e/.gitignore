@@ -1,3 +1,4 @@
 target/
 .env.ci
+.certs.ci/
 artifacts/

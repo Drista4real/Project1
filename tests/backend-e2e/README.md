@@ -63,6 +63,14 @@ và ghi vào `.env.ci` đã được gitignore. Không cần khai báo GitHub Se
 khóa Supabase thật vào CI. Không có cổng container nào được publish ra host.
 Runner dùng container tạm; bước cleanup luôn xóa containers, volumes và file env.
 
+Postman đi qua service `postman-gateway` bằng TLS 1.3. Mỗi job tạo CA và server
+certificate với SAN `postman-gateway`; CLI chỉ tin CA được mount read-only và
+không bỏ qua xác minh TLS. CA private key được xóa ngay sau khi ký; server key
+chỉ mount vào Nginx. `.certs.ci/` được gitignore và xóa trong cleanup; không copy
+chứng chỉ/private key vào artifact. Java vẫn kiểm tra API/Auth qua mạng nội bộ
+như trước. Image Postman cài lockfile với lifecycle scripts bị tắt và chạy binary
+bằng đường dẫn tuyệt đối. Xem [issue security #26](https://github.com/Drista4real/Project1/issues/26).
+
 Lệnh thực thi trong container Java là `mvn --batch-mode --no-transfer-progress verify`.
 Failsafe tìm các lớp `*IT`, trả mã lỗi nếu test thất bại hoặc không tìm thấy test;
 không retry test thất bại. Biến môi trường và URL nội bộ được kiểm tra để tránh

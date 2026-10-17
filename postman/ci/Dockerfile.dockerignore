@@ -2,3 +2,4 @@
 !postman/
 !postman/ci/
 !postman/ci/**
+postman/ci/node_modules/
