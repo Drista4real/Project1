@@ -1,0 +1,5 @@
+# Optional preparation for future LoRA experiments (no training pipeline yet).
+-r requirements-colab.txt
+peft>=0.13,<1
+accelerate>=1,<2
+datasets>=3,<5
