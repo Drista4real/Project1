@@ -168,9 +168,13 @@ def classify_text(text: str) -> dict[str, Any]:
 
 def show_classification(result: dict[str, Any]) -> None:
     """Render genuine model provenance and unresolved review warnings."""
-    from app.infrastructure.config.settings import get_settings
+    try:
+        from app.infrastructure.config.settings import get_settings
 
-    settings = get_settings()
+        settings = get_settings()
+    except HANDLED_ERRORS as exc:
+        friendly_error("Hiển thị phân loại", exc)
+        return
     model_name = (
         "PhoBERT + LoRA"
         if settings.classifier_backend == "lora"

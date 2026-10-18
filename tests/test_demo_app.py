@@ -45,6 +45,28 @@ def test_empty_inputs_and_mock_receipt(demo: AppTest) -> None:
     )
 
 
+def test_cached_classification_missing_settings_dependency(
+    demo: AppTest, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A missing settings dependency during rendering must not crash the page."""
+    import builtins
+
+    original_import = builtins.__import__
+
+    def missing_settings(name: str, *args: object, **kwargs: object) -> object:
+        if name == "app.infrastructure.config.settings":
+            raise ModuleNotFoundError(
+                "No module named 'pydantic_settings'", name="pydantic_settings"
+            )
+        return original_import(name, *args, **kwargs)
+
+    demo.session_state["text_result"] = {"raw_input": ""}
+    monkeypatch.setattr(builtins, "__import__", missing_settings)
+    demo.run()
+    assert not demo.exception
+    assert any("requirements-demo.txt" in item.value for item in demo.error)
+
+
 def test_local_text_and_voice(demo: AppTest) -> None:
     """Exercise actual cached PhoBERT/LightGBM plus the missing-model ASR mock."""
     demo.text_input(key="transaction_text").set_value("cơm sườn 35k").run()
