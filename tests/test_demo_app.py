@@ -158,6 +158,7 @@ def test_uploaded_voice_never_uses_mock(monkeypatch: pytest.MonkeyPatch) -> None
     from unittest.mock import Mock
 
     import streamlit as st
+
     from app.infrastructure.ai.edge_asr import recognizer as asr_module
 
     buffer = io.BytesIO()
@@ -183,7 +184,7 @@ def test_uploaded_voice_never_uses_mock(monkeypatch: pytest.MonkeyPatch) -> None
     demo = AppTest.from_file(str(APP), default_timeout=60).run()
     demo.button(key="analyze_voice").click().run()
     assert not demo.exception
-    assert any("Chưa có model ASR" in item.value for item in demo.error)
+    assert any("Chưa cấu hình Gemini" in item.value for item in demo.error)
     assert "voice_result" not in demo.session_state
     engine.transcribe_and_normalize.assert_not_called()
     assert not demo.metric
@@ -218,7 +219,7 @@ def test_uploaded_receipt_never_uses_mock(monkeypatch: pytest.MonkeyPatch) -> No
     demo = AppTest.from_file(str(APP), default_timeout=60).run()
     demo.button(key="analyze_receipt").click().run()
     assert not demo.exception
-    assert any("Chưa cấu hình Qwen" in item.value for item in demo.error), [
+    assert any("Chưa cấu hình Gemini" in item.value for item in demo.error), [
         item.value for item in demo.error
     ]
     assert "receipt_result" not in demo.session_state

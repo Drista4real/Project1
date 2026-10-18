@@ -1,5 +1,30 @@
 # Model 4: receipt VLM and persona advice
 
+Architecture note (2026-10-18): Model 4 owns receipt extraction, including its
+receipt-level category; a Model 1 pass is optional for category-only ambiguity.
+The Advisor belongs to Model 2 even though its adapter lives in this directory.
+[ADR 0003](../../../../../docs/adr/0003-three-tier-ai-and-modality-fallback.md)
+and [the target specification](../../../../../docs/SPECIFICATION.md#55-ma-trận-fallback-theo-công-đoạn)
+define Gemini multimodal fallback that rereads the original image when Qwen
+extraction fails. The prototype is implemented only in the standalone Streamlit
+demo (`frontend/demo_pipeline.py`). Flutter, FastAPI and these shared model
+adapters remain unchanged; app integration is a later phase.
+Configure compatible `GEMINI_AUDIO_MODEL` and `GEMINI_RECEIPT_MODEL` endpoints
+for demo fallback. Fallback runs automatically in the background, without a Gemini
+button or per-request approval dialog. User review before saving is separate
+from fallback execution; manual correction is recovery if automation fails.
+The target Tier 2 fallback orchestrator chooses text/audio/image by the failing
+operation. Qwen extraction fallback triggers on errors/timeouts, truncated output,
+schema/required-field failures or arithmetic inconsistency after accounting for
+documented tax, fees and discounts. A self-reported confidence field is not a
+calibrated probability. Category-only ambiguity uses Model 1, not image rereading.
+After task-specific evaluation, a single Gemini media request may return both
+extracted data and an allowed category. A complete validated result goes straight
+to review; do not reclassify it in another cloud call. If the category is unresolved,
+try the local classifier and retain a needs-review draft once the shared cloud
+budget is exhausted. Demo orchestration is implemented; app orchestration and
+combined semantic media extraction/category output await evaluation/integration.
+
 Schemas use Pydantic v2 with forbidden extra fields, strict integer VND amounts,
 positive item quantities, six Vietnamese categories, finite confidence in [0,1],
 and valid ISO dates or null. Qwen2.5-VL extracts receipt documents only using
@@ -7,8 +32,8 @@ async `httpx` and the OpenAI-compatible chat completions API. Requests include
 Base64 images and a JSON schema prompt. FPT Cloud requests send
 `response_format=json_schema` with `strict=true`; other routes use JSON mode.
 Every response is strictly validated by Pydantic before use; JSON mode alone
-does not guarantee schema compliance. Gemini 2.5 Flash generates persona advice
-only via the asynchronous Google Gen AI SDK, with `response_json_schema`.
+does not guarantee schema compliance. Gemini uses the asynchronous Google Gen AI
+SDK with `response_json_schema`; Advisor behavior remains unchanged.
 The receipt parser strips a complete JSON Markdown fence and converts Vietnamese
 day/month/year dates (with `/`, `-`, or `.` separators and a four-digit year) to
 ISO dates before validation. Invalid dates, two-digit years, incorrect money
@@ -16,7 +41,7 @@ types, extra fields, and unsupported categories remain rejected.
 Gemini also categorizes text in the authenticated `/api/v1/ingestion/text`
 endpoint when the local classifier is unavailable or below its confidence
 threshold. Money normalization remains deterministic and local. The Streamlit
-demo still shows the Model 1 routing hint without that additional NLP call.
+demo now performs actual text category fallback through its separate pipeline.
 
 Configure `OPENROUTER_API_KEY`, `QWEN_BASE_URL` (default
 `https://openrouter.ai/api/v1`) and `QWEN_MODEL` (default
@@ -27,7 +52,19 @@ DashScope uses its compatible-mode base URL, `DASHSCOPE_API_KEY`, and native
 Advisor credentials remain separate: `GEMINI_API_KEY`, with
 `GEMINI_MODEL=gemini-3.8-flash` in the current environment template. The original
 specification used 2.5 Flash; newer accounts may receive a model-unavailable
-response for that version. Receipt calls never use the Gemini key.
+response for that version. The demo uses `GEMINI_INPUT_MODEL` for text and
+separate `GEMINI_AUDIO_MODEL`/`GEMINI_RECEIPT_MODEL` overrides for media
+(otherwise `GEMINI_INPUT_MODEL`). Model access must be checked for the account.
+
+The demo's Gemini client allows one logical request/one transport attempt with
+a 20-second timeout; Qwen uses 15 seconds. It sends original media inline, then
+validates output independently. Transcript recovery and unresolved image categories
+use local classification once that budget is spent. Its extended receipt schema
+supports separately printed tax/fee/discount adjustments without changing the
+shared adapter schema. The low-level Qwen adapter still has its original line/total
+check; disagreement triggers a fresh image read in the demo. See the
+[Streamlit guide](../../../../../frontend/STREAMLIT_DEMO.md) for formats, limits,
+configuration, memory retention, testing and remaining quality evaluation.
 
 FPT Cloud is also supported: set `FPT_API_KEY`,
 `QWEN_BASE_URL=https://mkp-api.fptcloud.com/v1`, and
@@ -80,8 +117,8 @@ async def inspect_receipt() -> ReceiptExtractionResult:
 `extract_receipt` returns `ReceiptExtractionResult`. The protocol method
 `await extract(image, mime_type)` returns vendor-neutral `ReceiptData`, retaining
 items, category, confidence, and arithmetic validity so the application can
-request confirmation. The domain protocol, `IngestReceipt.execute`, and the API
-receipt hook use async/await. Domain and application layers do not import SDKs
+request confirmation. The domain protocol, `IngestReceipt.execute`, and the
+legacy receipt hook use async/await. Domain/application layers do not import SDKs
 or Pydantic schemas. Accepted images are nonempty bytes with JPEG, PNG, or WebP
 MIME types.
 

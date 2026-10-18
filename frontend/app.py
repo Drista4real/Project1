@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import sys
 from dataclasses import dataclass
@@ -18,6 +19,8 @@ ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
 if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 if TYPE_CHECKING:
     from app.domain.interfaces.classifier_interface import ITransactionClassifier
@@ -29,10 +32,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 HANDLED_ERRORS = (ImportError, OSError, ValueError, RuntimeError)
-
-
-class QwenNotConfiguredError(RuntimeError):
-    """Uploaded images require a configured real Qwen client."""
 
 
 @dataclass(frozen=True)
@@ -72,15 +71,6 @@ def classifier() -> ITransactionClassifier:
     )
 
     return LightGBMTransactionClassifier()
-
-
-def predict_category(
-    model: ITransactionClassifier, text: str
-) -> tuple[str, float, str]:
-    """Use the common classifier contract for both direct local adapters."""
-    result = model.classify(text)
-    source = "LOCAL" if result.confidence >= 0.8 else "CLOUD_FALLBACK"
-    return result.label, result.confidence, source
 
 
 @st.cache_resource(show_spinner=False)
@@ -133,6 +123,8 @@ def friendly_error(context: str, exc: Exception) -> None:
             "Hãy thử đọc lại; nếu lỗi vẫn còn, cần kiểm tra phản hồi của model."
         ),
         "truncated": "Gemini trả phản hồi bị cắt trước khi hoàn thành hóa đơn.",
+        "configuration": "Chưa cấu hình Gemini khả dụng; kiểm tra API key và model.",
+        "budget": "Đã dùng hết ngân sách fallback cho lần phân tích này.",
     }
     reason = getattr(exc, "reason", None)
     if reason in cloud_errors:
@@ -164,24 +156,18 @@ def friendly_error(context: str, exc: Exception) -> None:
 
 
 def classify_text(text: str) -> dict[str, Any]:
-    """Measure normalization and warmed local inference, preserving routing hints."""
-    model = classifier()
-    parser = normalizer()
-    start = perf_counter()
-    normalized, amount = parser.normalize(text)
-    category, confidence, source = predict_category(model, normalized)
-    return dict(
-        text=normalized,
-        amount=amount,
-        category=category,
-        confidence=confidence,
-        source=source,
-        latency=(perf_counter() - start) * 1000,
+    """Run standalone Model 1 with automatic real Gemini category fallback."""
+    from frontend.demo_pipeline import DemoPipeline
+
+    return asyncio.run(
+        DemoPipeline(
+            classifier, gemini_api_key=st.session_state.get("gemini_api_key") or None
+        ).text(text)
     )
 
 
 def show_classification(result: dict[str, Any]) -> None:
-    """Render metrics and distinguish a cloud routing hint from an actual call."""
+    """Render genuine model provenance and unresolved review warnings."""
     from app.infrastructure.config.settings import get_settings
 
     settings = get_settings()
@@ -197,57 +183,41 @@ def show_classification(result: dict[str, Any]) -> None:
     st.write("**Văn bản chuẩn hóa:**", result["text"])
     columns = st.columns(4)
     columns[0].metric("Số tiền", money(result["amount"]))
-    columns[1].metric("Danh mục", result["category"])
+    columns[1].metric("Danh mục", result["category"] or "Chưa xác định")
     columns[2].metric("Tin cậy P", f"{result['confidence']:.1%}")
     columns[3].metric("Latency", f"{result['latency']:.1f} ms")
-    if result["source"] == "LOCAL":
+    if result["source"] == "LOCAL" and result["confidence"] >= 0.8:
         st.success("LOCAL · P ≥ 0,8")
+    elif result["source"] == "GEMINI":
+        st.success("GEMINI · đã gọi fallback phân loại văn bản")
     else:
-        st.warning("CLOUD_FALLBACK · P < 0,8 — danh mục tạm thời, cần xác nhận.")
-        st.caption(
-            "Đây là tín hiệu định tuyến; chưa có lời gọi cloud phân loại trong demo."
-        )
+        st.warning("Danh mục tạm thời hoặc chưa xác định; cần kiểm tra.")
+    if result.get("extraction_source") == "GEMINI_AUDIO":
+        st.caption("Phiên âm: Gemini từ audio gốc · Phân loại: " + result["source"])
+    for warning in result.get("warnings", []):
+        st.warning(warning)
     if result["amount"] is None:
         st.info("Chưa nhận diện được số tiền. Bổ sung đơn vị như k, cành hoặc triệu.")
     if result.get("mock"):
         st.warning(
             "MOCK ASR · phiên âm giả lập, không phải kết quả nhận diện file audio."
         )
-    st.caption(
-        "Latency đo xử lý sau khi model đã nạp; không gồm thời gian nạp trọng số."
-    )
+    st.caption("Latency gồm tải model nếu chưa cache, xử lý cục bộ và fallback nếu có.")
 
 
 async def extract_image(
     image: bytes, mime_type: str, mock: bool = False, api_key: str | None = None
 ) -> dict[str, Any]:
-    """Own the async cloud client within one event loop and always close it."""
-    from app.infrastructure.ai.cloud_vlm.qwen_client import QwenVLMReceiptExtractor
+    """Run demo-only Qwen-to-Gemini image recovery in one event loop."""
+    from frontend.demo_pipeline import DemoPipeline
 
-    extractor = QwenVLMReceiptExtractor(
-        api_key=api_key,
-        test_mode=True if mock else None,
-        timeout_seconds=45.0,
-    )
-    start = perf_counter()
-    try:
-        if extractor.is_mock and not mock:
-            raise QwenNotConfiguredError(
-                "Chưa cấu hình Qwen để đọc ảnh thật. "
-                "Nhập API key của nhà cung cấp trong mục Kết nối Qwen ở thanh bên."
-            )
-        result = await extractor.extract_receipt(image, mime_type)
-        return dict(
-            receipt=result.model_dump(),
-            mock=extractor.is_mock,
-            latency=(perf_counter() - start) * 1000,
-        )
-    finally:
-        await extractor.aclose()
+    return await DemoPipeline(
+        classifier, gemini_api_key=st.session_state.get("gemini_api_key") or None
+    ).image(image, mime_type, mock=mock, qwen_api_key=api_key)
 
 
 def ingestion_screen() -> None:
-    """Render text, WAV/M4A/MP3 voice, and image receipt workflows with persistent results."""
+    """Render text, WAV/M4A/MP3 voice and receipt workflows with saved results."""
     st.subheader("Ghi chép nhanh, xem AI hiểu gì")
     text_tab, voice_tab, receipt_tab = st.tabs(["Văn bản", "Giọng nói", "Hóa đơn"])
     with text_tab:
@@ -279,6 +249,10 @@ def ingestion_screen() -> None:
         )
         if audio is not None:
             st.audio(audio.getvalue(), format=audio.type or "audio/wav")
+        st.caption(
+            "WAV PCM16, M4A hoặc MP3, tối đa 60 giây và 8 MiB. "
+            "ASR lỗi sẽ tự dùng Gemini."
+        )
         analyze, quick = st.columns(2)
         run_audio = analyze.button("Phân tích Voice", key="analyze_voice")
         run_mock = quick.button("Test phiên âm mẫu (MOCK)", key="quick_voice")
@@ -290,44 +264,43 @@ def ingestion_screen() -> None:
             st.session_state.pop("voice_result", None)
             try:
                 with st.spinner("Đang phiên âm và phân loại…"):
-                    engine = recognizer(mock_mode=run_mock)
                     if run_audio and audio is None:
                         st.info("Chọn file âm thanh trước khi phân tích.")
-                    elif run_audio and engine.is_mock:
-                        st.error(
-                            "Chưa có model ASR để nhận diện file âm thanh đã tải lên. "
-                            "Cần encoder.onnx, decoder.onnx và tokens.txt trong "
-                            "weights/onnx/phowhisper-tiny/ "
-                            "(hoặc encoder.int8.onnx và decoder.int8.onnx). "
-                            "Sau khi thêm model, bấm Nạp lại model ASR."
-                        )
                     else:
-                        model = classifier()
-                        start = perf_counter()
-                        normalized, amount = engine.transcribe_and_normalize(
-                            audio.getvalue()
-                            if run_audio and audio is not None
-                            else b"mock-audio"
+                        from frontend.demo_pipeline import DemoPipeline
+
+                        st.session_state["voice_result"] = asyncio.run(
+                            DemoPipeline(
+                                classifier,
+                                recognizer=recognizer,
+                                gemini_api_key=st.session_state.get("gemini_api_key")
+                                or None,
+                            ).voice(
+                                audio.getvalue()
+                                if run_audio and audio is not None
+                                else b"mock-audio",
+                                mock=run_mock,
+                            )
                         )
-                        category, confidence, source = predict_category(
-                            model, normalized
-                        )
-                        st.session_state["voice_result"] = dict(
-                            text=normalized,
-                            amount=amount,
-                            category=category,
-                            confidence=confidence,
-                            source=source,
-                            mock=engine.is_mock,
-                            latency=(perf_counter() - start) * 1000,
+                        st.session_state["voice_result"]["input_id"] = (
+                            "MOCK"
+                            if run_mock
+                            else hashlib.sha256(audio.getvalue()).hexdigest()
                         )
             except HANDLED_ERRORS as exc:
                 friendly_error("Phân tích giọng nói", exc)
-        if "voice_result" in st.session_state:
+        if "voice_result" in st.session_state and (
+            st.session_state["voice_result"].get("input_id") == "MOCK"
+            or (
+                audio is not None
+                and st.session_state["voice_result"].get("input_id")
+                == hashlib.sha256(audio.getvalue()).hexdigest()
+            )
+        ):
             show_classification(st.session_state["voice_result"])
     with receipt_tab:
         image = st.file_uploader(
-            "Tải ảnh hóa đơn", type=["jpg", "jpeg", "png"], key="receipt_file"
+            "Tải ảnh hóa đơn", type=["jpg", "jpeg", "png", "webp"], key="receipt_file"
         )
         if image is not None:
             try:
@@ -344,10 +317,11 @@ def ingestion_screen() -> None:
             else:
                 try:
                     with st.spinner("Đang đọc hóa đơn…"):
-                        mime = (
-                            "image/png"
-                            if image is not None and image.name.lower().endswith(".png")
-                            else "image/jpeg"
+                        extension = (
+                            image.name.rsplit(".", 1)[-1].lower() if image else "jpg"
+                        )
+                        mime = {"png": "image/png", "webp": "image/webp"}.get(
+                            extension, "image/jpeg"
                         )
                         st.session_state["receipt_result"] = asyncio.run(
                             extract_image(
@@ -359,23 +333,47 @@ def ingestion_screen() -> None:
                                 api_key=st.session_state.get("qwen_api_key") or None,
                             )
                         )
-                except QwenNotConfiguredError as exc:
-                    st.error(str(exc))
+                        st.session_state["receipt_result"]["input_id"] = (
+                            "MOCK"
+                            if run_mock
+                            else hashlib.sha256(image.getvalue()).hexdigest()
+                        )
                 except HANDLED_ERRORS as exc:
-                    friendly_error("Đọc hóa đơn", exc)
-        if "receipt_result" in st.session_state:
+                    friendly_error(
+                        "Đọc hóa đơn" if run_mock else "Đọc hóa đơn (Qwen → Gemini)",
+                        exc,
+                    )
+        if "receipt_result" in st.session_state and (
+            st.session_state["receipt_result"].get("input_id") == "MOCK"
+            or (
+                image is not None
+                and st.session_state["receipt_result"].get("input_id")
+                == hashlib.sha256(image.getvalue()).hexdigest()
+            )
+        ):
             result = st.session_state["receipt_result"]
             receipt = result["receipt"]
             columns = st.columns(3)
-            columns[0].metric("Tổng hóa đơn", money(receipt["total_amount"]))
-            columns[1].metric("Tin cậy", f"{receipt['confidence_score']:.0%}")
+            columns[0].metric("Tổng hóa đơn", money(result["amount"]))
+            columns[1].metric(
+                "Kiểm tra số học",
+                "Khớp" if receipt["is_arithmetic_valid"] else "Cần kiểm tra",
+            )
             columns[2].metric("Latency", f"{result['latency']:.0f} ms")
             st.write("**Cửa hàng:**", receipt["merchant_name"])
             st.write("**Danh mục:**", receipt["category"])
             st.write(
                 "**Ngày giao dịch:**", receipt["transaction_date"] or "Chưa đọc được"
             )
-            st.badge("Powered by Qwen2.5-VL (Document VLM)", color="blue")
+            st.badge(
+                "Powered by Gemini (Image fallback)"
+                if result["source"] == "GEMINI_IMAGE"
+                else "Powered by Qwen2.5-VL (Document VLM)",
+                color="blue",
+            )
+            st.caption("Nguồn danh mục: " + result["category_source"])
+            for warning in result.get("warnings", []):
+                st.warning(warning)
             st.dataframe(receipt["items"], hide_index=True, width="stretch")
             if receipt["is_arithmetic_valid"]:
                 st.success("Tổng các món khớp hóa đơn trong ngưỡng sai lệch 5%.")
@@ -409,7 +407,7 @@ def sidebar_controls() -> Controls:
                 type="password",
                 key="gemini_api_key",
                 help=(
-                    "Dùng cho AI Advisor và Fallback NLP; "
+                    "Dùng cho Advisor và fallback text/audio/ảnh của demo; "
                     "để trống để dùng biến môi trường."
                 ),
             )

@@ -1,5 +1,30 @@
 # Chạy Model 3 giọng nói sau khi clone
 
+Model 3 chỉ phiên âm audio thành transcript; văn bản sau chuẩn hóa đi qua
+Model 1 để phân loại. Fallback Gemini phân loại text không sửa được phiên âm
+sai. [Kiến trúc đích, mục 5.5](SPECIFICATION.md#55-ma-trận-fallback-theo-công-đoạn)
+quy định bộ điều phối backend chọn text/audio theo lỗi. Luồng chính là
+PhoWhisper → transcript dùng được → Model 1; điểm phân loại thấp chỉ gọi Gemini
+bằng text. Fallback audio ban đầu tự kích hoạt khi runtime lỗi/transcript rỗng;
+quality gate nâng cao chỉ bật sau khi kiểm chứng tín hiệu và hiệu chuẩn.
+Khi đã gọi Gemini bằng audio, có thể yêu cầu cả transcript/dữ liệu giao dịch
+và danh mục trong cùng request; nếu đủ và đạt kiểm định thì chuyển review,
+không bắt buộc qua Model 1 hoặc gọi cloud phân loại lần nữa. Đường gộp cần
+đánh giá trước khi bật; nếu chỉ có transcript thì vẫn dùng Model 1 trong cùng
+ngân sách cloud, hết ngân sách mà còn mơ hồ thì giữ nháp cần kiểm tra. Không có nút
+gọi Gemini hay hộp thoại xác nhận từng lần fallback; quyền xử lý cloud được
+thiết lập trước khi dùng tính năng. Chỉ yêu cầu sửa/thu lại khi xử lý tự động
+không giải quyết được (kể cả khi mất mạng). Tín hiệu chất lượng/ngưỡng ASR
+cần được thiết kế và kiểm chứng, không lấy điểm phân loại Model 1 thay thế;
+cloud ASR hiện chỉ được thử nghiệm trong [demo Streamlit](../frontend/STREAMLIT_DEMO.md):
+runtime lỗi/transcript rỗng → Gemini nhận audio gốc → classifier local, không gọi
+Gemini lần hai. `GEMINI_API_KEY` và `GEMINI_AUDIO_MODEL` dành cho demo; hỗ trợ WAV
+PCM16 mono/stereo, 8–48 kHz và M4A/MP3 qua PyAV, tối đa 60 giây/8 MiB.
+Flutter vẫn phiên âm trên thiết bị,
+không tự tải audio lên backend; phần đấu nối app để giai đoạn sau. Offline phiên
+âm không đồng nghĩa toàn bộ phân loại/lưu giao dịch hoạt động offline.
+Mock không phải ASR dự phòng.
+
 Model PhoWhisper-tiny INT8 được phân phối riêng qua GitHub Release, không đưa
 binary vào lịch sử Git. Dùng Python 3.11 trở lên cho các script tải/đóng gói.
 

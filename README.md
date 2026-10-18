@@ -2,6 +2,8 @@
 
 Thiết lập giọng nói sau khi clone: [tải Model 3 từ GitHub Release](docs/MODEL3_SETUP.md).
 Thiết lập classifier sau khi clone: [tải PhoBERT cho Model 1](backend/app/infrastructure/ai/classifier/README.md#setup-after-cloning-no-training).
+
+Kiến trúc đích và fallback Model 1/3/4: [đặc tả hệ thống, mục 5](docs/SPECIFICATION.md#5-thiết-kế-kiến-trúc-hệ-thống-và-4-mô-hình-ai), [ADR 0004](docs/adr/0004-three-tier-ai-and-modality-fallback.md), [GitHub #52](https://github.com/Drista4real/Project1/issues/52). Phần 5.6 của đặc tả phân biệt thiết kế với tính năng đã triển khai.
 ## Đề tài 17: Hệ thống Quản lý Tài chính Cá nhân Dự báo Dòng tiền Thông minh (AI-driven Cash Flow Forecasting & Financial Management)
 
 ---
@@ -17,8 +19,12 @@ Quản lý tài chính cá nhân là nhu cầu thiết yếu đối với ngư�
 ### 1.2. Giải pháp đề xuất: Kiến trúc Hybrid AI & Hệ thống Bất đồng bộ
 Hệ thống giải quyết bài toán bằng cách kết hợp:
 * **Kiến trúc AI phân tầng (Tiered Hybrid AI):**
-  * *Tầng 1 (Local/Edge - Low Latency < 50ms):* Fine-tune mô hình ngôn ngữ nhỏ gọn tiếng Việt (PhoBERT) để gán nhãn tự động nội dung chuyển khoản và mô hình học sâu chuỗi thời gian (DLinear/LSTM) để dự báo số dư/dòng tiền 7–30 ngày.
-  * *Tầng 2 (Cloud LLM - Reasoning Engine):* Gemini API đóng vai trò Chuyên gia tư vấn tài chính (Financial Advisor), chỉ kích hoạt khi fallback gán nhãn ca khó và phân tích thói quen, lập kế hoạch tiết kiệm chuyên sâu.
+  * *Tầng 1 — Client / On-device:* Flutter chạy Model 3 PhoWhisper-tiny INT8 qua sherpa-onnx để phiên âm offline, chuẩn hóa cơ bản và review; SQLCipher/Optimistic UI theo thiết kế đích.
+  * *Tầng 2 — Backend CPU:* FastAPI điều phối; Model 1 PhoBERT + LightGBM phân loại text/transcript; Model 2 LightGBM/EWMA tính dòng tiền, runway và safe-to-spend; Redis/Celery cho tác vụ nặng.
+  * *Tầng 3 — Cloud GPU & Foundation API:* Model 4 Qwen Document VLM đọc hóa đơn thành JSON kèm danh mục; Gemini cung cấp fallback theo tác vụ và Advisor của Model 2. Model/version cấu hình riêng, không cố định một phiên bản cho mọi đầu vào.
+* **Fallback tự động chạy ngầm ở mọi model:** Model 1 → Gemini phân loại text khi thiếu tự tin; Model 3 → Gemini hỗ trợ audio khi phiên âm lỗi hoặc không đạt kiểm tra chất lượng; Model 4 → Gemini multimodal đọc lại ảnh khi Qwen thất bại; Advisor → mẫu cục bộ khi cloud lỗi. Không có nút gọi Gemini hoặc xác nhận cho từng fallback. Hóa đơn đã có danh mục hợp lệ không bắt buộc qua Model 1. Sửa/thu lại/nhập tay là phục hồi khi luồng tự động không xử lý được; review trước lưu vẫn giữ nguyên.
+* **Bộ điều phối fallback chung tại backend:** Chọn text/audio/ảnh theo công đoạn lỗi. Luồng giọng nói chính là PhoWhisper → Model 1; điểm phân loại thấp chỉ gọi Gemini bằng text. Fallback audio ban đầu dùng lỗi runtime/transcript rỗng; chỉ mở rộng kiểm tra chất lượng sau khi có tín hiệu được kiểm chứng. Qwen dùng điều kiện lỗi/timeout, phản hồi bị cắt, schema và số học thay vì confidence tự khai. Khi Gemini đã nhận audio/ảnh, có thể gộp trích xuất và phân loại trong một request; đủ dữ liệu, danh mục và đạt kiểm định thì chuyển review, không gọi cloud phân loại lần nữa. Đường gộp cần đánh giá trước khi bật; mọi nhánh dùng chung ngân sách gọi cloud. Chi tiết tại [mục 5.5](docs/SPECIFICATION.md#55-ma-trận-fallback-theo-công-đoạn).
+* **Hiện trạng:** demo Streamlit có fallback Gemini tự động cho Model 1/3/4 với ngân sách một lần gọi mỗi lượt phân tích. Phần đấu nối fallback media với Flutter/FastAPI để giai đoạn sau; API/app hiện có được giữ nguyên. Model 2/Advisor giữ nguyên. Request media gộp phân loại, quality gate ASR nâng cao, SQLCipher và hàng đợi media còn cần triển khai/kiểm chứng. Các chỉ tiêu độ trễ/chất lượng trong đặc tả là mục tiêu nghiệm thu. Xem [hướng dẫn demo](frontend/STREAMLIT_DEMO.md).
 * **Hạ tầng Dữ liệu & Backend Hiện đại (Supabase & PostgreSQL):**
   * Sử dụng **Supabase Cloud (PostgreSQL)** làm cơ sở dữ liệu chính: hỗ trợ Row Level Security (RLS) bảo mật tuyệt đối cho dữ liệu tài chính từng người dùng, Realtime subscriptions, Auth đa phương thức và Auto-generated RESTful APIs.
 * **Đa nền tảng (Cross-platform Flutter App):**
@@ -43,8 +49,8 @@ Hệ thống giải quyết bài toán bằng cách kết hợp:
 
 ### 2.1. GIAI ĐOẠN 1: GIỮA KỲ (Nghiên cứu & Thực nghiệm Mô hình AI)
 * **Dataset:** Xây dựng tập dữ liệu 5,000 - 10,000 giao dịch ngân hàng thực tế (sao kê MBBank, Vietcombank, Techcombank...). Chuẩn hóa teencode, viết tắt, danh mục 8-10 nhóm chi tiêu.
-* **NLP Model:** `vinai/phobert-base-v2` kết hợp LoRA (Parameter-Efficient Fine-Tuning) phân loại nội dung chuyển khoản tiếng Việt với F1-Score $\ge 88\%$. Fallback sang Gemini khi độ tin cậy thấp.
-* **Time-Series Forecasting:** So sánh thực nghiệm ARIMA vs. LSTM/Bi-LSTM vs. DLinear để dự báo số dư và xu hướng thâm hụt 7 - 30 ngày.
+* **NLP Model:** Kiến trúc chính Model 1 dùng PhoBERT + LightGBM, mục tiêu Macro F1 $\ge 88\%$, fallback Gemini khi `P_class < 0.8`. PhoBERT + LoRA là nhánh thực nghiệm tùy chọn, không thay đổi kiến trúc chính.
+* **Time-Series Forecasting:** Model 2 dùng LightGBM Regressor cho nhóm thu nhập cố định và EWMA cho nhóm linh hoạt, dự báo 7–30 ngày. ARIMA/LSTM/DLinear chỉ là phương án so sánh nghiên cứu.
 
 ### 2.2. GIAI ĐOẠN 2: CUỐI KỲ (Hệ thống Flutter App & Supabase BaaS)
 * **Frontend:** Ứng dụng Flutter trực quan: Dashboard tài chính, quản lý thu/chi, cảnh báo thâm hụt và biểu đồ dự báo.
@@ -215,7 +221,7 @@ erDiagram
    * `public.debts_loans`: Sổ ghi nợ và cho vay, theo dõi kỳ hạn thanh toán và nhắc nợ.
    * `public.recurring_transactions`: Quản lý hóa đơn định kỳ, thuê bao tháng (tiền nhà, internet, gym...).
 4. **Phân hệ AI Dự báo & Trợ lý Thông minh:**
-   * `public.cashflow_forecasts`: Chuỗi thời gian dự báo số dư 7 - 30 ngày (DLinear / LSTM) kèm khoảng tin cậy.
+   * `public.cashflow_forecasts`: Lưu chuỗi dự báo số dư 7–30 ngày từ Model 2 (LightGBM/EWMA theo phân khúc); khoảng tin cậy cần phương pháp và đánh giá riêng.
    * `public.cashflow_alerts`: Cảnh báo nguy cơ thâm hụt số dư trước ngày nhận lương kèm hành động đề xuất.
    * `public.ai_consultations`, `public.ai_chat_sessions`, `public.ai_chat_messages`: Hệ thống lưu trữ phiên tư vấn tài chính thông minh của Google Gemini AI kèm snapshot tài chính.
    * `public.notes`: Bảng kiểm tra kết nối nhanh giữa Flutter và PostgreSQL.
@@ -311,8 +317,8 @@ flutter run -d chrome
 
 | Thành viên | Trách nhiệm chính | Giai đoạn 1 (Giữa kỳ) | Giai đoạn 2 (Cuối kỳ) |
 | :--- | :--- | :--- | :--- |
-| **Thành viên 1** | Team Lead & AI Engineer | Xây dựng dataset, huấn luyện PhoBERT + LoRA phân loại giao dịch | Tích hợp Gemini Fallback & API Endpoint AI |
-| **Thành viên 2** | Time-Series & Data Pipeline | Tiền xử lý chuỗi thời gian, huấn luyện ARIMA, LSTM & DLinear | Đóng gói pipeline dự báo dòng tiền 7-30 ngày |
+| **Thành viên 1** | Team Lead & AI Engineer | Xây dựng dataset, PhoBERT embedding + LightGBM phân loại giao dịch | Tích hợp fallback Model 1/3/4 theo tác vụ & API AI |
+| **Thành viên 2** | Time-Series & Data Pipeline | Tiền xử lý chuỗi thời gian, LightGBM/EWMA theo phân khúc | Đóng gói dự báo 7–30 ngày và nhánh AI Advisor của Model 2 |
 | **Thành viên 3** | Backend & Database (Supabase) | Thiết kế Data Schema, đặc tả quan hệ thực thể | Triển khai PostgreSQL trên Supabase, viết RLS, Indexes |
 | **Thành viên 4** | Mobile/Web Frontend (Flutter) | Thiết kế Wireframe giao diện, luồng người dùng | Xây dựng Flutter UI/UX, tích hợp Supabase SDK & Charts |
 
@@ -320,6 +326,7 @@ flutter run -d chrome
 
 ## 7. TIÊU CHÍ NGHIỆM THU (ACCEPTANCE CRITERIA)
 
-* **NLP Model:** PhoBERT đạt F1-Score $\ge 88\%$ trên tập dữ liệu tiếng Việt; độ trễ suy luận $< 50\text{ms}$.
-* **Time-Series:** Mô hình DLinear / LSTM đạt chỉ số MAPE tối ưu hơn mô hình truyền thống ARIMA.
+* **NLP Model:** PhoBERT + LightGBM đạt Macro F1 $\ge 88\%$; mục tiêu inference CPU <15 ms, cần đo cả pipeline và công bố cấu hình benchmark.
+* **Time-Series:** Đánh giá LightGBM/EWMA theo phân khúc và rolling-origin; mục tiêu MAE <300.000 VND, MAPE <10% theo đặc tả, ghi rõ cách xử lý giá trị thực bằng/tiệm cận 0.
+* **Fallback:** Kiểm tra riêng lỗi phiên âm, đọc hóa đơn và phân loại; lỗi cloud giữ nháp để người dùng sửa. Schema hợp lệ không thay thế kiểm tra số học/nội dung; không tự lưu hoặc ghi đè dữ liệu đã xác nhận.
 * **Hệ thống Frontend & Backend:** Ứng dụng Flutter tương tác mượt mà với cơ sở dữ liệu Supabase PostgreSQL, bảo mật phân quyền theo từng User ID, phản hồi thời gian thực và đồng bộ dữ liệu đa nền tảng.

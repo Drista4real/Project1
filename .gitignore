@@ -23,6 +23,10 @@ __pycache__/
 .nox/
 .ipynb_checkpoints/
 
+# Local IDE state
+.idea/
+*.iml
+
 # Coverage and Python packaging outputs
 .coverage
 .coverage.*
