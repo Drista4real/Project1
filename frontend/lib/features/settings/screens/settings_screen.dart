@@ -257,10 +257,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Icons.account_balance_wallet_outlined,
                 color: Theme.of(context).colorScheme.primary,
               ),
-              title: const Text('Tất cả dữ liệu tài chính'),
-              subtitle: const Text(
-                'Quản lý thu chi · Xem lịch sử dự báo và tư vấn',
-              ),
+              title: const Text('Quản lý tài chính'),
+              subtitle: const Text('Ví, lịch thu chi, mục tiêu và sổ nợ'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () async {
                 await Navigator.of(context).push(

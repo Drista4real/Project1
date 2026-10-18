@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:project_one/shared/state/async_data_cubit.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:project_one/features/management/cubit/record_form_cubit.dart';
@@ -7,6 +8,8 @@ import 'package:project_one/features/finance/domain/repositories/management_repo
 import 'package:project_one/core/theme/app_theme.dart';
 import 'package:project_one/shared/widgets/finance_form.dart';
 import 'package:project_one/features/management/config/management_metadata.dart';
+import 'package:project_one/features/management/config/management_form_layout.dart';
+import 'package:project_one/features/management/widgets/management_theme.dart';
 import 'package:project_one/features/management/widgets/management_error_panel.dart';
 
 class RecordFormScreen extends StatefulWidget {
@@ -29,6 +32,60 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
   final _form = GlobalKey<FormState>();
   final _controllers = <String, TextEditingController>{};
   final _values = <String, dynamic>{};
+  final _advanced = ExpansibleController();
+  late final String _initialSnapshot;
+  bool _allowPop = false;
+  bool _confirmingLeave = false;
+  String get _snapshot => jsonEncode({
+    'values': _values,
+    'text': {
+      for (final entry in _controllers.entries) entry.key: entry.value.text,
+    },
+  });
+  bool get _dirty => !_readOnly && _snapshot != _initialSnapshot;
+
+  bool _isAdvanced(String key) {
+    final primary = managementPrimaryFields[name];
+    if (_readOnly || primary == null || primary.contains(key)) return false;
+    // A required field without a default must never be hidden from a new user.
+    final required = (_schema['required'] as List?) ?? const [];
+    return !(required.contains(key) &&
+        !(_properties[key] as Map).containsKey('default'));
+  }
+
+  void _changed() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _leave() async {
+    if (_busy || _confirmingLeave) return;
+    if (_dirty) {
+      _confirmingLeave = true;
+      final discard = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Bỏ thay đổi chưa lưu?'),
+          content: const Text('Thông tin bạn vừa chỉnh sửa chưa được lưu.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Tiếp tục chỉnh sửa'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Bỏ thay đổi'),
+            ),
+          ],
+        ),
+      );
+      _confirmingLeave = false;
+      if (discard != true || !mounted) return;
+    }
+    if (!mounted) return;
+    setState(() => _allowPop = true);
+    Navigator.pop(context);
+  }
+
   Map<String, List<Map<String, dynamic>>> get _options => _cubit.state.options;
   late final Map<String, dynamic> _schema = Map<String, dynamic>.from(
     widget.resource['schema'] as Map,
@@ -99,11 +156,24 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
       _controllers['month_year']!.text =
           '${now.year}-${now.month.toString().padLeft(2, '0')}-01';
     }
+    if (name == 'recurring_transactions' && widget.record == null) {
+      final today = DateTime.now().toIso8601String().split('T').first;
+      for (final field in ['start_date', 'next_execution_date']) {
+        if (_controllers[field]?.text.isEmpty == true) {
+          _controllers[field]!.text = today;
+        }
+      }
+    }
+    _initialSnapshot = _snapshot;
+    for (final controller in _controllers.values) {
+      controller.addListener(_changed);
+    }
     _cubit.loadReferences();
   }
 
   @override
   void dispose() {
+    _advanced.dispose();
     for (final controller in _controllers.values) {
       controller.dispose();
     }
@@ -112,7 +182,20 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
   }
 
   Future<void> _save() async {
-    if (_readOnly || _busy || !validateFinanceForm(_form)) return;
+    if (_readOnly || _busy) return;
+    final invalid = _form.currentState!.validateGranularly();
+    if (invalid.isNotEmpty) {
+      if (invalid.any(
+        (field) =>
+            field.context.findAncestorWidgetOfExactType<ExpansionTile>() !=
+            null,
+      )) {
+        _advanced.expand();
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+      }
+      if (mounted) validateFinanceForm(_form);
+      return;
+    }
     FocusManager.instance.primaryFocus?.unfocus();
     final data = <String, dynamic>{};
     for (final entry in _properties.entries) {
@@ -194,7 +277,7 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
                   Icon(
                     entry.value,
                     size: 20,
-                    color: AppTheme.primaryForestGreen,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                   const SizedBox(width: 10),
                   Text(managementIconLabels[entry.key]!),
@@ -327,6 +410,7 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
           : 1,
       decoration: financeInputDecoration(
         label,
+        hint: managementFieldHint(name, key),
         helper: numeric && type['type'] == 'number'
             ? 'Nhập số, ví dụ 150000 hoặc 150000,50'
             : type['type'] == 'object'
@@ -635,22 +719,23 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      BlocConsumer<RecordFormCubit, RecordFormState>(
-        bloc: _cubit,
-        listenWhen: (previous, current) => previous.saving && !current.saving,
-        listener: (context, state) {
-          if (state.saved) Navigator.pop(context, true);
-          if (state.saveError != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Không thể lưu dữ liệu: ${state.saveError}'),
-              ),
-            );
-          }
-        },
-        builder: (context, state) => _buildContent(context, state),
-      );
+  Widget build(BuildContext context) => ManagementTheme(
+    builder: (context) => BlocConsumer<RecordFormCubit, RecordFormState>(
+      bloc: _cubit,
+      listenWhen: (previous, current) => previous.saving && !current.saving,
+      listener: (context, state) {
+        if (state.saved) Navigator.pop(context, true);
+        if (state.saveError != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Không thể lưu dữ liệu: ${state.saveError}'),
+            ),
+          );
+        }
+      },
+      builder: (context, state) => _buildContent(context, state),
+    ),
+  );
 
   Widget _buildContent(BuildContext context, RecordFormState state) {
     final groups = <String, List<String>>{
@@ -662,10 +747,15 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
       'Tùy chọn': [],
     };
     for (final entry in _properties.entries) {
+      if (_isAdvanced(entry.key)) continue;
       groups[_groupFor(entry.key, entry.value as Map)]!.add(entry.key);
     }
+    final advanced = _properties.keys.where(_isAdvanced).toList();
     return PopScope(
-      canPop: !_busy,
+      canPop: !_busy && (_allowPop || !_dirty || state.saved),
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _leave();
+      },
       child: Scaffold(
         appBar: AppBar(
           title: Text(
@@ -678,7 +768,7 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
           leading: IconButton(
             tooltip: 'Quay lại',
             icon: const Icon(Icons.arrow_back),
-            onPressed: _busy ? null : () => Navigator.pop(context),
+            onPressed: _busy ? null : _leave,
           ),
         ),
         bottomNavigationBar: _readOnly
@@ -719,13 +809,28 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
                           child: Text(
                             _readOnly
                                 ? 'Dữ liệu của hệ thống chỉ được xem.'
-                                : 'Các trường có dấu * cần được điền trước khi lưu.',
-                            style: const TextStyle(
-                              color: AppTheme.textMuted,
+                                : 'Điền thông tin chính bên dưới. Các trường có dấu * cần được điền trước khi lưu.',
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                               fontSize: 12,
                             ),
                           ),
                         ),
+                        if (!_readOnly)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 20),
+                            child: Text(
+                              managementDescriptions[name] ??
+                                  'Bạn có thể thay đổi thông tin này sau.',
+                              style: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
                         if (_error != null)
                           FinanceFormSection(
                             title: 'Chưa lưu được dữ liệu',
@@ -757,6 +862,33 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
                                 ],
                               ),
                             ),
+                        if (advanced.isNotEmpty)
+                          Card(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            child: ExpansionTile(
+                              controller: _advanced,
+                              maintainState: true,
+                              title: const Text('Tùy chỉnh thêm'),
+                              subtitle: const Text(
+                                'Màu sắc, thông tin bổ sung và các tùy chọn',
+                              ),
+                              childrenPadding: const EdgeInsets.fromLTRB(
+                                16,
+                                0,
+                                16,
+                                20,
+                              ),
+                              children: [
+                                for (var i = 0; i < advanced.length; i++) ...[
+                                  if (i > 0) const SizedBox(height: 18),
+                                  _field(
+                                    advanced[i],
+                                    _properties[advanced[i]] as Map,
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
                       ],
                     ),
                   ),

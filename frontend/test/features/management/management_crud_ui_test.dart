@@ -7,6 +7,15 @@ import 'package:project_one/features/management/config/management_metadata.dart'
 
 import '../../helpers/memory_management_repository.dart';
 
+class FailingDetailsRepository extends MemoryManagementRepository {
+  bool fail = true;
+  @override
+  Future<Map<String, dynamic>> get(String resource, String key) async {
+    if (fail) throw StateError('Không có kết nối');
+    return super.get(resource, key);
+  }
+}
+
 Future<void> openModule(
   WidgetTester tester,
   MemoryManagementRepository repository,
@@ -38,6 +47,74 @@ Future<void> openModule(
 }
 
 void main() {
+  testWidgets(
+    'failed detail load leaves the list available and can be retried',
+    (tester) async {
+      final repository = FailingDetailsRepository();
+      await openModule(tester, repository, 'tags');
+      await tester.tap(find.text('Du lịch'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Không thể mở chi tiết'), findsOneWidget);
+      expect(find.byTooltip('Đóng chi tiết'), findsNothing);
+      repository.fail = false;
+      await tester.tap(find.text('Du lịch'));
+      await tester.pumpAndSettle();
+      expect(find.byTooltip('Đóng chi tiết'), findsOneWidget);
+      expect(repository.saved, isNull);
+    },
+  );
+  testWidgets(
+    'leaving a changed form asks before discarding and keeps input when canceled',
+    (tester) async {
+      final repository = MemoryManagementRepository();
+      await openModule(tester, repository, 'tags', create: true);
+      expect(find.byKey(const ValueKey('color')), findsNothing);
+      await tester.enterText(
+        find.byKey(const ValueKey('name')),
+        'Chuyến đi mùa hè',
+      );
+      await tester.tap(find.byTooltip('Quay lại'));
+      await tester.pumpAndSettle();
+      expect(find.text('Bỏ thay đổi chưa lưu?'), findsOneWidget);
+      await tester.tap(find.text('Tiếp tục chỉnh sửa'));
+      await tester.pumpAndSettle();
+      expect(find.text('Chuyến đi mùa hè'), findsOneWidget);
+      await tester.tap(find.byTooltip('Quay lại'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Bỏ thay đổi'));
+      await tester.pumpAndSettle();
+      expect(find.text('Mở'), findsOneWidget);
+      expect(repository.saved, isNull);
+    },
+  );
+
+  testWidgets(
+    'invalid advanced input is revealed and saved values survive collapse',
+    (tester) async {
+      final repository = MemoryManagementRepository();
+      repository.records.first['color'] = '#wrong';
+      await openModule(
+        tester,
+        repository,
+        'tags',
+        record: repository.records.first,
+      );
+      expect(find.byKey(const ValueKey('color')), findsNothing);
+      await tester.tap(find.text('Lưu thay đổi'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('color')), findsOneWidget);
+      expect(find.text('Giá trị không đúng định dạng'), findsOneWidget);
+      await tester.enterText(find.byKey(const ValueKey('color')), '#D96B43');
+      await tester.ensureVisible(find.text('Tùy chỉnh thêm'));
+      await tester.tap(find.text('Tùy chỉnh thêm'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('color')), findsNothing);
+      await tester.tap(find.text('Lưu thay đổi'));
+      await tester.pumpAndSettle();
+      expect(repository.saved?['color'], '#D96B43');
+      expect(repository.saved?['name'], 'Du lịch');
+    },
+  );
   for (final name in generatedFinanceResources) {
     testWidgets('$name only permits viewing generated records', (tester) async {
       final repository = MemoryManagementRepository();
@@ -56,17 +133,53 @@ void main() {
       await tester.tap(find.text('Du lịch'));
       await tester.pumpAndSettle();
       expect(find.byType(FinanceSaveBar), findsNothing);
-      expect(
-        tester
-            .widget<TextFormField>(find.byKey(const ValueKey('name')))
-            .enabled,
-        isFalse,
-      );
+      expect(find.text('Dữ liệu của hệ thống · Chỉ xem'), findsOneWidget);
+      expect(find.byType(TextFormField), findsNothing);
+      expect(find.widgetWithText(FilledButton, 'Chỉnh sửa'), findsNothing);
       expect(repository.saved, isNull);
       expect(repository.deleted, isFalse);
     });
   }
-
+  testWidgets(
+    'details do not edit data and deletion still requires confirmation',
+    (tester) async {
+      final repository = MemoryManagementRepository();
+      await openModule(tester, repository, 'tags');
+      await tester.tap(find.text('Du lịch'));
+      await tester.pumpAndSettle();
+      expect(find.text('Tên'), findsOneWidget);
+      expect(repository.saved, isNull);
+      await tester.tap(find.widgetWithText(TextButton, 'Xóa'));
+      await tester.pumpAndSettle();
+      expect(find.text('Xóa dữ liệu này?'), findsOneWidget);
+      expect(repository.deleted, isFalse);
+      await tester.tap(find.text('Hủy'));
+      await tester.pumpAndSettle();
+      expect(repository.deleted, isFalse);
+      await tester.tap(find.text('Du lịch'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Chỉnh sửa'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('name')),
+        'Chuyến đi hè',
+      );
+      await tester.tap(find.text('Lưu thay đổi'));
+      await tester.pumpAndSettle();
+      expect(repository.saved?['name'], 'Chuyến đi hè');
+    },
+  );
+  testWidgets('generated records cannot be opened in create mode', (
+    tester,
+  ) async {
+    final repository = MemoryManagementRepository();
+    await openModule(tester, repository, 'cashflow_forecasts', create: true);
+    expect(
+      find.text('Dữ liệu do hệ thống tạo, chỉ có thể xem.'),
+      findsOneWidget,
+    );
+    expect(find.byType(FinanceSaveBar), findsNothing);
+  });
   testWidgets(
     'budget validates every section and saves selected month as first day',
     (tester) async {
