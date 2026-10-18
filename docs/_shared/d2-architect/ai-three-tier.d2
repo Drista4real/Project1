@@ -1,0 +1,78 @@
+# Nguồn: GLOSSARY.md; docs/adr/0004-three-tier-ai-and-modality-fallback.md
+# Kiến trúc mục tiêu, không khẳng định đã tích hợp đầy đủ vào ứng dụng.
+direction: down
+vars: {
+  d2-config: {
+    layout-engine: elk
+    theme-id: 1
+  }
+}
+title: "KIẾN TRÚC AI 3 TẦNG • 4 PHÂN HỆ MODEL\nThiết kế mục tiêu — theo ADR 0004" {
+  shape: text
+  near: top-center
+  style.font-size: 28
+}
+device: "TẦNG 1 • THIẾT BỊ NGƯỜI DÙNG" {
+  direction: right
+  style.fill: "#EFF6FF"
+  style.stroke: "#2563EB"
+  app: "Flutter\nNhập chữ • thu âm • chụp hóa đơn"
+  asr: "MODEL 3 • Phiên âm tiếng Việt\nPhoWhisper INT8 / sherpa-onnx\nChạy trên thiết bị; chuẩn hóa cơ bản" {
+    style.fill: "#DBEAFE"
+  }
+  review: "Kiểm tra và sửa bản nháp\nNgười dùng xác nhận trước khi lưu"
+  app -> asr: "Giọng nói"
+}
+backend: "TẦNG 2 • BACKEND ỨNG DỤNG / CPU" {
+  direction: right
+  style.fill: "#F8FAFC"
+  style.stroke: "#475569"
+  pipeline: "FastAPI • Điều phối và kiểm định\nChọn luồng text / audio / ảnh\nQuản lý ngân sách cloud và retry\nTác vụ nền: Redis / Celery (mục tiêu)"
+  classifier: "MODEL 1 • Phân loại giao dịch\nPhoBERT + LightGBM\nTrích số tiền theo quy tắc" {
+    style.fill: "#DBEAFE"
+  }
+  ledger: "Dịch vụ lưu giao dịch\nChỉ ghi sau xác nhận; chống lưu trùng"
+  data: "Dữ liệu giao dịch đã lưu" {
+    shape: cylinder
+  }
+  forecast: "MODEL 2 • Lõi dự báo dòng tiền\nLightGBM / EWMA\nSố dư dự báo • runway • cờ rủi ro\nAdvisor lỗi: dùng mẫu diễn giải cục bộ" {
+    style.fill: "#DBEAFE"
+  }
+  pipeline -> classifier: "Văn bản cần phân loại"
+  classifier -> pipeline: "Danh mục và độ tin cậy"
+  ledger -> data: "Lưu thành công"
+  data -> forecast: "Dữ liệu đã xác nhận"
+}
+cloud: "TẦNG 3 • CLOUD INFERENCE / FOUNDATION APIs" {
+  direction: right
+  style.fill: "#EFF6FF"
+  style.stroke: "#2563EB"
+  style.stroke-dash: 5
+  receipt: "MODEL 4 • Đọc hóa đơn\nQwen VLM qua dịch vụ inference\nẢnh → JSON và danh mục tổng hóa đơn" {
+    style.fill: "#DBEAFE"
+  }
+  fallback: "Gemini • Fallback dùng chung\nPhân loại text / phục hồi audio / đọc lại ảnh\nTự động khi lỗi hoặc không đạt kiểm định\nTối đa 1 yêu cầu fallback logic / tác vụ"
+  advisor: "MODEL 2 • AI Advisor\nGemini diễn giải chỉ số và cờ rủi ro\nKhông tính lại hay sửa số liệu tài chính" {
+    style.fill: "#DBEAFE"
+  }
+}
+device.app -> backend.pipeline: "Văn bản / ảnh hóa đơn"
+device.asr -> backend.pipeline: "Transcript; audio gốc nếu ASR lỗi"
+backend.pipeline -> cloud.receipt: "Đọc ảnh hóa đơn"
+cloud.receipt -> backend.pipeline: "JSON + danh mục → kiểm định"
+backend.pipeline -> cloud.fallback: "Text / audio / ảnh theo lỗi cần xử lý" {
+  style.stroke-dash: 5
+}
+cloud.fallback -> backend.pipeline: "Kết quả phục hồi → kiểm định" {
+  style.stroke-dash: 5
+}
+backend.pipeline -> device.review: "Bản nháp; giữ chờ sửa nếu chưa rõ"
+device.review -> backend.ledger: "Xác nhận lưu giao dịch"
+backend.forecast -> cloud.advisor: "Chỉ số đã tính và cờ rủi ro"
+cloud.advisor -> device.app: "Lời giải thích và gợi ý"
+backend.forecast -> device.app: "Dự báo và cảnh báo"
+legend: "CHÚ GIẢI\nKhối xanh: phân hệ Model 1–4; Model 2 trải qua hai tầng.\nMũi tên nét đứt: fallback tự động; khung nét đứt: dịch vụ cloud.\nModel 4 có danh mục: không bắt buộc qua Model 1; chỉ chuyển mô tả khi danh mục còn mơ hồ.\nASR offline không đồng nghĩa toàn bộ pipeline offline.\nĐường Gemini gộp trích xuất và phân loại chỉ bật sau đánh giá chất lượng.\nSơ đồ mô tả mục tiêu; tích hợp app đầy đủ, hàng đợi và triển khai GPU chưa được khẳng định hoàn tất." {
+  shape: text
+  near: bottom-center
+  style.font-size: 16
+}
