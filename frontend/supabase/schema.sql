@@ -397,6 +397,26 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+-- Keep the same profile/financial ownership when an anonymous user links email.
+CREATE OR REPLACE FUNCTION public.sync_auth_profile_email()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  UPDATE public.profiles SET email = NEW.email WHERE id = NEW.id;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.sync_auth_profile_email() FROM PUBLIC;
+
+CREATE OR REPLACE TRIGGER on_auth_user_email_updated
+  AFTER UPDATE OF email ON auth.users
+  FOR EACH ROW
+  WHEN (OLD.email IS DISTINCT FROM NEW.email)
+  EXECUTE FUNCTION public.sync_auth_profile_email();
+
 -- 3. Function & Trigger: Tự động cập nhật số dư Ví (accounts.balance) và Profile (profiles.current_balance) khi có giao dịch
 CREATE OR REPLACE FUNCTION public.update_account_and_profile_balance()
 RETURNS TRIGGER AS $$

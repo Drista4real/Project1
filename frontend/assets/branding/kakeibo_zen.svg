@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="1024" height="1024">
+  <title>Kakeibo Zen — phong bao và lá</title>
+  <path fill="#D8EDE2" d="M0 0 H108 V108 H0 Z"/>
+  <path d="M31 43 H77 Q81 43 81 47 V72 Q81 76 77 76 H31 Q27 76 27 72 V47 Q27 43 31 43 Z" fill="#2D5A43" stroke="none" stroke-width="0" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M29 48 L54 64 L79 48" fill="none" stroke="#F6FBF5" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M50 50 C44 36 58 27 75 28 C75 43 66 53 50 50 Z" fill="#2D5A43" stroke="#D8EDE2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M50 50 Q59 40 69 34" fill="none" stroke="#F6FBF5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

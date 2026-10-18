@@ -74,6 +74,7 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
+    - assets/branding/kakeibo_mark.png
     - assets/images/envelope_zen_header.jpg
     - assets/models/phowhisper-tiny/
   fonts:

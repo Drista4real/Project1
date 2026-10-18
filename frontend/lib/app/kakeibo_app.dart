@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:project_one/features/auth/widgets/auth_gate.dart';
 
 import 'package:project_one/app/app_router.dart';
 import 'package:project_one/core/theme/app_theme.dart';
@@ -7,12 +9,24 @@ import 'package:project_one/features/settings/widgets/app_lock_gate.dart';
 import 'package:project_one/features/settings/cubit/app_preferences.dart';
 
 class KakeiboZenApp extends StatelessWidget {
-  const KakeiboZenApp({super.key, this.preferences});
+  const KakeiboZenApp({super.key, this.preferences, this.auth});
   final AppPreferences? preferences;
+  final GoTrueClient? auth;
 
   @override
   Widget build(BuildContext context) {
     final source = preferences ?? AppDependencies.preferences;
+    if (auth != null) {
+      return AuthGate(
+        auth: auth!,
+        preferences: source,
+        signedInBuilder: (_) => _buildAccount(source),
+      );
+    }
+    return _buildAccount(source);
+  }
+
+  Widget _buildAccount(AppPreferences source) {
     return ListenableBuilder(
       listenable: source,
       builder: (context, _) =>

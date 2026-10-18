@@ -1,5 +1,12 @@
 # Flutter ↔ FastAPI
 
+Đăng nhập/đăng ký, OTP email, quên mật khẩu và khách liên kết email được mô tả
+trong [hướng dẫn cấu hình Supabase Auth](supabase/README.md). Cần cấu hình SMTP,
+mẫu thư OTP và Anonymous Sign-Ins trên Supabase để sử dụng dịch vụ thực.
+
+Logo gốc và preview Android nằm trong `assets/branding/`; tái tạo PNG và native
+resources bằng `python tool/generate_branding.py` (cần Pillow).
+
 Bản v1 phát hành Android APK, backend Docker trên Render. Xem
 [hướng dẫn phát hành](../docs/release-v1.md) để tạo khóa ký và build APK với URL API thật.
 

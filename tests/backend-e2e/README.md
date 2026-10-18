@@ -1,5 +1,16 @@
 # Backend integration & API E2E — Java
 
+`EmailAndGuestAuthIT` bổ sung OTP email/recovery qua hộp thư SMTP Mailpit nội bộ,
+từ chối dùng lại mã, mật khẩu mới, anonymous refresh, cách ly RLS và liên kết
+email giữ nguyên UID/ví/giao dịch/số dư. Stack hiện dùng email autoconfirm để
+giữ các test/Postman cũ; trường hợp liên kết cần nhập OTP được kiểm tra ở Flutter
+và cần smoke trên dự án bật xác nhận email. Mailpit không có cổng host hay gửi
+ra hộp thư bên ngoài. Template mã thử nghiệm được phục vụ bởi gateway nội bộ.
+
+Không ghi log nội dung thư, mã OTP hoặc response chứa phiên. Nếu Docker daemon
+không có trên máy local, việc thêm các ca này không có nghĩa là chúng đã chạy;
+chờ bằng chứng workflow Backend Java E2E sau khi đẩy thay đổi.
+
 Bộ test chạy **trong Docker trên GitHub Actions**. Không cần cài Java/Maven,
 chạy backend hay database trên máy cá nhân. Không dùng Supabase production,
 không dùng file `backend/.env`, không mock xác thực hoặc repository.

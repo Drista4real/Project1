@@ -63,6 +63,15 @@ public final class Api {
         return new Api(token, userId);
     }
 
+    public static Api fromSession(Response response) {
+        assertEquals(200, response.statusCode(), "Supabase session request failed");
+        String token = response.jsonPath().getString("access_token");
+        String userId = response.jsonPath().getString("user.id");
+        assertNotNull(token, "Session has no access token");
+        assertNotNull(userId, "Session has no user");
+        return new Api(token, userId);
+    }
+
     public RequestSpecification authenticated() {
         return request(BASE).auth().oauth2(token);
     }

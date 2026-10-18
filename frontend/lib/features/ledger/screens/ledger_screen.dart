@@ -10,6 +10,7 @@ import 'package:project_one/features/finance/domain/repositories/management_repo
 import 'package:project_one/features/management/open_finance_module.dart';
 import 'package:project_one/app/widgets/app_screen_navigation.dart';
 import 'package:project_one/features/auth/screens/auth_screen.dart';
+import 'package:project_one/shared/widgets/kakeibo_logo.dart';
 import 'package:project_one/features/transactions/screens/transaction_detail_screen.dart';
 
 part '../widgets/ledger_content.dart';
@@ -109,11 +110,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
               color: Theme.of(context).colorScheme.primaryContainer,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              Icons.spa,
-              color: Theme.of(context).colorScheme.primary,
-              size: 22,
-            ),
+            child: const KakeiboLogo(size: 26),
           ),
           const SizedBox(width: 12),
           Expanded(
