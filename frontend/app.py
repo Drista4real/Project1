@@ -20,9 +20,7 @@ if str(BACKEND) not in sys.path:
     sys.path.insert(0, str(BACKEND))
 
 if TYPE_CHECKING:
-    from app.infrastructure.ai.classifier.lgbm_inference import (
-        LightGBMTransactionClassifier,
-    )
+    from app.domain.interfaces.classifier_interface import ITransactionClassifier
     from app.infrastructure.ai.edge_asr.normalizer import (
         VietnameseFinancialSlangNormalizer,
     )
@@ -55,13 +53,34 @@ def money(value: float | int | None) -> str:
 
 
 @st.cache_resource(show_spinner=False)
-def classifier() -> LightGBMTransactionClassifier:
+def classifier() -> ITransactionClassifier:
     """Load PhoBERT and the classifier once, only when classification is requested."""
+    from app.infrastructure.config.settings import get_settings
+
+    settings = get_settings()
+    if settings.classifier_backend == "lora":
+        from app.infrastructure.ai.classifier.lora import LoRAClassifier
+
+        return LoRAClassifier(
+            settings.classifier_lora_dir,
+            device=settings.classifier_device,
+            cache_dir=settings.classifier_lora_cache_dir,
+            local_files_only=True,
+        )
     from app.infrastructure.ai.classifier.lgbm_inference import (
         LightGBMTransactionClassifier,
     )
 
     return LightGBMTransactionClassifier()
+
+
+def predict_category(
+    model: ITransactionClassifier, text: str
+) -> tuple[str, float, str]:
+    """Use the common classifier contract for both direct local adapters."""
+    result = model.classify(text)
+    source = "LOCAL" if result.confidence >= 0.8 else "CLOUD_FALLBACK"
+    return result.label, result.confidence, source
 
 
 @st.cache_resource(show_spinner=False)
@@ -150,7 +169,7 @@ def classify_text(text: str) -> dict[str, Any]:
     parser = normalizer()
     start = perf_counter()
     normalized, amount = parser.normalize(text)
-    category, confidence, source = model.predict(normalized)
+    category, confidence, source = predict_category(model, normalized)
     return dict(
         text=normalized,
         amount=amount,
@@ -163,6 +182,18 @@ def classify_text(text: str) -> dict[str, Any]:
 
 def show_classification(result: dict[str, Any]) -> None:
     """Render metrics and distinguish a cloud routing hint from an actual call."""
+    from app.infrastructure.config.settings import get_settings
+
+    settings = get_settings()
+    model_name = (
+        "PhoBERT + LoRA"
+        if settings.classifier_backend == "lora"
+        else "PhoBERT + LightGBM"
+    )
+    device = (
+        settings.classifier_device if settings.classifier_backend == "lora" else "cpu"
+    )
+    st.caption(f"{model_name} · {device}")
     st.write("**Văn bản chuẩn hóa:**", result["text"])
     columns = st.columns(4)
     columns[0].metric("Số tiền", money(result["amount"]))
@@ -170,7 +201,7 @@ def show_classification(result: dict[str, Any]) -> None:
     columns[2].metric("Tin cậy P", f"{result['confidence']:.1%}")
     columns[3].metric("Latency", f"{result['latency']:.1f} ms")
     if result["source"] == "LOCAL":
-        st.success("LOCAL · CPU — P ≥ 0,8")
+        st.success("LOCAL · P ≥ 0,8")
     else:
         st.warning("CLOUD_FALLBACK · P < 0,8 — danh mục tạm thời, cần xác nhận.")
         st.caption(
@@ -274,7 +305,9 @@ def ingestion_screen() -> None:
                             if run_audio and audio is not None
                             else b"mock-audio"
                         )
-                        category, confidence, source = model.predict(normalized)
+                        category, confidence, source = predict_category(
+                            model, normalized
+                        )
                         st.session_state["voice_result"] = dict(
                             text=normalized,
                             amount=amount,

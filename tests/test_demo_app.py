@@ -61,6 +61,39 @@ def test_local_text_and_voice(demo: AppTest) -> None:
     assert any("MOCK ASR" in item.value for item in demo.warning)
 
 
+def test_standalone_lora_text_without_api(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The real LoRA adapter works through Streamlit with no API server."""
+    import sys
+
+    import streamlit as st
+
+    sys.path.insert(0, str(ROOT / "backend"))
+    from app.infrastructure.config.settings import get_settings
+
+    monkeypatch.setenv("CLASSIFIER_BACKEND", "lora")
+    monkeypatch.setenv("CLASSIFIER_DEVICE", "cpu")
+    monkeypatch.setenv("HF_HUB_OFFLINE", "1")
+    st.cache_resource.clear()
+    get_settings.cache_clear()
+    try:
+        demo = AppTest.from_file(str(APP), default_timeout=60).run()
+        demo.text_input(key="transaction_text").set_value("ăn trưa 40k").run()
+        demo.button(key="analyze_text").click().run()
+        assert not demo.exception and not demo.error
+        assert any(
+            item.label == "Danh mục" and item.value == "Ăn uống"
+            for item in demo.metric
+        )
+        assert any(
+            item.label == "Số tiền" and item.value == "40.000 ₫"
+            for item in demo.metric
+        )
+        assert any("PhoBERT + LoRA" in item.value for item in demo.caption)
+    finally:
+        st.cache_resource.clear()
+        get_settings.cache_clear()
+
+
 def test_fixed_dashboard_and_custom_payday(demo: AppTest) -> None:
     """Use the actual checkpoint, chart, and persona while changing a salary date."""
     demo.button(key="update_forecast").click().run()
