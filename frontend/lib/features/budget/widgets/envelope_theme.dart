@@ -4,8 +4,8 @@ import '../models/envelope_pillar.dart';
 ThemeData envelopeTheme(ThemeData theme) => theme.copyWith(
   textTheme: theme.textTheme.apply(
     fontFamily: 'BeVietnamPro',
-    bodyColor: EnvelopeStyle.ink,
-    displayColor: EnvelopeStyle.ink,
+    bodyColor: theme.colorScheme.onSurface,
+    displayColor: theme.colorScheme.onSurface,
   ),
   filledButtonTheme: FilledButtonThemeData(
     style: FilledButton.styleFrom(
@@ -22,9 +22,9 @@ ThemeData envelopeTheme(ThemeData theme) => theme.copyWith(
   outlinedButtonTheme: OutlinedButtonThemeData(
     style: OutlinedButton.styleFrom(
       minimumSize: const Size(0, 48),
-      foregroundColor: EnvelopeStyle.primary,
+      foregroundColor: theme.colorScheme.primary,
       side: BorderSide.none,
-      backgroundColor: EnvelopeStyle.border,
+      backgroundColor: theme.colorScheme.surfaceContainerHighest,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       textStyle: const TextStyle(
         fontFamily: 'BeVietnamPro',
@@ -35,7 +35,7 @@ ThemeData envelopeTheme(ThemeData theme) => theme.copyWith(
   ),
   textButtonTheme: TextButtonThemeData(
     style: TextButton.styleFrom(
-      foregroundColor: EnvelopeStyle.primary,
+      foregroundColor: theme.colorScheme.primary,
       textStyle: const TextStyle(fontFamily: 'BeVietnamPro', fontSize: 12),
     ),
   ),

@@ -9,7 +9,7 @@ Future<bool?> showEnvelopeSheet(BuildContext context, Widget child) =>
       isDismissible: false,
       enableDrag: false,
       useSafeArea: true,
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       constraints: const BoxConstraints(maxWidth: 640),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -74,10 +74,10 @@ class EnvelopeSheetFrame extends StatelessWidget {
                       Expanded(
                         child: Text(
                           title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w600,
-                            color: EnvelopeStyle.primary,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                         ),
                       ),
@@ -133,26 +133,30 @@ class EnvelopeSheetFrame extends StatelessWidget {
   }
 }
 
-InputDecoration envelopeInput(String hint) => InputDecoration(
-  hintText: hint,
-  filled: true,
-  fillColor: EnvelopeStyle.soft,
-  hintStyle: const TextStyle(color: EnvelopeStyle.muted, fontSize: 13),
-  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-  border: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(8),
-    borderSide: BorderSide.none,
-  ),
-  enabledBorder: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(8),
-    borderSide: BorderSide.none,
-  ),
-  focusedBorder: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(8),
-    borderSide: const BorderSide(color: EnvelopeStyle.primary),
-  ),
-  errorMaxLines: 2,
-);
+InputDecoration envelopeInput(BuildContext context, String hint) =>
+    InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+      hintStyle: TextStyle(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        fontSize: 13,
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide.none,
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide.none,
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: EnvelopeStyle.primary),
+      ),
+      errorMaxLines: 2,
+    );
 
 class EnvelopeFieldLabel extends StatelessWidget {
   const EnvelopeFieldLabel(this.text, {super.key});

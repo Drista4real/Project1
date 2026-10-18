@@ -481,14 +481,14 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
       if (!didPop && !_saving) _close();
     },
     child: Scaffold(
-      backgroundColor: const Color(0xFFF5FAF5),
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: const Row(
+        title: Row(
           children: [
             Icon(
               Icons.spa_outlined,
-              color: AppTheme.primaryForestGreen,
+              color: Theme.of(context).colorScheme.primary,
               size: 29,
             ),
             SizedBox(width: 12),
@@ -540,7 +540,7 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
                     onPressed: _saving ? null : _close,
                     icon: const Icon(Icons.close),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       children: [
                         Text(
@@ -548,7 +548,7 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
                           style: TextStyle(
                             fontSize: 23,
                             fontWeight: FontWeight.w700,
-                            color: AppTheme.primaryForestGreen,
+                            color: Theme.of(context).colorScheme.primary,
                           ),
                         ),
                         SizedBox(height: 4),
@@ -628,11 +628,11 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
                 ),
               if (_drafts.isEmpty && !_analyzing) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Nhập câu tự nhiên, sau đó nhấn Phân tích để kiểm tra từng giao dịch.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: AppTheme.textMuted,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                     fontSize: 13,
                     height: 1.5,
                   ),
@@ -648,9 +648,9 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
                 const SizedBox(height: 22),
                 Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.chevron_left,
-                      color: AppTheme.primaryForestGreen,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                     const SizedBox(width: 6),
                     Expanded(
@@ -673,7 +673,9 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
                           vertical: 5,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE3ECE5),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -751,10 +753,13 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
                   ),
                 ),
                 const SizedBox(height: 10),
-                const Text(
+                Text(
                   'Mẹo: Vuốt sang trái để bỏ một giao dịch trước khi lưu.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ],

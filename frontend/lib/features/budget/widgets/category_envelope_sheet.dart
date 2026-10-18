@@ -93,10 +93,10 @@ class _CategoryEnvelopeSheetState extends State<CategoryEnvelopeSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (_system)
-            const Text(
+            Text(
               'Danh mục hệ thống chỉ đọc. Bạn có thể đặt hạn mức riêng cho tháng này.',
               style: TextStyle(
-                color: EnvelopeStyle.muted,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 12,
                 height: 1.5,
               ),
@@ -109,6 +109,7 @@ class _CategoryEnvelopeSheetState extends State<CategoryEnvelopeSheet> {
             maxLength: 500,
             textInputAction: TextInputAction.next,
             decoration: envelopeInput(
+              context,
               'Ví dụ: Tập gym, Trà chiều...',
             ).copyWith(counterText: ''),
             validator: (value) => (value ?? '').trim().isEmpty
@@ -174,14 +175,16 @@ class _CategoryEnvelopeSheetState extends State<CategoryEnvelopeSheet> {
         style: FilledButton.styleFrom(
           backgroundColor: selected
               ? EnvelopeStyle.primary
-              : EnvelopeStyle.border,
-          foregroundColor: selected ? Colors.white : EnvelopeStyle.ink,
+              : Theme.of(context).colorScheme.outlineVariant,
+          foregroundColor: selected
+              ? Colors.white
+              : Theme.of(context).colorScheme.onSurface,
           disabledBackgroundColor: selected
               ? EnvelopeStyle.primary
-              : EnvelopeStyle.border,
+              : Theme.of(context).colorScheme.outlineVariant,
           disabledForegroundColor: selected
               ? Colors.white
-              : EnvelopeStyle.muted,
+              : Theme.of(context).colorScheme.onSurfaceVariant,
           padding: const EdgeInsets.symmetric(horizontal: 4),
           minimumSize: const Size(0, 44),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

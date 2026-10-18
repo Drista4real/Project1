@@ -141,16 +141,16 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
                                 : tx.isIncome
                                 ? Icons.arrow_downward
                                 : Icons.arrow_upward,
-                            color: AppTheme.primaryForestGreen,
+                            color: Theme.of(context).colorScheme.primary,
                             size: 32,
                           ),
                           const SizedBox(height: 16),
                           Text(
                             '${tx.amount.toStringAsFixed(2)} ₫',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 30,
                               fontWeight: FontWeight.w800,
-                              color: AppTheme.primaryForestGreen,
+                              color: Theme.of(context).colorScheme.primary,
                             ),
                           ),
                           const SizedBox(height: 12),

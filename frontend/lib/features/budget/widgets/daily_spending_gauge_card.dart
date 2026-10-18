@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:project_one/core/theme/app_theme.dart';
-
 class PillarImpactCard extends StatelessWidget {
   const PillarImpactCard({super.key});
 
@@ -10,7 +8,7 @@ class PillarImpactCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF5EF),
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
@@ -19,13 +17,13 @@ class PillarImpactCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.eco_outlined,
               size: 20,
-              color: AppTheme.primaryForestGreen,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
           const SizedBox(width: 12),
@@ -33,20 +31,20 @@ class PillarImpactCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Tác động phong bao Kakeibo',
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w800,
-                    color: AppTheme.textCharcoal,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 3),
                 RichText(
-                  text: const TextSpan(
+                  text: TextSpan(
                     style: TextStyle(
                       fontSize: 11.5,
-                      color: AppTheme.textCharcoal,
+                      color: Theme.of(context).colorScheme.onSurface,
                       height: 1.45,
                     ),
                     children: [
@@ -92,9 +90,9 @@ class DailySpendingLimitGaugeCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.borderLight),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
@@ -116,12 +114,12 @@ class DailySpendingLimitGaugeCard extends StatelessWidget {
                     color: Color(0xFF285B45),
                   ),
                 ),
-                const Text(
+                Text(
                   '70%',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w800,
-                    color: AppTheme.textCharcoal,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
               ],
@@ -131,7 +129,7 @@ class DailySpendingLimitGaugeCard extends StatelessWidget {
           const SizedBox(width: 14),
 
           // Details
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -140,13 +138,16 @@ class DailySpendingLimitGaugeCard extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
-                    color: AppTheme.textCharcoal,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 SizedBox(height: 3),
                 Text(
                   'Đã dùng 315.000 ₫ / 450.000 ₫',
-                  style: TextStyle(fontSize: 10.5, color: AppTheme.textMuted),
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -156,15 +157,15 @@ class DailySpendingLimitGaugeCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F1),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Text(
+            child: Text(
               'Còn 135.000 ₫',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
-                color: AppTheme.primaryForestGreen,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
           ),

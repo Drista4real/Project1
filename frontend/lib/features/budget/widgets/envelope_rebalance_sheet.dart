@@ -78,10 +78,10 @@ class _EnvelopeRebalanceSheetState extends State<EnvelopeRebalanceSheet> {
         children: [
           Text(
             'Phân chia ngân sách tháng ${widget.data.month.month}/${widget.data.month.year} theo 4 trụ cột. Hạn mức riêng của danh mục được giữ nguyên.',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               height: 1.5,
-              color: EnvelopeStyle.muted,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const EnvelopeFieldLabel('Ngân sách tháng (VNĐ)'),
@@ -124,7 +124,10 @@ class _EnvelopeRebalanceSheetState extends State<EnvelopeRebalanceSheet> {
                         LengthLimitingTextInputFormatter(3),
                       ],
                       onChanged: (_) => setState(() {}),
-                      decoration: envelopeInput('0').copyWith(suffixText: '%'),
+                      decoration: envelopeInput(
+                        context,
+                        '0',
+                      ).copyWith(suffixText: '%'),
                       validator: (v) =>
                           int.tryParse(v ?? '') == null || int.parse(v!) > 100
                           ? '0–100%'
@@ -140,7 +143,7 @@ class _EnvelopeRebalanceSheetState extends State<EnvelopeRebalanceSheet> {
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: _sum == 100
-                  ? EnvelopeStyle.primary
+                  ? Theme.of(context).colorScheme.primary
                   : Theme.of(context).colorScheme.error,
             ),
           ),

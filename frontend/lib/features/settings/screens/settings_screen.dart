@@ -15,10 +15,12 @@ import 'package:project_one/app/widgets/app_screen_header.dart';
 import 'package:project_one/app/widgets/app_screen_navigation.dart';
 import 'package:project_one/shared/widgets/kakeibo_card.dart';
 import 'package:project_one/shared/formatters/currency_formatter.dart';
+import 'package:project_one/features/settings/cubit/app_preferences.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, this.repository});
+  const SettingsScreen({super.key, this.repository, this.preferences});
   final ManagementRepository? repository;
+  final AppPreferences? preferences;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -29,11 +31,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   late final _cubit = SettingsCubit(_repository)..refresh();
   Set<String> get _tags => _cubit.state.tags;
   String get _range => _cubit.state.range;
-  bool get _reminders => _profile?['reminder_time'] != null;
+  AppPreferences get _preferences =>
+      widget.preferences ?? AppDependencies.preferences;
+  String? get _reminderTime => _profile?['reminder_time'] as String?;
+  Future<void> _saveReminder(String? value) =>
+      _saveLegacyPreference('reminder_time', value);
+  Future<void> _saveBiometrics(bool value) =>
+      _saveLegacyPreference('biometrics_enabled', value);
+  Future<void> _saveLegacyPreference(String field, dynamic value) =>
+      _cubit.savePreference(field, value);
+  bool _updatingDevice = false;
+  bool get _reminders => _reminderTime != null;
   bool get _biometrics => _profile?['biometrics_enabled'] == true;
-  bool get _darkMode => _profile?['dark_mode_enabled'] == true;
+  bool get _darkMode => _preferences.darkMode;
   bool get _loading => _cubit.state.loading;
-  bool get _saving => _cubit.state.saving;
+  bool get _saving => _cubit.state.saving || _updatingDevice;
   String? get _error => _cubit.state.error;
   FinanceRecord? get _profile => _cubit.state.data?.profile;
   List<FinanceRecord> get _tagRecords => _cubit.state.data?.tags ?? [];
@@ -50,11 +62,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadSettings() => _cubit.refresh();
 
-  Future<void> _savePreference(String field, dynamic value) async {
+  Future<void> _updateDevice(Future<void> Function() update) async {
+    if (_saving) return;
+    setState(() => _updatingDevice = true);
     try {
-      await _cubit.savePreference(field, value);
+      await update();
     } catch (error) {
       if (mounted) _notice('$error');
+    } finally {
+      if (mounted) setState(() => _updatingDevice = false);
     }
   }
 
@@ -89,11 +105,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      BlocBuilder<SettingsCubit, SettingsState>(
-        bloc: _cubit,
-        builder: (context, state) => _buildContent(context),
-      );
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: _preferences,
+    builder: (context, _) => BlocBuilder<SettingsCubit, SettingsState>(
+      bloc: _cubit,
+      builder: (context, state) => _buildContent(context),
+    ),
+  );
 
   Widget _buildContent(BuildContext context) {
     final matches = _filteredTransactions;
@@ -104,9 +122,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           Card(
             child: ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.person_outline,
-                color: AppTheme.primaryForestGreen,
+                color: Theme.of(context).colorScheme.primary,
               ),
               title: Text(
                 SupabaseConfig.currentUser?.email ??
@@ -131,6 +149,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           if (_loading) const LinearProgressIndicator(),
+          if (_preferences.error != null)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(_preferences.error!),
+              ),
+            ),
           if (_error != null)
             Card(
               child: Padding(
@@ -168,12 +193,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           Card(
             child: ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.account_balance_wallet_outlined,
-                color: AppTheme.primaryForestGreen,
+                color: Theme.of(context).colorScheme.primary,
               ),
               title: const Text('Tất cả dữ liệu tài chính'),
-              subtitle: const Text('Các nhóm dữ liệu và lịch sử tư vấn'),
+              subtitle: const Text(
+                'Quản lý thu chi · Xem lịch sử dự báo và tư vấn',
+              ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () async {
                 await Navigator.of(context).push(
@@ -190,9 +217,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: _cubit.search,
             decoration: InputDecoration(
               hintText: 'Tìm theo ghi chú, số tiền, #hashtag...',
-              prefixIcon: const Icon(Icons.search, color: AppTheme.textMuted),
+              prefixIcon: Icon(
+                Icons.search,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
               filled: true,
-              fillColor: Colors.white,
+              fillColor: Theme.of(context).colorScheme.surface,
               contentPadding: const EdgeInsets.symmetric(vertical: 14),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(30),
@@ -203,9 +233,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 12),
           Card(
             child: ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.category_outlined,
-                color: AppTheme.primaryForestGreen,
+                color: Theme.of(context).colorScheme.primary,
               ),
               title: const Text('Danh mục thu / chi'),
               subtitle: const Text('Tùy chỉnh cách phân loại giao dịch'),
@@ -213,13 +243,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () => _manage('categories'),
             ),
           ),
-          Row(
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
             children: [
-              const Expanded(
-                child: Text(
-                  'Thẻ của bạn',
-                  style: TextStyle(fontWeight: FontWeight.w600),
-                ),
+              const Text(
+                'Thẻ của bạn',
+                style: TextStyle(fontWeight: FontWeight.w600),
               ),
               TextButton(
                 onPressed: () => _manage('tags'),
@@ -232,9 +263,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
           if (!_loading && _profile != null && _tagRecords.isEmpty)
-            const Text(
+            Text(
               'Chưa có thẻ. Tạo thẻ và gắn vào giao dịch để lọc theo sự kiện.',
-              style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           SizedBox(
             height: 34,
@@ -249,11 +283,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       selected: _tags.contains(tag),
                       onSelected: (selected) => _cubit.selectTag(tag, selected),
                       showCheckmark: false,
-                      backgroundColor: const Color(0xFFEAF0E9),
-                      selectedColor: const Color(0xFFD2E5D8),
-                      labelStyle: const TextStyle(
+                      backgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
+                      selectedColor: Theme.of(
+                        context,
+                      ).colorScheme.primaryContainer,
+                      labelStyle: TextStyle(
                         fontSize: 11,
-                        color: AppTheme.textCharcoal,
+                        color: Theme.of(context).colorScheme.onSurface,
                       ),
                       side: BorderSide.none,
                       padding: EdgeInsets.zero,
@@ -266,7 +304,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: const Color(0xFFE8EDE8),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(13),
             ),
             child: Row(
@@ -288,21 +326,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         decoration: BoxDecoration(
                           color: _range == range
-                              ? Colors.white
+                              ? Theme.of(context).colorScheme.surface
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(
-                              range,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: _range == range
-                                    ? AppTheme.primaryForestGreen
-                                    : AppTheme.textMuted,
-                                fontWeight: FontWeight.w600,
+                            Flexible(
+                              child: Text(
+                                range,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: _range == range
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                             if (range == 'Tùy chọn')
@@ -319,7 +363,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (_customRange != null && _range == 'Tùy chọn')
             Text(
               '${_customRange!.start.day}/${_customRange!.start.month}/${_customRange!.start.year} – ${_customRange!.end.day}/${_customRange!.end.month}/${_customRange!.end.year}',
-              style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           if (_profile != null)
             KakeiboCard(
@@ -355,9 +402,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       },
                     ),
                   if (matches.length > 12)
-                    const Text(
+                    Text(
                       'Hiển thị 12 kết quả đầu tiên. Thu hẹp bộ lọc để tìm thêm.',
-                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                 ],
               ),
@@ -391,7 +441,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 : '${_transactions.length} giao dịch · ${_tagRecords.length} thẻ',
                             style: TextStyle(
                               fontSize: 10,
-                              color: AppTheme.textMuted,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                               height: 1.3,
                             ),
                           ),
@@ -420,10 +472,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     vertical: 10,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F0),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(11),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
                       Icon(
                         Icons.circle,
@@ -436,7 +490,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           'Dữ liệu riêng theo tài khoản đăng nhập',
                           style: TextStyle(
                             fontSize: 10,
-                            color: AppTheme.textMuted,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ),
@@ -445,7 +501,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w700,
-                          color: AppTheme.primaryForestGreen,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                     ],
@@ -466,7 +522,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
                             children: [
                               Text(
                                 'Ghi chép chánh niệm',
@@ -475,18 +533,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
-                              SizedBox(width: 6),
                               _KakeiboTag(),
                             ],
                           ),
                           SizedBox(height: 4),
                           Text(
-                            _profile?['reminder_time'] == null
+                            !_preferences.reminders.supported
+                                ? 'Nhắc hằng ngày hỗ trợ Android, iOS và macOS'
+                                : _reminderTime == null
                                 ? 'Chưa đặt giờ nhắc'
-                                : '${_profile!['reminder_time']}'.substring(
-                                    0,
-                                    5,
-                                  ),
+                                : _reminderTime!.substring(0, 5),
                             style: TextStyle(
                               fontSize: 11,
                               color: AppTheme.expenseCoral,
@@ -498,23 +554,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     Switch(
                       value: _reminders,
-                      onChanged: _loading || _saving || _profile == null
+                      onChanged:
+                          _loading ||
+                              _saving ||
+                              _profile == null ||
+                              !_preferences.reminders.supported
                           ? null
-                          : (value) => _savePreference(
-                              'reminder_time',
-                              value ? '20:30:00' : null,
+                          : (value) => _updateDevice(
+                              () => _saveReminder(value ? '20:30:00' : null),
                             ),
                       activeThumbColor: AppTheme.primaryForestGreen,
                     ),
                   ],
                 ),
                 TextButton.icon(
-                  onPressed: _loading || _saving || _profile == null
+                  onPressed:
+                      _loading ||
+                          _saving ||
+                          _profile == null ||
+                          !_preferences.reminders.supported
                       ? null
                       : () async {
-                          final stored =
-                              '${_profile?['reminder_time'] ?? '20:30:00'}'
-                                  .split(':');
+                          final stored = (_reminderTime ?? '20:30:00').split(
+                            ':',
+                          );
                           final picked = await showTimePicker(
                             context: context,
                             initialTime: TimeOfDay(
@@ -529,9 +592,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                           );
                           if (picked != null && mounted) {
-                            await _savePreference(
-                              'reminder_time',
-                              '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}:00',
+                            await _updateDevice(
+                              () => _saveReminder(
+                                '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}:00',
+                              ),
                             );
                           }
                         },
@@ -543,16 +607,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F0),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Row(
+                  child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(
                         Icons.spa_outlined,
                         size: 18,
-                        color: AppTheme.primaryForestGreen,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                       SizedBox(width: 9),
                       Expanded(
@@ -560,7 +626,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           '“Dành 2 phút mỗi tối để tâm trí an yên và làm chủ dòng tiền.”',
                           style: TextStyle(
                             fontSize: 12,
-                            color: AppTheme.textMuted,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                             fontStyle: FontStyle.italic,
                             height: 1.4,
                           ),
@@ -573,21 +641,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'TIỆN ÍCH & THIẾT LẬP',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppTheme.textMuted,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: .3,
+              Expanded(
+                child: Text(
+                  'TIỆN ÍCH & THIẾT LẬP',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: .3,
+                  ),
                 ),
               ),
               Text(
-                'Phiên bản 2.4 Zen',
-                style: TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                'Kakeibo Zen',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
@@ -596,10 +669,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: Icons.receipt_long_outlined,
             title: 'Xuất báo cáo Excel / PDF',
             subtitle: 'Hỗ trợ đối soát thuế, chia sẻ gia đình...',
-            trailing: const Text(
-              'XLSX, PDF  ›',
-              style: TextStyle(fontSize: 10, color: AppTheme.textMuted),
-            ),
+            trailing: const Icon(Icons.chevron_right),
             onTap: () => _notice('Tính năng xuất báo cáo đang được chuẩn bị.'),
           ),
           const SizedBox(height: 9),
@@ -609,22 +679,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: 'Lưu tùy chọn; khóa sinh trắc học chưa được bật',
             trailing: Switch(
               value: _biometrics,
-              onChanged: _loading || _saving || _profile == null
+              onChanged:
+                  _loading ||
+                      _saving ||
+                      _profile == null ||
+                      !_preferences.security.supported
                   ? null
-                  : (value) => _savePreference('biometrics_enabled', value),
+                  : (value) => _updateDevice(() => _saveBiometrics(value)),
               activeThumbColor: AppTheme.primaryForestGreen,
             ),
           ),
           const SizedBox(height: 9),
           _SettingTile(
             icon: Icons.dark_mode_outlined,
-            title: 'Ưu tiên giao diện tối',
-            subtitle: 'Lưu lựa chọn vào hồ sơ cá nhân',
+            title: 'Giao diện tối',
+            subtitle: 'Áp dụng toàn ứng dụng trên thiết bị này',
             trailing: Switch(
               value: _darkMode,
               onChanged: _loading || _saving || _profile == null
                   ? null
-                  : (value) => _savePreference('dark_mode_enabled', value),
+                  : (value) =>
+                        _updateDevice(() => _preferences.setDarkMode(value)),
               activeThumbColor: AppTheme.primaryForestGreen,
             ),
           ),
@@ -635,7 +710,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 _iconTile(Icons.menu_book, const Color(0xFFEAF1EB), size: 60),
                 const SizedBox(width: 11),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -653,7 +728,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           fontSize: 10,
-                          color: AppTheme.textMuted,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           height: 1.3,
                         ),
                       ),
@@ -676,10 +751,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     width: size,
     height: size,
     decoration: BoxDecoration(
-      color: color,
+      color: Theme.of(context).brightness == Brightness.dark
+          ? Theme.of(context).colorScheme.primaryContainer
+          : color,
       borderRadius: BorderRadius.circular(13),
     ),
-    child: Icon(icon, color: AppTheme.primaryForestGreen, size: size * .52),
+    child: Icon(
+      icon,
+      color: Theme.of(context).brightness == Brightness.dark
+          ? Theme.of(context).colorScheme.onPrimaryContainer
+          : AppTheme.primaryForestGreen,
+      size: size * .52,
+    ),
   );
 
   void _notice(String message) {
@@ -696,7 +779,7 @@ class _KakeiboTag extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
     decoration: BoxDecoration(
-      color: const Color(0xFFFFE0D6),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(10),
     ),
     child: const Text(
@@ -727,7 +810,7 @@ class _SettingTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Material(
-    color: Colors.white,
+    color: Theme.of(context).colorScheme.surface,
     borderRadius: BorderRadius.circular(17),
     child: InkWell(
       onTap: onTap,
@@ -736,7 +819,9 @@ class _SettingTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(17),
-          border: Border.all(color: AppTheme.borderLight),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
         child: Row(
           children: [
@@ -744,10 +829,14 @@ class _SettingTile extends StatelessWidget {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: const Color(0xFFEAF1EB),
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(11),
               ),
-              child: Icon(icon, color: AppTheme.primaryForestGreen, size: 20),
+              child: Icon(
+                icon,
+                color: Theme.of(context).colorScheme.primary,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -766,9 +855,9 @@ class _SettingTile extends StatelessWidget {
                     subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 9,
-                      color: AppTheme.textMuted,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],

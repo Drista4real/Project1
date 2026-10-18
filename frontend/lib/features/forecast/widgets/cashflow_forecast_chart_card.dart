@@ -29,7 +29,7 @@ class CashflowForecastChartCard extends StatelessWidget {
         const SizedBox(height: 6),
         Text(
           'Hiện tại: ${formatVnd(currentBalance)}',
-          style: const TextStyle(color: AppTheme.primaryForestGreen),
+          style: TextStyle(color: Theme.of(context).colorScheme.primary),
         ),
         const SizedBox(height: 16),
         if (records.isEmpty)
@@ -47,6 +47,7 @@ class CashflowForecastChartCard extends StatelessWidget {
                 currentBalance,
                 days,
                 DateTime.now(),
+                Theme.of(context).colorScheme,
               ),
             ),
           ),
@@ -55,11 +56,11 @@ class CashflowForecastChartCard extends StatelessWidget {
           spacing: 16,
           runSpacing: 6,
           children: [
-            const Text(
+            Text(
               '● Số dư hiện tại',
               style: TextStyle(
                 fontSize: 11,
-                color: AppTheme.primaryForestGreen,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
             const Text(
@@ -72,7 +73,10 @@ class CashflowForecastChartCard extends StatelessWidget {
                     .map((item) => '${item['model_name']}')
                     .toSet()
                     .join(' · '),
-                style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
           ],
         ),
@@ -82,7 +86,14 @@ class CashflowForecastChartCard extends StatelessWidget {
 }
 
 class _ForecastPainter extends CustomPainter {
-  _ForecastPainter(this.records, this.balance, this.days, this.today);
+  _ForecastPainter(
+    this.records,
+    this.balance,
+    this.days,
+    this.today,
+    this.scheme,
+  );
+  final ColorScheme scheme;
   final List<FinanceRecord> records;
   final double balance;
   final int days;
@@ -113,19 +124,19 @@ class _ForecastPainter extends CustomPainter {
         Offset(left, y(value)),
         Offset(left + width, y(value)),
         Paint()
-          ..color = AppTheme.borderLight
+          ..color = scheme.outlineVariant
           ..strokeWidth = 1,
       );
       _text(
         canvas,
         formatVnd(value),
         Offset(0, y(value) - 6),
-        AppTheme.textMuted,
+        scheme.onSurfaceVariant,
         9,
       );
     }
     final first = Offset(left, y(balance));
-    canvas.drawCircle(first, 4, Paint()..color = AppTheme.primaryForestGreen);
+    canvas.drawCircle(first, 4, Paint()..color = scheme.primary);
     final path = Path()..moveTo(first.dx, first.dy);
     for (final item in records) {
       final point = Offset(
@@ -147,14 +158,14 @@ class _ForecastPainter extends CustomPainter {
       canvas,
       '${start.day}/${start.month}',
       Offset(left - 8, size.height - 18),
-      AppTheme.textMuted,
+      scheme.onSurfaceVariant,
       10,
     );
     _text(
       canvas,
       '${end.day}/${end.month}',
       Offset(left + width - 30, size.height - 18),
-      AppTheme.textMuted,
+      scheme.onSurfaceVariant,
       10,
     );
   }
@@ -181,5 +192,6 @@ class _ForecastPainter extends CustomPainter {
       oldDelegate.records != records ||
       oldDelegate.balance != balance ||
       oldDelegate.days != days ||
-      oldDelegate.today != today;
+      oldDelegate.today != today ||
+      oldDelegate.scheme != scheme;
 }

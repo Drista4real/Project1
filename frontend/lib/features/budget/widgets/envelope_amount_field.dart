@@ -32,7 +32,7 @@ class EnvelopeAmountField extends StatelessWidget {
       LengthLimitingTextInputFormatter(13),
       _VndInputFormatter(),
     ],
-    decoration: envelopeInput('1.000.000').copyWith(
+    decoration: envelopeInput(context, '1.000.000').copyWith(
       suffixText: '₫',
       helperText:
           helperText ??

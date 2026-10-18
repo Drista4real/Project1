@@ -18,9 +18,9 @@ class ReportModeBottomToggle extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: AppTheme.borderLight),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withAlpha(8),
@@ -50,7 +50,9 @@ class ReportModeBottomToggle extends StatelessWidget {
                     Icon(
                       Icons.show_chart,
                       size: 16,
-                      color: isHistory ? Colors.white : AppTheme.textMuted,
+                      color: isHistory
+                          ? Colors.white
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(width: 6),
                     Text(
@@ -60,7 +62,9 @@ class ReportModeBottomToggle extends StatelessWidget {
                         fontWeight: isHistory
                             ? FontWeight.w700
                             : FontWeight.w500,
-                        color: isHistory ? Colors.white : AppTheme.textMuted,
+                        color: isHistory
+                            ? Colors.white
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -87,7 +91,9 @@ class ReportModeBottomToggle extends StatelessWidget {
                     Icon(
                       Icons.auto_awesome,
                       size: 16,
-                      color: !isHistory ? Colors.white : AppTheme.textMuted,
+                      color: !isHistory
+                          ? Colors.white
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                     const SizedBox(width: 6),
                     Text(
@@ -97,7 +103,9 @@ class ReportModeBottomToggle extends StatelessWidget {
                         fontWeight: !isHistory
                             ? FontWeight.w700
                             : FontWeight.w500,
-                        color: !isHistory ? Colors.white : AppTheme.textMuted,
+                        color: !isHistory
+                            ? Colors.white
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(width: 5),

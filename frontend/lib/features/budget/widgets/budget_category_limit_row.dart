@@ -27,8 +27,10 @@ class BudgetCategoryLimitRow extends StatelessWidget {
         : pillar?.color ?? EnvelopeStyle.primary;
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: EnvelopeStyle.border)),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
       ),
       child: Row(
         children: [
@@ -57,7 +59,9 @@ class BudgetCategoryLimitRow extends StatelessWidget {
                     value: limit <= 0 ? 0 : (used / limit).clamp(0, 1),
                     minHeight: 4,
                     color: color,
-                    backgroundColor: EnvelopeStyle.soft,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     semanticsLabel: 'Chi tiêu $title',
                   ),
                 ),
@@ -78,10 +82,10 @@ class BudgetCategoryLimitRow extends StatelessWidget {
           IconButton(
             tooltip: 'Chỉnh hạn mức $title',
             onPressed: onEdit,
-            icon: const Icon(
+            icon: Icon(
               Icons.edit_outlined,
               size: 19,
-              color: EnvelopeStyle.muted,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ],

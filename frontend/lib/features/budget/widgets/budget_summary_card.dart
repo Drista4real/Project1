@@ -145,7 +145,7 @@ class BudgetDailyAllowance extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: const Color(0xFFE2FAF2),
+      color: Theme.of(context).colorScheme.surfaceContainerHighest,
       borderRadius: BorderRadius.circular(12),
     ),
     child: Row(
@@ -167,9 +167,9 @@ class BudgetDailyAllowance extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 '${overview.daysLeft} ngày còn lại trong tháng',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
-                  color: EnvelopeStyle.muted,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 4),

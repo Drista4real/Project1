@@ -94,7 +94,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: const Color(0xFFE8EDE8),
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(24),
           ),
           child: Row(
@@ -126,10 +126,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
               child: Text(
                 title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: AppTheme.primaryForestGreen,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
             ),
@@ -192,7 +192,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
     children: [
       Text(
         title,
-        style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+        style: TextStyle(
+          fontSize: 11,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
       Text(
         formatVnd(amount),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:project_one/core/theme/app_theme.dart';
 
 class NaturalInputCard extends StatelessWidget {
   const NaturalInputCard({
@@ -27,7 +26,7 @@ class NaturalInputCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(20),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(22),
     ),
     child: Column(
@@ -35,10 +34,10 @@ class NaturalInputCard extends StatelessWidget {
       children: [
         Row(
           children: [
-            const Icon(
+            Icon(
               Icons.psychology_outlined,
               size: 21,
-              color: AppTheme.primaryForestGreen,
+              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: 8),
             const Expanded(
@@ -51,7 +50,7 @@ class NaturalInputCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: AppTheme.lightMintBg,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Text('Tiếng Việt', style: TextStyle(fontSize: 11)),
@@ -84,7 +83,7 @@ class NaturalInputCard extends StatelessWidget {
               style: TextButton.styleFrom(
                 backgroundColor: recording
                     ? const Color(0xFFFFE9E0)
-                    : AppTheme.lightMintBg,
+                    : Theme.of(context).colorScheme.surfaceContainerHighest,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
                   vertical: 14,
@@ -114,7 +113,9 @@ class NaturalInputCard extends StatelessWidget {
               label: const Text('Hóa đơn'),
               style: OutlinedButton.styleFrom(
                 side: BorderSide.none,
-                backgroundColor: AppTheme.lightMintBg,
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHighest,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
                   vertical: 14,
@@ -142,7 +143,9 @@ class NaturalInputCard extends StatelessWidget {
                       }
                     },
               style: IconButton.styleFrom(
-                backgroundColor: AppTheme.lightMintBg,
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.surfaceContainerHighest,
               ),
               icon: const Icon(Icons.content_paste_outlined, size: 20),
             ),
@@ -189,7 +192,10 @@ class NaturalInputCard extends StatelessWidget {
                 : (transcribing
                       ? 'Đang chuyển lời nói thành chữ trên thiết bị. Giả lập có thể mất lâu hơn.'
                       : 'Đang chuẩn bị micro và model tiếng Việt. Chờ dòng “Micro đã bật” rồi nói.'),
-            style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ],

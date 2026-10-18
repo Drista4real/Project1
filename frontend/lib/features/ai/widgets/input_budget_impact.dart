@@ -63,17 +63,17 @@ class InputBudgetImpact extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: const Color(0xFFEAF3EE),
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const CircleAvatar(
+              CircleAvatar(
                 backgroundColor: Colors.white,
                 child: Icon(
                   Icons.spa_outlined,
-                  color: AppTheme.primaryForestGreen,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
               const SizedBox(width: 12),
@@ -99,9 +99,9 @@ class InputBudgetImpact extends StatelessWidget {
                         loadFailed
                             ? 'Chưa tải được ngân sách để đối chiếu.'
                             : 'Chưa có ngân sách tương ứng để đối chiếu.',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppTheme.textMuted,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -119,7 +119,7 @@ class InputBudgetImpact extends StatelessWidget {
                               fontSize: 12,
                               color: remaining < 0
                                   ? AppTheme.expenseCoral
-                                  : AppTheme.primaryForestGreen,
+                                  : Theme.of(context).colorScheme.primary,
                             ),
                           );
                         },
@@ -136,7 +136,7 @@ class InputBudgetImpact extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -150,7 +150,9 @@ class InputBudgetImpact extends StatelessWidget {
                       SizedBox.expand(
                         child: CircularProgressIndicator(
                           value: ((spent + pending) / limit).clamp(0, 1),
-                          backgroundColor: AppTheme.lightMintBg,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
                           strokeWidth: 4,
                         ),
                       ),
@@ -173,9 +175,9 @@ class InputBudgetImpact extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         'Dự kiến ${formatVnd(spent + pending)} / ${formatVnd(limit)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
-                          color: AppTheme.textMuted,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],

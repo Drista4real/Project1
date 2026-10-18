@@ -3,7 +3,6 @@ import 'package:project_one/features/forecast/cubit/forecast_cubit.dart';
 import 'package:flutter/material.dart';
 
 import 'package:project_one/app/app_dependencies.dart';
-import 'package:project_one/core/theme/app_theme.dart';
 import 'package:project_one/features/finance/domain/usecases/finance_insights.dart';
 import 'package:project_one/features/forecast/widgets/cashflow_deficit_warning_card.dart';
 import 'package:project_one/features/forecast/widgets/cashflow_forecast_chart_card.dart';
@@ -110,17 +109,20 @@ class _CashflowForecastScreenState extends State<CashflowForecastScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          const Text(
+          Text(
             'Dự báo dòng tiền',
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w800,
-              color: AppTheme.primaryForestGreen,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
-          const Text(
+          Text(
             'Dự báo và tư vấn đã lưu của bạn',
-            style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 14),
           Row(

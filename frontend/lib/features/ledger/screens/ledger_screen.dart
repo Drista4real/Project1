@@ -106,12 +106,12 @@ class _LedgerScreenState extends State<LedgerScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppTheme.secondaryMint,
+              color: Theme.of(context).colorScheme.primaryContainer,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.spa,
-              color: AppTheme.primaryForestGreen,
+              color: Theme.of(context).colorScheme.primary,
               size: 22,
             ),
           ),
@@ -119,7 +119,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
                   'Kakeibo Zen',
                   maxLines: 1,
@@ -127,14 +127,17 @@ class _LedgerScreenState extends State<LedgerScreen> {
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
-                    color: AppTheme.primaryForestGreen,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
                 Text(
                   'Sổ Thu Chi Thông Minh',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -150,10 +153,10 @@ class _LedgerScreenState extends State<LedgerScreen> {
           padding: const EdgeInsets.only(right: 16.0, left: 4.0),
           child: CircleAvatar(
             radius: 18,
-            backgroundColor: AppTheme.secondaryMint,
-            child: const Icon(
+            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+            child: Icon(
               Icons.person,
-              color: AppTheme.primaryForestGreen,
+              color: Theme.of(context).colorScheme.primary,
               size: 22,
             ),
           ),

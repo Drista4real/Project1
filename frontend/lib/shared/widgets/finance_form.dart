@@ -35,7 +35,6 @@ InputDecoration financeInputDecoration(
   suffixIcon: suffix,
   suffixText: suffixText,
   filled: true,
-  fillColor: AppTheme.bgCanvas,
   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
   border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
   enabledBorder: OutlineInputBorder(
@@ -68,9 +67,9 @@ class FinanceFormSection extends StatelessWidget {
     margin: const EdgeInsets.only(bottom: 16),
     padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: AppTheme.borderLight),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,7 +82,10 @@ class FinanceFormSection extends StatelessWidget {
           const SizedBox(height: 5),
           Text(
             subtitle!,
-            style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 12,
+            ),
           ),
         ],
         const SizedBox(height: 18),
@@ -108,9 +110,11 @@ class FinanceSaveBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
     padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-    decoration: const BoxDecoration(
-      color: Colors.white,
-      border: Border(top: BorderSide(color: AppTheme.borderLight)),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surface,
+      border: Border(
+        top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
     ),
     child: SafeArea(
       top: false,
