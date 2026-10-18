@@ -216,7 +216,7 @@ async def extract_image(
 
 
 def ingestion_screen() -> None:
-    """Render text, WAV voice, and image receipt workflows with persistent results."""
+    """Render text, WAV/M4A/MP3 voice, and image receipt workflows with persistent results."""
     st.subheader("Ghi chép nhanh, xem AI hiểu gì")
     text_tab, voice_tab, receipt_tab = st.tabs(["Văn bản", "Giọng nói", "Hóa đơn"])
     with text_tab:
@@ -241,9 +241,13 @@ def ingestion_screen() -> None:
         ):
             show_classification(st.session_state["text_result"])
     with voice_tab:
-        audio = st.file_uploader("Tải âm thanh WAV", type=["wav"], key="voice_file")
+        audio = st.file_uploader(
+            "Tải âm thanh (WAV, M4A, MP3)",
+            type=["wav", "m4a", "mp3"],
+            key="voice_file",
+        )
         if audio is not None:
-            st.audio(audio.getvalue(), format="audio/wav")
+            st.audio(audio.getvalue(), format=audio.type or "audio/wav")
         analyze, quick = st.columns(2)
         run_audio = analyze.button("Phân tích Voice", key="analyze_voice")
         run_mock = quick.button("Test phiên âm mẫu (MOCK)", key="quick_voice")
@@ -257,10 +261,10 @@ def ingestion_screen() -> None:
                 with st.spinner("Đang phiên âm và phân loại…"):
                     engine = recognizer(mock_mode=run_mock)
                     if run_audio and audio is None:
-                        st.info("Chọn file WAV trước khi phân tích.")
+                        st.info("Chọn file âm thanh trước khi phân tích.")
                     elif run_audio and engine.is_mock:
                         st.error(
-                            "Chưa có model ASR để nhận diện file WAV đã tải lên. "
+                            "Chưa có model ASR để nhận diện file âm thanh đã tải lên. "
                             "Cần encoder.onnx, decoder.onnx và tokens.txt trong "
                             "weights/onnx/phowhisper-tiny/ "
                             "(hoặc encoder.int8.onnx và decoder.int8.onnx). "

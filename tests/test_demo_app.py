@@ -26,7 +26,7 @@ def test_empty_inputs_and_mock_receipt(demo: AppTest) -> None:
     assert any("Nhập nội dung" in item.value for item in demo.info)
     demo.button(key="analyze_voice").click().run()
     assert not demo.exception
-    assert any("Chọn file WAV" in item.value for item in demo.info)
+    assert any("Chọn file âm thanh" in item.value for item in demo.info)
     demo.button(key="analyze_receipt").click().run()
     assert not demo.exception
     assert any("Chọn ảnh" in item.value for item in demo.info)
@@ -133,7 +133,9 @@ def test_uploaded_voice_never_uses_mock(monkeypatch: pytest.MonkeyPatch) -> None
         recording.setsampwidth(2)
         recording.setframerate(16000)
         recording.writeframes(b"\x00\x00" * 1600)
-    uploaded = SimpleNamespace(name="voice.wav", getvalue=lambda: buffer.getvalue())
+    uploaded = SimpleNamespace(
+        name="voice.wav", type="audio/wav", getvalue=lambda: buffer.getvalue()
+    )
     engine = Mock(is_mock=True)
     st.cache_resource.clear()
     monkeypatch.setenv("GEMINI_API_KEY", "")
