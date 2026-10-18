@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:project_one/shared/widgets/kakeibo_logo.dart';
 
 class AppScreenHeader extends StatelessWidget implements PreferredSizeWidget {
   final String subtitle;
@@ -20,11 +21,7 @@ class AppScreenHeader extends StatelessWidget implements PreferredSizeWidget {
             color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(
-            Icons.spa,
-            color: Theme.of(context).colorScheme.primary,
-            size: 20,
-          ),
+          child: const KakeiboLogo(size: 28),
         ),
         const SizedBox(width: 9),
         Expanded(
