@@ -23,6 +23,19 @@ SHAPES = [(ENVELOPE, GREEN, None, 0), (FOLD, None, CREAM, 3.2),
           (LEAF, GREEN, MINT, 2), (VEIN, None, CREAM, 2.4)]
 
 
+def curve_points(command, origin, values):
+    result = []
+    for step in range(1, 33):
+        t = step / 32
+        u = 1 - t
+        if command == 'Q':
+            point = tuple(u*u*origin[d] + 2*u*t*values[d] + t*t*values[d+2] for d in (0, 1))
+        else:
+            point = tuple(u**3*origin[d] + 3*u*u*t*values[d] + 3*u*t*t*values[d+2] + t**3*values[d+4] for d in (0, 1))
+        result.append(point)
+    return result
+
+
 def points(path):
     tokens = re.findall(r'[A-Z]|-?\d+(?:\.\d+)?', path)
     result, current, start = [], (0, 0), (0, 0)
@@ -42,15 +55,8 @@ def points(path):
             current = (values[0], current[1]) if command == 'H' else (current[0], values[0])
             result.append(current)
         elif command in ('Q', 'C'):
-            origin = current
-            for step in range(1, 33):
-                t = step / 32
-                u = 1 - t
-                if command == 'Q':
-                    current = tuple(u*u*origin[d] + 2*u*t*values[d] + t*t*values[d+2] for d in (0, 1))
-                else:
-                    current = tuple(u**3*origin[d] + 3*u*u*t*values[d] + 3*u*t*t*values[d+2] + t**3*values[d+4] for d in (0, 1))
-                result.append(current)
+            result.extend(curve_points(command, current, values))
+            current = result[-1]
         else:
             result.append(start)
             current = start
@@ -78,17 +84,7 @@ def write(path, value):
     path.write_text(value, encoding='utf-8')
 
 
-def main():
-    ASSETS.mkdir(parents=True, exist_ok=True)
-    paths = '\n'.join(
-        f'  <path d="{path}" fill="{fill or "none"}" stroke="{stroke or "none"}" stroke-width="{width}" stroke-linecap="round" stroke-linejoin="round"/>'
-        for path, fill, stroke, width in SHAPES
-    )
-    write(ASSETS / 'kakeibo_zen.svg',
-          f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="1024" height="1024">\n'
-          f'  <title>Kakeibo Zen — phong bao và lá</title>\n  <path fill="{MINT}" d="M0 0 H108 V108 H0 Z"/>\n{paths}\n</svg>\n')
-    render(1024, MINT).save(ASSETS / 'kakeibo_zen_1024.png')
-    render(1080).crop((220, 220, 860, 860)).resize((512, 512), Image.Resampling.LANCZOS).save(ASSETS / 'kakeibo_mark.png')
+def write_launcher_pngs():
     for density, size in [('mdpi', 48), ('hdpi', 72), ('xhdpi', 96), ('xxhdpi', 144), ('xxxhdpi', 192)]:
         folder = RES / f'mipmap-{density}'
         folder.mkdir(parents=True, exist_ok=True)
@@ -98,17 +94,9 @@ def main():
         ImageDraw.Draw(mask).ellipse((0, 0, size*4, size*4), fill=255)
         icon.putalpha(mask.resize((size, size), Image.Resampling.LANCZOS))
         icon.save(folder / 'ic_launcher_round.png')
-    vector_paths = '\n'.join(
-        f'    <path android:pathData="{path}" android:fillColor="{fill or "#00000000"}"'
-        + (f' android:strokeColor="{stroke}" android:strokeWidth="{width}" android:strokeLineCap="round" android:strokeLineJoin="round"' if stroke else '') + '/>'
-        for path, fill, stroke, width in SHAPES
-    )
-    vector_header = '<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">\n'
-    write(RES / 'drawable' / 'ic_launcher_foreground.xml', vector_header + vector_paths + '\n</vector>\n')
-    # Even-odd contours cut out folds/veins so all visible pixels have one alpha mask.
-    mono = ENVELOPE + ' M30 48 L54 63 L78 48 L78 52 L54 67 L30 52 Z ' + LEAF + ' M52 47 Q60 38 69 33 L70 35 Q61 41 54 49 Z'
-    write(RES / 'drawable' / 'ic_launcher_monochrome.xml', vector_header + f'    <path android:fillColor="#FF000000" android:fillType="evenOdd" android:pathData="{mono}"/>\n</vector>\n')
-    write(RES / 'values' / 'launcher_colors.xml', f'<resources>\n    <color name="ic_launcher_background">{MINT}</color>\n</resources>\n')
+
+
+def write_adaptive_icons():
     for version in (26, 33):
         adaptive = '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n    <background android:drawable="@color/ic_launcher_background"/>\n    <foreground android:drawable="@drawable/ic_launcher_foreground"/>\n'
         if version == 33:
@@ -116,6 +104,9 @@ def main():
         adaptive += '</adaptive-icon>\n'
         for name in ('ic_launcher', 'ic_launcher_round'):
             write(RES / f'mipmap-anydpi-v{version}' / f'{name}.xml', adaptive)
+
+
+def write_preview():
     preview = Image.new('RGB', (960, 320), CREAM)
     draw = ImageDraw.Draw(preview)
     for index, shape in enumerate(('square', 'round', 'squircle')):
@@ -129,6 +120,33 @@ def main():
         preview.paste(icon, (40+index*320, 32), mask)
         draw.text((40+index*320, 290), shape, fill=GREEN)
     preview.save(ASSETS / 'android_icon_preview.png')
+
+
+def main():
+    ASSETS.mkdir(parents=True, exist_ok=True)
+    paths = '\n'.join(
+        f'  <path d="{path}" fill="{fill or "none"}" stroke="{stroke or "none"}" stroke-width="{width}" stroke-linecap="round" stroke-linejoin="round"/>'
+        for path, fill, stroke, width in SHAPES
+    )
+    write(ASSETS / 'kakeibo_zen.svg',
+          f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="1024" height="1024">\n'
+          f'  <title>Kakeibo Zen — phong bao và lá</title>\n  <path fill="{MINT}" d="M0 0 H108 V108 H0 Z"/>\n{paths}\n</svg>\n')
+    render(1024, MINT).save(ASSETS / 'kakeibo_zen_1024.png')
+    render(1080).crop((220, 220, 860, 860)).resize((512, 512), Image.Resampling.LANCZOS).save(ASSETS / 'kakeibo_mark.png')
+    write_launcher_pngs()
+    vector_paths = '\n'.join(
+        f'    <path android:pathData="{path}" android:fillColor="{fill or "#00000000"}"'
+        + (f' android:strokeColor="{stroke}" android:strokeWidth="{width}" android:strokeLineCap="round" android:strokeLineJoin="round"' if stroke else '') + '/>'
+        for path, fill, stroke, width in SHAPES
+    )
+    vector_header = '<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">\n'
+    write(RES / 'drawable' / 'ic_launcher_foreground.xml', vector_header + vector_paths + '\n</vector>\n')
+    # Even-odd contours cut out folds/veins so all visible pixels have one alpha mask.
+    mono = ENVELOPE + ' M30 48 L54 63 L78 48 L78 52 L54 67 L30 52 Z ' + LEAF + ' M52 47 Q60 38 69 33 L70 35 Q61 41 54 49 Z'
+    write(RES / 'drawable' / 'ic_launcher_monochrome.xml', vector_header + f'    <path android:fillColor="#FF000000" android:fillType="evenOdd" android:pathData="{mono}"/>\n</vector>\n')
+    write(RES / 'values' / 'launcher_colors.xml', f'<resources>\n    <color name="ic_launcher_background">{MINT}</color>\n</resources>\n')
+    write_adaptive_icons()
+    write_preview()
 
 
 if __name__ == '__main__':

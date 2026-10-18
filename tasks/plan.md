@@ -27,6 +27,7 @@ from feature commits. The existing unrelated stash is retained.
 - [#49](https://github.com/Drista4real/Project1/issues/49): Integrate authentication screens and session gate
 - [#50](https://github.com/Drista4real/Project1/issues/50): Implement anonymous guest access and email linking
 - [#51](https://github.com/Drista4real/Project1/issues/51): Create Kakeibo Zen logo and Android launcher assets
+- [#55](https://github.com/Drista4real/Project1/issues/55): Resolve SonarCloud email metadata and branding complexity findings
 
 ## Checkpoints and boundaries
 
@@ -61,3 +62,9 @@ The new Java integration sources compile targeting Java 21; Compose structure
 validates. Docker daemon is unavailable locally, so the actual Auth/SMTP/RLS
 suite has not executed. Specs #45–#47 and umbrella #44 retain hosted-service and
 device acceptance. See frontend/supabase/README.md for configuration/migration.
+
+PR #54 SonarCloud follow-up: the five email templates now declare document titles,
+languages and UTF-8. Verification preserves their OTP placeholders and body HTML.
+Branding helpers split curve sampling, launcher PNGs, adaptive icons and previews;
+all 21 regenerated assets match both the previous generator and committed files
+byte-for-byte. Publishing the fix triggers a fresh SonarCloud quality gate.
