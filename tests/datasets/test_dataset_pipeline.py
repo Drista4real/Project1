@@ -27,6 +27,79 @@ ROOT = Path(__file__).resolve().parents[2]
 TAXONOMY = ROOT / "data/taxonomy/expense_categories.v1.json"
 
 
+def test_user_scope_approval_is_limited_to_exact_text_and_category(tmp_path: Path) -> None:
+    """Nine explicit decisions resolve only the scope flag, preserving other checks."""
+    policy = ROOT / "data/taxonomy/expense_categories.v3_user_review.json"
+    payload = json.loads(policy.read_text(encoding="utf-8"))
+    rows = [{"text": e["text"], "category": e["category"],
+             "annotation_status": "approved"}
+            for e in payload["approved_scope_exceptions"]]
+    path = write_input(tmp_path / "approved.csv", rows)
+    records, _ = read_sources([Source(path, "user-reviewed", "public", "user supplied")])
+    eligible, review, _ = audit_records(records, Taxonomy.load(policy), "quarantine")
+    assert len(eligible) == 9
+    assert not review
+    records, _ = read_sources([Source(path, "user-reviewed", "public", "user supplied")])
+    _, old_review, _ = audit_records(records, Taxonomy.load(TAXONOMY), "quarantine")
+    assert len(old_review) == 9
+    rows = [
+        {"text": "vay tien ngan hang 500k", "category": rows[0]["category"]},
+        {"text": rows[0]["text"], "category": "unknown"},
+        {**rows[1], "annotation_status": "pending"},
+    ]
+    write_input(path, rows)
+    records, _ = read_sources([Source(path, "fixture", "synthetic", "test")])
+    eligible, review, audit = audit_records(records, Taxonomy.load(policy), "quarantine")
+    assert not eligible
+    assert len(review) == 3
+    assert audit["review_reasons"]["possible_income_transfer_or_debt"] == 2
+    assert audit["review_reasons"]["annotation_pending"] == 1
+
+
+def test_scope_approval_requires_documented_user_decision(tmp_path: Path) -> None:
+    payload = json.loads(TAXONOMY.read_text(encoding="utf-8"))
+    payload["approved_scope_exceptions"] = [{"text": "vay 20k", "category": "unknown"}]
+    path = tmp_path / "invalid.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="Scope exceptions require"):
+        Taxonomy.load(path)
+
+
+def test_supplied_labels_keep_unreviewed_status_and_still_obey_audit(tmp_path: Path) -> None:
+    """Development ingestion must not claim approval or bypass conflict checks."""
+    rows = examples()[:3]
+    for row in rows:
+        row["annotation_status"] = "provided"
+    path = write_input(tmp_path / "provided.csv", rows)
+    records, _ = read_sources([Source(path, "contributor", "public", "user supplied")])
+    eligible, review, _ = audit_records(records, Taxonomy.load(TAXONOMY), "quarantine")
+    assert len(eligible) == 3
+    assert not review
+    assert {r.annotation_status for r in eligible} == {"provided"}
+    assert all(r.origins[0]["annotation_status"] == "provided" for r in eligible)
+    rows.append({**rows[0], "category": "unknown"})
+    write_input(path, rows)
+    records, _ = read_sources([Source(path, "contributor", "public", "user supplied")])
+    _, review, audit = audit_records(records, Taxonomy.load(TAXONOMY), "quarantine")
+    assert len(review) == 2
+    assert audit["review_reasons"]["conflicting_annotation"] == 2
+
+
+def test_near_comparison_limit_is_explicit_and_never_skips_pairs(tmp_path: Path) -> None:
+    """Increasing the budget permits work; exhausting it still fails closed."""
+    label = next(iter(Taxonomy.load(TAXONOMY).labels))
+    path = write_input(tmp_path / "similar.csv", [
+        {"text": "abcdefghij 10k", "category": label},
+        {"text": "abcdxfghij 20k", "category": label},
+    ])
+    records, _ = read_sources([Source(path, "fixture", "synthetic", "test")])
+    with pytest.raises(ValueError, match="budget exceeded"):
+        group_records(records, 0.9, max_near_comparisons=0)
+    audit = group_records(records, 0.9, max_near_comparisons=10)
+    assert audit["near_candidate_comparisons"] == 1
+    assert audit["groups"] == 1
+
+
 def write_input(path: Path, rows: list[dict[str, str]]) -> Path:
     """Write a CSV fixture using the union of its declared columns."""
     columns = sorted(set().union(*(row.keys() for row in rows)))

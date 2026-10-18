@@ -1,5 +1,17 @@
 # Taxonomy và hướng dẫn gán nhãn giao dịch
 
+## Duyệt chín câu trong bộ gộp — 18/10/2026
+
+Người dùng xác nhận cả chín câu trong review của bộ gộp đúng với nhãn hiện tại,
+bao gồm `vay xam xe bi dinh dam het 30k` là vá săm xe, giữ Đi lại.
+[Taxonomy v3](../data/taxonomy/expense_categories.v3_user_review.json) kế thừa
+toàn bộ v2, thêm `approved_scope_exceptions` cho đúng chín cặp text/nhãn này.
+Mỗi ngoại lệ có người duyệt, ngày và ghi chú. Chỉ bỏ cờ
+`possible_income_transfer_or_debt` cho đúng text chuẩn hóa và nhãn đã duyệt;
+nhãn lạ, xung đột, trạng thái pending và các kiểm tra khác vẫn cách ly bình thường.
+Không áp dụng quyết định này cho mọi câu chứa vay/trả nợ. Bộ hiện hành là
+`bundle_v2` trong [báo cáo bộ gộp](MODEL1_MERGED_DATASET.md).
+
 ## Quyết định hiện hành — quy ước mặc định ngày 15/10/2026
 
 Người dùng đã yêu cầu duyệt toàn bộ 75 dòng trong annotation template theo các mặc định sau. Quyết định này thay thế yêu cầu review các mô tả tương ứng trong phần v1 bên dưới; các quy tắc khác vẫn áp dụng.
@@ -72,7 +84,7 @@ UTF-8 CSV, bắt buộc `text,category`. Các trường khác được hỗ tr�
 | --- | --- |
 | `record_id` | ID gốc tùy chọn để truy vết; pipeline sinh ID nội dung riêng và lưu ID gốc trong origins |
 | `transaction_type` | Mặc định `expense` cho CSV cũ; phải khai báo đúng với dữ liệu nhập mới. Income/transfer bị tách review |
-| `annotation_status` | `approved`, `pending`, `rejected`, `synthetic`; nguồn real/public không có trạng thái mặc định pending |
+| `annotation_status` | `approved`, `pending`, `rejected`, `synthetic`, `provided`; nguồn real/public không có trạng thái mặc định pending |
 | `source_group` | Nhóm thu thập/phiên/nguồn con bên trong cùng `source_id`, không được rải qua các tập |
 | `subject_id` | ID giả danh cùng một người, dùng nhất quán giữa các nguồn; toàn bộ dữ liệu người đó được gom một nhóm |
 | `template_id` | ID họ mẫu sinh/ngữ nghĩa, dùng namespace ổn định như `generator_v1.food.rice`; cùng ID giữa các nguồn vẫn cùng nhóm |
@@ -80,6 +92,13 @@ UTF-8 CSV, bắt buộc `text,category`. Các trường khác được hỗ tr�
 | `annotator_id`, `annotation_note` | Người duyệt giả danh và lý do gán nhãn; được lưu trong provenance |
 
 Nguồn và quyền sử dụng khai báo qua CLI hoặc JSON sources riêng: `source_id`, `kind` (`synthetic`/`real`/`public`), `usage_rights`, `path`. Đây là khai báo truy vết, không phải bằng chứng tự động rằng dataset được cấp phép.
+
+`provided` dùng khi người dùng bàn giao dữ liệu đã gán nhãn và yêu cầu dùng cho
+thử nghiệm phát triển. Pipeline giữ nhãn và cho phép chia tập nhưng không khẳng
+định nhãn đã được người duyệt phê duyệt. Mọi luật kiểm tra và cách ly vẫn áp dụng.
+Không tự chuyển nguồn `pending` thành `provided` hoặc `approved` khi chưa có yêu
+cầu sử dụng dữ liệu gán nhãn. Bộ gộp ngày 18/10/2026 dùng trạng thái này cho bốn
+CSV từ nhóm; nhãn teacher tiếp tục là `synthetic`.
 
 Legacy CSV hiện có không có subject/template IDs. Pipeline gom họ mẫu bằng mô tả đã bỏ số tiền, dấu, khoảng cách và so khớp gần; không suy ra được tác giả hoặc chứng minh toàn bộ họ ngữ nghĩa độc lập. Khi thu thập/sinh mới phải lưu metadata ngay từ nguồn. Không dùng `source_id` toàn bộ dataset làm một group nếu muốn chia bên trong nguồn đó; dùng các group thực sự độc lập.
 
@@ -89,6 +108,8 @@ Legacy CSV hiện có không có subject/template IDs. Pipeline gom họ mẫu b
 - Bản sao cùng nhãn được gộp nhưng giữ mọi nguồn, dòng gốc và ràng buộc nhóm; cờ review của một bản sao không bị bỏ qua bởi bản khác.
 - Description key để phát hiện rò rỉ bỏ số tiền viết bằng chữ số và đơn vị phổ biến, bỏ dấu/chấm câu/khoảng cách. Chỉ dùng cho grouping, không làm preprocessing của PhoBERT và không dùng để xóa bản gần trùng.
 - So gần bằng SequenceMatcher trên candidate có trigram, ngưỡng mặc định 0,9; gom transitive closure với mô tả/group/subject/template. Quá ngân sách so sánh sẽ báo lỗi, không âm thầm bỏ qua. Có thể gom dư; cần đọc audit.
+- `--max-near-comparisons` cho phép khai báo ngân sách lớn hơn mặc định 2 triệu;
+  giá trị được lưu trong manifest. Bộ gộp 6.000 dòng dùng 20 triệu, vẫn giữ ngưỡng 0,9.
 - Chia toàn nhóm, mặc định **70% train / 15% validation / 15% test**, seed 42; cân đối lớp xấp xỉ. Không phá nhóm để đạt đúng tỷ lệ. Mỗi nhãn cần ít nhất 3 nhóm độc lập; không đủ thì báo lỗi và không xuất các tập train/validation/test.
 - Cùng nội dung và constraint cho membership ổn định khi đảo thứ tự dòng. Nếu đổi dữ liệu/config/taxonomy thì là **dataset version mới**, không bảo đảm mẫu cũ giữ nguyên split. Đóng băng bundle để so các thí nghiệm trên cùng test.
 - Validation dùng chọn model/siêu tham số/calibration; test chỉ dùng đánh giá sau khi chốt. Nếu cần calibration độc lập, chia tiếp **bên trong train/validation**, không lấy từ test. Augment sau chia và chỉ augment train; giữ quan hệ mẫu cha.

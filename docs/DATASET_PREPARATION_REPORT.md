@@ -1,5 +1,10 @@
 # Kết quả chuẩn bị dữ liệu classifier — 15/10/2026
 
+Cập nhật 18/10/2026: bộ gộp năm nguồn có 6.000 dòng đầu vào. Người dùng đã
+duyệt chín câu bị cách ly, bundle v2 hiện có 5.996 mẫu duy nhất, không còn câu
+chờ duyệt. Xem [báo cáo bộ gộp Model 1](MODEL1_MERGED_DATASET.md).
+Các kết quả bên dưới được giữ làm lịch sử đợt ngày 15/10.
+
 Phạm vi: S04, D02–D04, D08 trong [checklist](APP_COMPLETION_CHECKLIST.md). Đã thực thi pipeline trên CSV hiện có; không train lại checkpoint dự án hoặc gọi API cloud.
 
 ## Quyết định đã nhận từ người dùng

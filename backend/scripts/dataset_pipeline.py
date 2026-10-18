@@ -22,7 +22,7 @@ from typing import Any
 
 SPLITS = ("train", "validation", "test")
 SOURCE_KINDS = {"synthetic", "real", "public"}
-STATUSES = {"approved", "pending", "rejected", "synthetic"}
+STATUSES = {"approved", "pending", "rejected", "synthetic", "provided"}
 OPTIONAL_COLUMNS = {
     "record_id",
     "transaction_type",
@@ -99,6 +99,7 @@ class Taxonomy:
     ambiguity_keys: frozenset[str]
     outside_scope_patterns: tuple[str, ...]
     sha256: str
+    approved_scope_exceptions: frozenset[tuple[str, str]] = frozenset()
 
     @classmethod
     def load(cls, path: Path) -> Taxonomy:
@@ -125,6 +126,18 @@ class Taxonomy:
         patterns = tuple(payload.get("outside_scope_patterns", []))
         for pattern in patterns:
             re.compile(pattern)
+        exceptions = payload.get("approved_scope_exceptions", [])
+        if any(
+            entry.get("category") not in labels
+            or not entry.get("text", "").strip()
+            or entry.get("approved_by") != "user"
+            or not entry.get("decision_date")
+            or not entry.get("note")
+            for entry in exceptions
+        ):
+            raise ValueError(
+                "Scope exceptions require exact text/category and user decision"
+            )
         return cls(
             payload["version"],
             labels,
@@ -133,6 +146,7 @@ class Taxonomy:
             ),
             patterns,
             digest(raw),
+            frozenset((exact_key(e["text"]), e["category"]) for e in exceptions),
         )
 
 
@@ -311,7 +325,10 @@ def audit_records(
             record.reasons.add("no_description")
         if description_key(record.text) in taxonomy.ambiguity_keys:
             record.reasons.add("ambiguous_description")
-        if any(
+        if (
+            exact_key(record.text),
+            record.category,
+        ) not in taxonomy.approved_scope_exceptions and any(
             re.search(pattern, description_key(record.text))
             for pattern in taxonomy.outside_scope_patterns
         ):
@@ -411,7 +428,9 @@ class Components:
         self.parents[max(left, right)] = min(left, right)
 
 
-def group_records(records: list[Record], threshold: float) -> dict[str, Any]:
+def group_records(
+    records: list[Record], threshold: float, max_near_comparisons: int = 2_000_000
+) -> dict[str, Any]:
     """Keep masked amounts, near descriptions and provenance in atomic groups.
 
     Near matching uses a trigram candidate index and a bounded comparison budget.
@@ -447,7 +466,7 @@ def group_records(records: list[Record], threshold: float) -> dict[str, Any]:
             ):
                 continue
             comparisons += 1
-            if comparisons > 2_000_000:
+            if comparisons > max_near_comparisons:
                 raise ValueError(
                     "Near-duplicate budget exceeded; curate source groups first"
                 )
@@ -694,6 +713,7 @@ def prepare_dataset(
     ratios: tuple[float, float, float] = (0.7, 0.15, 0.15),
     seed: int = 42,
     near_threshold: float = 0.9,
+    max_near_comparisons: int = 2_000_000,
 ) -> dict[str, Any]:
     """Audit and export a new immutable bundle; never change source CSV/checkpoints.
 
@@ -705,7 +725,7 @@ def prepare_dataset(
     taxonomy = Taxonomy.load(taxonomy_path)
     raw, source_manifest = read_sources(sources)
     records, review, audit = audit_records(raw, taxonomy, ambiguity_policy)
-    grouping = group_records(records, near_threshold)
+    grouping = group_records(records, near_threshold, max_near_comparisons)
     audit["grouping"] = grouping
     audit["ambiguity_policy"] = ambiguity_policy
     audit["eligible_category_counts"] = dict(
@@ -738,6 +758,7 @@ def prepare_dataset(
             "seed": seed,
             "target_ratios": dict(zip(SPLITS, ratios, strict=True)),
             "near_threshold": near_threshold,
+            "max_near_comparisons": max_near_comparisons,
             "ambiguity_policy": ambiguity_policy,
         },
         "splits": {},

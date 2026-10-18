@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "version": "expense_six_v2_defaults",
+  "decision_date": "2026-10-15",
+  "decision_status": "confirmed_by_user",
+  "transaction_type": "expense",
+  "description": "Phân loại chi tiêu theo mục đích rõ hoặc mặc định đã được người dùng phê duyệt ngày 15/10/2026.",
+  "categories": [
+    {
+      "id": "food",
+      "name": "Ăn uống",
+      "legacy_encoded_id": 4
+    },
+    {
+      "id": "transport",
+      "name": "Đi lại",
+      "legacy_encoded_id": 5
+    },
+    {
+      "id": "shopping",
+      "name": "Mua sắm",
+      "legacy_encoded_id": 2
+    },
+    {
+      "id": "housing_utilities",
+      "name": "Hóa đơn/Nhà ở",
+      "legacy_encoded_id": 0
+    },
+    {
+      "id": "healthcare",
+      "name": "Y tế",
+      "legacy_encoded_id": 3
+    },
+    {
+      "id": "other",
+      "name": "Khác",
+      "legacy_encoded_id": 1
+    }
+  ],
+  "ambiguity_policy": "quarantine",
+  "ambiguous_examples": [
+    "be",
+    "thanh toán",
+    "chuyển tiền"
+  ],
+  "outside_scope_patterns": [
+    "^(nhan |tien )?luong( |$)",
+    "^(nhan |thu )?(thuong|thu nhap)( |$)",
+    "^chuyen (tien )?(giua cac vi|vi|tu vi)( |$)",
+    "^(vay|tra no|cho vay|thu hoi no)( |$)"
+  ],
+  "kakeibo_policy": "contextual_separate_annotation_not_determined_by_category",
+  "unknown_policy": "review_unless_explicit_user_approved_default",
+  "model_label_order_policy": "persist_explicit_mapping_do_not_use_json_array_index",
+  "default_label_policy": {
+    "approved_by": "user",
+    "decision_date": "2026-10-15",
+    "scope": "Bare descriptions, optionally with a monetary amount; explicit goods/services take precedence.",
+    "defaults": {
+      "grab": "transport",
+      "shopee": "shopping",
+      "shope": "shopping",
+      "đơn hàng shopee": "shopping",
+      "chốt đơn shopee": "shopping",
+      "mua đồ": "shopping",
+      "bao bạn bè": "other",
+      "bao bb": "other"
+    }
+  }
+}

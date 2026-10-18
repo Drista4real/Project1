@@ -6,6 +6,15 @@ The adapter inherits `ITransactionClassifier` and preserves
 `source` is `LOCAL` at confidence >= 0.8 and `CLOUD_FALLBACK` otherwise.
 The latter is a routing signal for an application orchestrator to enqueue Gemini.
 
+For the five-source Model 1 dataset prepared on 2026-10-18, use the frozen
+bundle and `--dataset-dir` rather than regenerating synthetic data. See
+[merged dataset handoff](../../../../../docs/MODEL1_MERGED_DATASET.md).
+From the repository root:
+
+```powershell
+python backend/scripts/train_classifier.py --dataset-dir data/prepared/model1_merged_1000_per_label_20261018/bundle_v2
+```
+
 From the repository root, install the optional NLP dependencies and train:
 
 ```powershell
