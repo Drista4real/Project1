@@ -193,11 +193,11 @@ class _CashflowForecastScreenState extends State<CashflowForecastScreen> {
             children: [
               OutlinedButton(
                 onPressed: () => _manage('cashflow_forecasts', refresh),
-                child: const Text('Quản lý dự báo'),
+                child: const Text('Lịch sử dự báo'),
               ),
               OutlinedButton(
                 onPressed: () => _manage('cashflow_alerts', refresh),
-                child: const Text('Quản lý cảnh báo'),
+                child: const Text('Lịch sử cảnh báo'),
               ),
               OutlinedButton(
                 onPressed: () => _manage('ai_chat_sessions', refresh),

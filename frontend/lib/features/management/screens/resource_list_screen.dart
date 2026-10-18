@@ -25,6 +25,7 @@ class ResourceListScreen extends StatefulWidget {
 
 class _ResourceListScreenState extends State<ResourceListScreen> {
   String get name => widget.resource['name'] as String;
+  bool get _readOnly => generatedFinanceResources.contains(name);
   bool get singleton => widget.resource['singleton'] == true;
   late final _cubit = ResourceListCubit(widget.repository, name)..refresh();
   int get _offset => _cubit.state.offset;
@@ -38,6 +39,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
   }
 
   Future<void> _edit([Map<String, dynamic>? record]) async {
+    if (_readOnly && record == null) return;
     try {
       final fresh = record == null
           ? null
@@ -66,6 +68,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
   }
 
   Future<void> _delete(Map<String, dynamic> item) async {
+    if (_readOnly) return;
     final extra = name == 'ai_chat_sessions'
         ? '\nToàn bộ tin nhắn trong cuộc trò chuyện cũng sẽ bị xóa.'
         : name == 'tags'
@@ -126,7 +129,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
         ),
       ],
     ),
-    floatingActionButton: singleton
+    floatingActionButton: singleton || _readOnly
         ? null
         : FloatingActionButton.extended(
             onPressed: _deleting ? null : () => _edit(),
@@ -151,9 +154,9 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
               const Text(
                 'Lịch được lưu để quản lý; chưa tự động phát sinh giao dịch.',
               ),
-            if (name.startsWith('ai_') || name == 'cashflow_forecasts')
+            if (_readOnly)
               const Text(
-                'Quản lý dữ liệu đã lưu. Chức năng này không tự tạo phản hồi hay dự báo AI.',
+                'Dữ liệu do hệ thống tạo · Chỉ xem. Xử lý cảnh báo tại màn Dự báo.',
               ),
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -198,7 +201,8 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                   ),
                   onTap: _deleting ? null : () => _edit(item),
                   trailing:
-                      singleton ||
+                      _readOnly ||
+                          singleton ||
                           (name == 'categories' && item['user_id'] == null)
                       ? const Icon(Icons.chevron_right)
                       : PopupMenuButton<String>(

@@ -145,10 +145,6 @@ class _LedgerScreenState extends State<LedgerScreen> {
         ],
       ),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications_none),
-          onPressed: () {},
-        ),
         Padding(
           padding: const EdgeInsets.only(right: 16.0, left: 4.0),
           child: CircleAvatar(

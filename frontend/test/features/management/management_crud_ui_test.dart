@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:project_one/core/theme/app_theme.dart';
 import 'package:project_one/features/management/open_finance_module.dart';
 import 'package:project_one/shared/widgets/finance_form.dart';
+import 'package:project_one/features/management/config/management_metadata.dart';
 
 import '../../helpers/memory_management_repository.dart';
 
@@ -37,6 +38,35 @@ Future<void> openModule(
 }
 
 void main() {
+  for (final name in generatedFinanceResources) {
+    testWidgets('$name only permits viewing generated records', (tester) async {
+      final repository = MemoryManagementRepository();
+      repository.catalog.add({
+        'name': name,
+        'title': 'Dữ liệu hệ thống',
+        'schema': {
+          'properties': {
+            'name': {'type': 'string'},
+          },
+        },
+      });
+      await openModule(tester, repository, name);
+      expect(find.byType(FloatingActionButton), findsNothing);
+      expect(find.byType(PopupMenuButton<String>), findsNothing);
+      await tester.tap(find.text('Du lịch'));
+      await tester.pumpAndSettle();
+      expect(find.byType(FinanceSaveBar), findsNothing);
+      expect(
+        tester
+            .widget<TextFormField>(find.byKey(const ValueKey('name')))
+            .enabled,
+        isFalse,
+      );
+      expect(repository.saved, isNull);
+      expect(repository.deleted, isFalse);
+    });
+  }
+
   testWidgets(
     'budget validates every section and saves selected month as first day',
     (tester) async {

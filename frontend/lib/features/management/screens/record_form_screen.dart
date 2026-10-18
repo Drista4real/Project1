@@ -59,9 +59,10 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
   String? get _error => _cubit.state.saveError;
   String get name => widget.resource['name'] as String;
   bool get _readOnly =>
-      name == 'categories' &&
-      widget.record != null &&
-      widget.record!['user_id'] == null;
+      generatedFinanceResources.contains(name) ||
+      (name == 'categories' &&
+          widget.record != null &&
+          widget.record!['user_id'] == null);
 
   Map<String, dynamic> _type(Map raw) {
     if (raw['anyOf'] is List) {
@@ -111,7 +112,7 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
   }
 
   Future<void> _save() async {
-    if (_busy || !validateFinanceForm(_form)) return;
+    if (_readOnly || _busy || !validateFinanceForm(_form)) return;
     FocusManager.instance.primaryFocus?.unfocus();
     final data = <String, dynamic>{};
     for (final entry in _properties.entries) {
@@ -717,7 +718,7 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
                           padding: const EdgeInsets.only(bottom: 18),
                           child: Text(
                             _readOnly
-                                ? 'Danh mục mặc định của hệ thống chỉ được xem.'
+                                ? 'Dữ liệu của hệ thống chỉ được xem.'
                                 : 'Các trường có dấu * cần được điền trước khi lưu.',
                             style: const TextStyle(
                               color: AppTheme.textMuted,

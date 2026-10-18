@@ -1,5 +1,14 @@
 import 'package:flutter/material.dart';
 
+/// Generated data is available for reading, never manual CRUD in the app.
+const generatedFinanceResources = {
+  'cashflow_forecasts',
+  'cashflow_alerts',
+  'ai_consultations',
+  'ai_chat_sessions',
+  'ai_chat_messages',
+};
+
 const managementLabels = <String, String>{
   'name': 'Tên',
   'account_type': 'Loại tài khoản',
