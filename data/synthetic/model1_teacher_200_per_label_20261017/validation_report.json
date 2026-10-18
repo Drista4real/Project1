@@ -1,0 +1,53 @@
+{
+  "rows": 1200,
+  "category_counts": {
+    "Ăn uống": 200,
+    "Đi lại": 200,
+    "Mua sắm": 200,
+    "Hóa đơn/Nhà ở": 200,
+    "Y tế": 200,
+    "Khác": 200
+  },
+  "unique_normalized_texts": 1200,
+  "scenario_pairs": 600,
+  "human_reviewed": false,
+  "review_rows": 0,
+  "duplicates_removed": 0,
+  "groups": 597,
+  "split_counts": {
+    "train": {
+      "Hóa đơn/Nhà ở": 140,
+      "Mua sắm": 140,
+      "Y tế": 140,
+      "Đi lại": 140,
+      "Khác": 140,
+      "Ăn uống": 140
+    },
+    "validation": {
+      "Đi lại": 30,
+      "Y tế": 30,
+      "Mua sắm": 30,
+      "Hóa đơn/Nhà ở": 30,
+      "Ăn uống": 30,
+      "Khác": 30
+    },
+    "test": {
+      "Đi lại": 30,
+      "Hóa đơn/Nhà ở": 30,
+      "Y tế": 30,
+      "Mua sắm": 30,
+      "Ăn uống": 30,
+      "Khác": 30
+    }
+  },
+  "split_isolation_verified": true,
+  "plain_and_provenance_csv_match": true,
+  "exact_overlap_with_existing_synthetic_csv": 0,
+  "overlap_note": "Do not randomly append to an existing split; merge sources and regroup with the dataset pipeline.",
+  "sha256": {
+    "transactions.csv": "d19ff6f87d3e4561c53ec8cab4566286d7438214308b0914a3abeb2a99fd3c89",
+    "transactions_with_provenance.csv": "9418bd96a15ae275b180576eb166dbe1bab506b70e3661116ab6037ef1ef2920",
+    "generation.json": "7bcac7bc3afc29ec13c77d810b9529b050c6dab9a257d87ee48eb3f6fcdfd896",
+    "sources.json": "88dcda9dc6fbffa9a140d81112538591c7f82b65baf29ee3c226a5ca5ac286bd"
+  }
+}

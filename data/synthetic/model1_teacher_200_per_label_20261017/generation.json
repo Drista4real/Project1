@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-17",
+  "issue": "https://github.com/Drista4real/Project1/issues/30",
+  "taxonomy": "expense_six_v2_defaults",
+  "method": "Current Codex assistant authored descriptions and hard category labels directly in this session. No external teacher API, logits, probabilities, student training or rationale-distillation loss was used.",
+  "teacher": "Codex assistant in this conversation; exact deployed model revision unavailable",
+  "human_reviewed": false,
+  "examples_per_label": 200,
+  "scenario_families_per_label": 100,
+  "variants_per_scenario": 2,
+  "provenance_group": "Each pair shares source_group; downstream near-duplicate grouping may merge more groups.",
+  "style": "Accented and unaccented Vietnamese, colloquial descriptions, abbreviations, explicit cross-category contexts and approved bare defaults.",
+  "generation_constraints": [
+    "One identified expense per description; six taxonomy v2 labels only.",
+    "Explicit goods or services take priority over merchant, platform, payment method and amount.",
+    "Bare grab defaults to transport; bare shopee/mua do to shopping; bare bao ban be to other.",
+    "Unknowns are not automatically other; income, transfers between own wallets and loan principal are outside scope.",
+    "No personal identifiers or real transaction records; no external corpus copied."
+  ],
+  "generation_reproducibility": "The source CSVs preserve the actual generated output. AI wording is not reproducible from a random seed; seed 42 is used only for downstream grouped splitting.",
+  "limitations": [
+    "AI-supplied labels have not been independently human-reviewed.",
+    "Two phrasings per scenario are intentionally related and must remain in the same split.",
+    "Balanced synthetic class frequencies and writing style are not representative of production traffic.",
+    "Synthetic validation/test sets only support development checks; use an independent human-labeled real-world test set for quality claims.",
+    "Near-duplicate grouping is heuristic, not a guarantee against all semantic overlap."
+  ]
+}

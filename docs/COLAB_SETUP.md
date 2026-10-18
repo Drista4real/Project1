@@ -24,6 +24,23 @@ Nếu ô nạp mã nguồn báo `checkout --detach develop` với mã lỗi 128,
 
 ## Khi nhóm bàn giao dữ liệu
 
+Bộ gộp 5 nguồn ngày 18/10/2026 ở
+`data/prepared/model1_merged_1000_per_label_20261018/`.
+Xem [báo cáo và cách dùng bộ gộp](MODEL1_MERGED_DATASET.md).
+Giải nén ZIP cùng tên lên Drive rồi cấu hình:
+
+```python
+DATASET_DIR = "/content/drive/MyDrive/Project1/datasets/model1_merged_1000_per_label_20261018/bundle_v2"
+RUN_LORA = True
+RUN_CLASSIFIER = False
+RUN_FORECASTER = False
+```
+
+Bundle và CSV cào được giữ local theo `.gitignore`, không có sẵn khi chỉ clone
+GitHub. Dùng mã nguồn hiện tại có hỗ trợ trạng thái `provided` và truyền bundle
+qua Drive. Bản CSV gộp giữ đủ 6.000 dòng; dùng bundle để giữ nguyên cách chia
+nhóm, xử lý trùng và cách ly của pipeline.
+
 Classifier nhận **bundle đã đóng băng**, gồm train/validation/test, taxonomy và manifest do pipeline dự án tạo. Đặt `DATASET_DIR` thành đường dẫn bundle trên Drive, chạy lại ô kiểm tra rồi mới bật `RUN_LORA` (hoặc `RUN_CLASSIFIER` nếu cần so sánh baseline LightGBM). Notebook giữ nguyên split qua `--dataset-dir`, không tự chia ngẫu nhiên CSV mới.
 
 Không dùng lại bundle v1 đã bị báo lệch hash trong [báo cáo dữ liệu](DATASET_PREPARATION_REPORT.md). Tạo bundle mới theo [hướng dẫn taxonomy](DATA_TAXONOMY_AND_ANNOTATION.md), dùng taxonomy v2 khi áp dụng các quy ước mặc định đã chốt, kiểm tra nguồn và phần annotation trước khi gộp. Không sửa manifest để bỏ qua lỗi. Dữ liệu hiện có là synthetic, chỉ dùng kiểm tra quy trình; chưa đại diện cho dữ liệu thực tế.

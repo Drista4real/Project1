@@ -31,6 +31,7 @@ def main() -> None:
     parser.add_argument("--ratios", nargs=3, type=float, default=(0.7, 0.15, 0.15))
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--near-threshold", type=float, default=0.9)
+    parser.add_argument("--max-near-comparisons", type=int, default=2_000_000)
     args = parser.parse_args()
     try:
         if args.verify:
@@ -79,6 +80,7 @@ def main() -> None:
             ratios=tuple(args.ratios),
             seed=args.seed,
             near_threshold=args.near_threshold,
+            max_near_comparisons=args.max_near_comparisons,
         )
         print(
             json.dumps(
