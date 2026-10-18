@@ -33,12 +33,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String get _range => _cubit.state.range;
   AppPreferences get _preferences =>
       widget.preferences ?? AppDependencies.preferences;
-  String? get _reminderTime => _profile?['reminder_time'] as String?;
-  Future<void> _saveReminder(String? value) =>
-      _saveLegacyPreference('reminder_time', value);
+  String? get _reminderTime => _preferences.reminderTime;
+  Future<void> _saveReminder(String? value) => _preferences.setReminder(value);
   Future<void> _saveBiometrics(bool value) => _preferences.setBiometrics(value);
-  Future<void> _saveLegacyPreference(String field, dynamic value) =>
-      _cubit.savePreference(field, value);
   bool _updatingDevice = false;
   bool get _reminders => _reminderTime != null;
   bool get _biometrics => _preferences.biometrics;
