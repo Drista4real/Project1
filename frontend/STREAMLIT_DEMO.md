@@ -13,6 +13,22 @@ python -m pip install -r frontend/requirements-demo.txt
 python -m streamlit run frontend/app.py
 ```
 
+Trên Windows, có thể chỉ rõ Python của `.venv` để cài và chạy trong cùng môi trường:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r frontend/requirements-demo.txt
+.\.venv\Scripts\python.exe -m streamlit run frontend/app.py
+```
+
+Nếu gặp `ModuleNotFoundError: No module named 'pydantic_settings'`, môi trường
+đang chạy demo thiếu gói `pydantic-settings` (đã có trong file requirements).
+Dừng Streamlit, cài gói bằng Python của môi trường đó rồi khởi động lại:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install "pydantic-settings>=2,<3"
+.\.venv\Scripts\python.exe -m streamlit run frontend/app.py
+```
+
 Truy cập `http://localhost:8501`. Đường dẫn dữ liệu được xác định theo vị trí mã
 nguồn, nên có thể khởi động từ thư mục khác nếu chỉ đúng đường dẫn tới file app.
 Các module backend chỉ được nạp khi cần và không khởi động FastAPI. Model local
