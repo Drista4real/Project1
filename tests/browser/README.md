@@ -33,13 +33,14 @@ push / pull_request / workflow_dispatch
   filter của workflow; nếu muốn bắt buộc với mọi PR, cần bỏ filter hoặc thêm
   workflow điều phối luôn chạy trước khi cấu hình branch protection.
 
-## Năm kịch bản smoke hiện tại
+## Kịch bản smoke hiện tại
 
-1. Flutter render được, có navigation và lời nhắc đăng nhập khi chưa có phiên.
-2. Bấm chuyển Sổ thu chi/Báo cáo/Ngân sách/Cài đặt; refresh giữ route Cài đặt.
+1. Flutter render màn hình đăng nhập và nút tiếp tục bằng khách khi chưa có phiên.
+2. Mở/refresh route Cài đặt khi chưa có phiên vẫn yêu cầu đăng nhập.
 3. Gửi form đăng nhập rỗng hiển thị validation email/password.
-4. Nhập email sai và password ngắn vẫn bị chặn ở UI.
+4. Nhập email sai và password rỗng bị chặn ở UI.
 5. Chuyển đăng nhập ↔ đăng ký và validation form đăng ký.
+6. Chuyển đăng nhập bằng OTP và khôi phục mật khẩu; email rỗng bị chặn trước khi gửi.
 
 Mỗi test tạo browser/profile mới. Selenium dùng explicit wait thay cho sleep
 cố định, thao tác click/gõ qua WebDriver; không truy cập Dart state hoặc gọi

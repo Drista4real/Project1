@@ -1,6 +1,7 @@
 """Starter cross-browser checks against the actual compiled Flutter UI."""
 
-from urllib.parse import urlsplit
+import os
+from pathlib import Path
 
 import pytest
 from selenium.webdriver.common.by import By
@@ -59,15 +60,7 @@ def see(browser, text):
     )
 
 
-def wait_for_route(browser, route):
-    WebDriverWait(browser, 15).until(
-        lambda driver: (urlsplit(driver.current_url).fragment or "/") == route,
-        message=f"Expected browser route {route}",
-    )
-
-
 def login_form(browser):
-    click(browser, "ledger-sign-in")
     element(browser, "auth-email")
     element(browser, "auth-password")
 
@@ -81,45 +74,35 @@ def fill(browser, identifier, value):
 
 
 def test_boots_real_flutter_app_and_prompts_for_login(browser):
-    element(browser, "nav-ledger")
-    element(browser, "ledger-sign-in")
+    login_form(browser)
+    element(browser, "auth-guest")
     assert "Kakeibo Zen" in browser.title
-    see(browser, "Vui lòng đăng nhập để quản lý tài chính.")
+    see(browser, "Chào mừng trở lại")
+    browser.save_screenshot(str(Path(os.environ["BROWSER_TEST_ARTIFACTS"]) / "auth-login.png"))
 
 
-def test_navigation_changes_routes_and_survives_reload(browser):
-    for identifier, route in [
-        ("nav-reports", "/reports"),
-        ("nav-budget", "/budget"),
-        ("nav-settings", "/settings"),
-        ("nav-ledger", "/"),
-    ]:
-        click(browser, identifier)
-        wait_for_route(browser, route)
-    click(browser, "nav-settings")
-    # Flutter updates browser history asynchronously after the WebDriver click.
-    # Reload only once the destination URL and its page content are present.
-    wait_for_route(browser, "/settings")
-    see(browser, "Tiện Ích và Cài Đặt")
+def test_private_route_reload_requires_authentication(browser):
+    browser.get(browser.current_url.split("#")[0] + "#/settings")
+    login_form(browser)
     browser.refresh()
-    wait_for_route(browser, "/settings")
-    see(browser, "Tiện Ích và Cài Đặt")
+    login_form(browser)
+    see(browser, "Chào mừng trở lại")
 
 
 def test_empty_login_validates_without_auth_request(browser):
     login_form(browser)
     click(browser, "auth-submit")
     see(browser, "Nhập email hợp lệ")
-    see(browser, "Nhập mật khẩu ít nhất 6 ký tự")
+    see(browser, "Nhập mật khẩu")
 
 
 def test_invalid_login_values_show_validation_errors(browser):
     login_form(browser)
     fill(browser, "auth-email", "not-an-email")
-    fill(browser, "auth-password", "123")
+    fill(browser, "auth-password", "")
     click(browser, "auth-submit")
     see(browser, "Nhập email hợp lệ")
-    see(browser, "Nhập mật khẩu ít nhất 6 ký tự")
+    see(browser, "Nhập mật khẩu")
 
 
 def test_switch_between_login_and_registration(browser):
@@ -131,3 +114,15 @@ def test_switch_between_login_and_registration(browser):
     see(browser, "Nhập email hợp lệ")
     click(browser, "auth-toggle-mode")
     see(browser, "Chưa có tài khoản? Đăng ký")
+
+
+@pytest.mark.parametrize("identifier,title", [
+    ("auth-use-otp", "Đăng nhập bằng OTP"),
+    ("auth-use-recovery", "Khôi phục mật khẩu"),
+])
+def test_email_code_modes_validate_before_sending(browser, identifier, title):
+    login_form(browser)
+    click(browser, identifier)
+    see(browser, title)
+    click(browser, "auth-submit")
+    see(browser, "Nhập email hợp lệ")
