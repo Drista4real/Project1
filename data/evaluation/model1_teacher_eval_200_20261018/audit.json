@@ -1,0 +1,25 @@
+{
+  "rows": 200,
+  "category_counts": {
+    "Ăn uống": 34,
+    "Đi lại": 34,
+    "Mua sắm": 33,
+    "Hóa đơn/Nhà ở": 33,
+    "Y tế": 33,
+    "Khác": 33
+  },
+  "reference": "data\\prepared\\model1_merged_1000_per_label_20261018\\transactions.csv",
+  "reference_rows": 6000,
+  "reference_sha256": "83351265704108f3a24ead4df0a61a614d3d60d4cce4c717efcb051577257a82",
+  "csv_sha256": "bb288395911f094fa4a4c77f71718c89e74665c2f798af628f3505e4f28d4152",
+  "taxonomy_sha256": "4bfe54b556ee78d479ae4271c86523e3aec18b417078f154a13b5924ae572a37",
+  "exact_overlap": 0,
+  "description_key_overlap": 0,
+  "near_threshold": 0.9,
+  "near_matches": [],
+  "limitations": [
+    "Lexical checks cannot prove semantic independence.",
+    "Synthetic teacher labels have not been independently reviewed.",
+    "No student predictions or teacher logits were used."
+  ]
+}

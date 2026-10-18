@@ -162,6 +162,9 @@ def test_real_training_selection_reload_and_head(tmp_path, inputs, monkeypatch):
         second = LoRAClassifier(output, local_files_only=True)
         assert first.predict("an trua 40k") == second.predict("an trua 40k")
         result = first.predict("an trua 40k")
+        classification = first.classify("an trua 40k")
+        assert classification.label == result["category"]
+        assert classification.confidence == result["confidence"]
         assert result["category"] in CATEGORIES
         assert 0 <= result["confidence"] <= 1
         assert result["source"] in ("LOCAL", "CLOUD_FALLBACK")

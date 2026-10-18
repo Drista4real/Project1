@@ -1,0 +1,11 @@
+{
+  "created_date": "2026-10-18",
+  "source_kind": "synthetic",
+  "teacher": "Codex assistant in this conversation; exact model version not asserted",
+  "method": "Direct teacher-authored sentences and hard labels; no logits or distillation loss",
+  "annotation_status": "synthetic",
+  "independent_human_review": false,
+  "intended_use": "separate development evaluation; not training",
+  "student_predictions_used": false,
+  "issue": "https://github.com/Drista4real/Project1/issues/35"
+}
