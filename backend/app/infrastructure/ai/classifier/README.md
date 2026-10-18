@@ -6,6 +6,38 @@ The adapter inherits `ITransactionClassifier` and preserves
 `source` is `LOCAL` at confidence >= 0.8 and `CLOUD_FALLBACK` otherwise.
 The latter is a routing signal for an application orchestrator to enqueue Gemini.
 
+## Setup after cloning (no training)
+
+From the repository root, using the Python environment that runs the backend:
+
+```powershell
+python -m pip install -r backend/requirements-classifier.txt
+python backend/scripts/download_classifier_model.py
+```
+
+The three classifier checkpoint files are already tracked in Git. This script
+reads `weights/checkpoints/classifier_config.json`, downloads missing PhoBERT
+files into `weights/cache/phobert/`, then reloads with downloads disabled and
+verifies a real 768-dimensional embedding. It reuses cached files and does not
+train or modify checkpoints/configuration. Internet is needed only for missing
+files; no teammate account or API key is required for the public model.
+
+To verify an existing cache without downloading:
+
+```powershell
+python backend/scripts/download_classifier_model.py --local-files-only
+```
+
+`--config PATH` selects another compatible classifier configuration.
+`--cache-dir PATH` is optional; application inference must use that same cache
+path if you change it. The script honors the revision in the configuration;
+`main` uses a cached branch reference when available and is not an immutable
+version pin. Share a configuration with a fixed model commit for reproducibility.
+This prepares the PhoBERT + LightGBM pipeline; separately trained LoRA adapters
+must be distributed with their own inference artifacts.
+
+## Training
+
 For the five-source Model 1 dataset prepared on 2026-10-18, use the frozen
 bundle and `--dataset-dir` rather than regenerating synthetic data. See
 [merged dataset handoff](../../../../../docs/MODEL1_MERGED_DATASET.md).
@@ -52,8 +84,9 @@ Three artifacts are saved to `weights/checkpoints/`:
   CLS pooling, feature size, and routing threshold.
 
 PhoBERT downloads are cached in `weights/cache/phobert/`; its resolved revision is
-saved in the JSON file. Inference only reads cached model files. Copy that cache
-and all three artifacts to the inference host. `--cache-dir PATH` changes the
+saved in the JSON file. Inference only reads cached model files. Use the setup
+script above on the inference host, or copy the cache and all three artifacts.
+`--cache-dir PATH` changes the
 training cache location; pass the same path to the inference embedder when using
 a custom location. `--local-files-only` trains without network access when the
 cache is already populated. Pickle artifacts must come from a trusted training run.
