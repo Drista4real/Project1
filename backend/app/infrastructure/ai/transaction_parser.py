@@ -26,6 +26,7 @@ from app.infrastructure.ai.edge_asr.normalizer import (
     VietnameseFinancialSlangNormalizer,
 )
 from app.infrastructure.ai.input_rules import split_transactions, suggest_category
+from app.infrastructure.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
 _CLASSIFIER_LOCK = Lock()
@@ -80,14 +81,34 @@ def local_classifier() -> ITransactionClassifier | None:
 @lru_cache(maxsize=1)
 def _load_local_classifier() -> ITransactionClassifier | None:
     """Load trusted local artifacts once; optional dependencies can be absent."""
+    settings = get_settings()
     try:
+        if settings.classifier_backend == "lora":
+            from app.infrastructure.ai.classifier.lora import LoRAClassifier
+
+            classifier = LoRAClassifier(
+                settings.classifier_lora_dir,
+                device=settings.classifier_device,
+                cache_dir=settings.classifier_lora_cache_dir,
+                local_files_only=True,
+            )
+            logger.info(
+                "Local classifier ready: LoRA on %s (%s)",
+                settings.classifier_device,
+                settings.classifier_lora_dir,
+            )
+            return classifier
         from app.infrastructure.ai.classifier.lgbm_inference import (
             LightGBMTransactionClassifier,
         )
 
         return LightGBMTransactionClassifier()
     except (ImportError, OSError, RuntimeError, ValueError):
-        logger.warning("Local classifier unavailable; transaction drafts need review")
+        logger.warning(
+            "Local classifier %s unavailable; transaction drafts need review",
+            settings.classifier_backend,
+            exc_info=True,
+        )
         return None
 
 

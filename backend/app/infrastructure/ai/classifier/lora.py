@@ -6,6 +6,10 @@ from pathlib import Path
 import torch
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
+from app.domain.interfaces.classifier_interface import (
+    ClassificationResult,
+    ITransactionClassifier,
+)
 from app.infrastructure.ai.classifier.config import CATEGORIES, CONFIDENCE_THRESHOLD
 from app.infrastructure.ai.classifier.phobert_embedder import preprocess_text
 
@@ -21,7 +25,7 @@ def select_device(name: str) -> torch.device:
     return torch.device(name)
 
 
-class LoRAClassifier:
+class LoRAClassifier(ITransactionClassifier):
     """Reload the base, classifier head and adapter with shared preprocessing."""
 
     def __init__(
@@ -83,3 +87,10 @@ class LoRAClassifier:
             "confidence": score,
             "source": "LOCAL" if score >= CONFIDENCE_THRESHOLD else "CLOUD_FALLBACK",
         }
+
+    def classify(self, text: str) -> ClassificationResult:
+        """Adapt the saved LoRA classifier to the transaction parsing contract."""
+        result = self.predict(text)
+        return ClassificationResult(
+            label=str(result["category"]), confidence=float(result["confidence"])
+        )

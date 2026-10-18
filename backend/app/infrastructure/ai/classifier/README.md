@@ -1,5 +1,60 @@
 # Model 1: Vietnamese transaction classification
 
+## LoRA backend for the October 2026 demo
+
+The standalone Streamlit demo (`frontend/app.py`) also honors this configuration
+and loads the classifier directly. It does not need an API server. From the
+repository root, using the prepared Python environment:
+
+```powershell
+python -m pip install -r frontend/requirements-demo.txt
+python -m streamlit run frontend/app.py
+```
+
+The backend can select the trained LoRA adapter through `backend/.env`:
+
+```dotenv
+CLASSIFIER_BACKEND=lora
+CLASSIFIER_DEVICE=cpu
+```
+
+Default paths are `weights/checkpoints/classifier_lora/` for the full adapter
+folder and `weights/cache/phobert-lora/` for the base-model cache. Override with
+absolute `CLASSIFIER_LORA_DIR` and `CLASSIFIER_LORA_CACHE_DIR` if needed.
+The approved run is `20261018T090941Z_baf75057`, best epoch 9 of 10,
+dataset `dataset_02f0e7a1e54a4973ef079e01`. Its test Macro F1 is 0.898825;
+the 200-example synthetic development evaluation has 193 correct predictions.
+These measurements do not establish real-world accuracy.
+
+Using the Python environment that will run the API, from the repository root:
+
+```powershell
+python -m pip install -r backend/requirements.txt -r backend/requirements-lora-inference.txt
+python backend/scripts/prepare_lora_model.py
+python backend/scripts/prepare_lora_model.py --local-files-only
+python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
+```
+
+Preparation downloads the exact base revision pinned in `lora_config.json`,
+then reloads the adapter and verifies a prediction offline. It does not train.
+It prints the configured device, revision, category, confidence and one warmed
+prediction timing. API inference always uses `local_files_only=True` and loads
+one classifier lazily per process. The first request can take longer because
+it loads the model; send a demo transaction before the presentation.
+
+LoRA implements the same `classify()` contract as LightGBM. Amount extraction,
+income/transfer handling, confidence routing and editable drafts retain their
+existing flow. Low-confidence predictions may call Gemini when configured;
+review is still required for inaccurate high-confidence suggestions.
+
+Set `CLASSIFIER_BACKEND=lightgbm` and restart the API to switch back. If the
+selected classifier cannot load, the parser logs the error and follows its
+existing cloud/rule/manual-review flow; it does not silently switch models.
+
+The trained `adapter_model.safetensors` alone is insufficient: preserve the
+adapter configuration, saved tokenizer, `lora_config.json` and pinned base cache.
+Keep `metrics.json`, `training_config.json` and the data manifest for provenance.
+
 The adapter inherits `ITransactionClassifier` and preserves
 `classify(text) -> ClassificationResult` for existing application use cases.
 `predict(text)` additionally returns `(category, confidence, source)`;
