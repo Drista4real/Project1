@@ -11,6 +11,15 @@ String authErrorMessage(AuthException error) {
     return 'Dịch vụ đang giới hạn số yêu cầu. Vui lòng chờ rồi thử lại.';
   }
   return switch (error.code) {
+    'otp_expired' || 'otp_disabled' =>
+      'Mã xác minh không đúng hoặc đã hết hạn. Vui lòng kiểm tra hoặc gửi lại mã.',
+    'session_not_found' || 'refresh_token_not_found' =>
+      'Phiên xác thực đã thay đổi hoặc hết hạn. Vui lòng thử lại.',
+    'anonymous_provider_disabled' =>
+      'Chế độ khách chưa được bật. Vui lòng đăng ký hoặc đăng nhập.',
+    'email_exists' || 'identity_already_exists' =>
+      'Email này đã được liên kết với tài khoản khác. Hãy dùng email khác để giữ dữ liệu khách.',
+    'same_password' => 'Mật khẩu mới cần khác mật khẩu hiện tại.',
     'email_not_confirmed' =>
       'Vui lòng mở email xác nhận tài khoản trước khi đăng nhập.',
     'signup_disabled' => 'Dự án hiện chưa cho phép đăng ký tài khoản mới.',
