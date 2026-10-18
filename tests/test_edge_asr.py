@@ -266,3 +266,49 @@ def test_explicit_mock_with_installed_models(
         35_000,
     )
     importer.assert_not_called()
+
+
+def encoded_audio(container: str, codec: str) -> bytes:
+    """Encode a short 44.1 kHz stereo tone the way phone recorders/MP3 players do."""
+    av = pytest.importorskip("av")
+    stream_buffer = io.BytesIO()
+    with av.open(stream_buffer, "w", format=container) as output:
+        stream = output.add_stream(codec, rate=44100, layout="stereo")
+        tone = np.sin(np.linspace(0, 440 * 2 * np.pi, 44100, dtype=np.float32)) / 2
+        frame = av.AudioFrame.from_ndarray(
+            np.vstack([tone, tone]).astype(np.float32), format="fltp", layout="stereo"
+        )
+        frame.rate = 44100
+        for packet in [*stream.encode(frame), *stream.encode(None)]:
+            output.mux(packet)
+    return stream_buffer.getvalue()
+
+
+@pytest.mark.parametrize(("container", "codec"), [("ipod", "aac"), ("mp3", "mp3")])
+def test_m4a_and_mp3(
+    real_branch: tuple[SherpaOnnxRecognizer, Mock, Mock],
+    tmp_path: Path,
+    container: str,
+    codec: str,
+) -> None:
+    """Resample compressed phone audio from bytes or path to 16 kHz mono float32."""
+    recognizer, engine, _factory = real_branch
+    data = encoded_audio(container, codec)
+    path = tmp_path / f"voice.{'m4a' if codec == 'aac' else 'mp3'}"
+    path.write_bytes(data)
+    for audio in (data, path):
+        assert recognizer.transcribe(audio) == "cà phê 55 cành"
+        rate, samples = engine.decode_stream.call_args.args[
+            0
+        ].accept_waveform.call_args.args
+        assert rate == 16000
+        assert samples.dtype == np.float32 and samples.ndim == 1
+        assert 15000 < samples.size < 18000
+        assert 0.2 < np.max(np.abs(samples)) <= 1
+
+
+def test_invalid_m4a(real_branch: tuple[SherpaOnnxRecognizer, Mock, Mock]) -> None:
+    """A truncated M4A must raise instead of being misread as raw PCM."""
+    recognizer, _engine, _factory = real_branch
+    with pytest.raises(ValueError, match="M4A/MP3"):
+        recognizer.transcribe(b"\x00\x00\x00\x18ftypM4A garbage")
