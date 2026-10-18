@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:project_one/features/settings/cubit/app_preferences.dart';
+import 'package:project_one/features/settings/widgets/app_lock_gate.dart';
 import '../../helpers/device_settings.dart';
 
 void main() {
@@ -110,6 +111,35 @@ void main() {
         ),
         isNull,
       );
+    },
+  );
+
+  testWidgets(
+    'lifecycle lock hides financial content and canceled authentication stays locked',
+    (tester) async {
+      await preferences.setBiometrics(true);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AppLockGate(
+            preferences: preferences,
+            child: const Scaffold(body: Text('Private balance')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Private balance'), findsOneWidget);
+      security.accepted = false;
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      await tester.pumpAndSettle();
+      expect(find.text('Private balance'), findsNothing);
+      expect(find.text('Sổ tài chính đã khóa'), findsOneWidget);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(find.text('Private balance'), findsNothing);
+      security.accepted = true;
+      await tester.tap(find.text('Mở khóa'));
+      await tester.pumpAndSettle();
+      expect(find.text('Private balance'), findsOneWidget);
     },
   );
 }

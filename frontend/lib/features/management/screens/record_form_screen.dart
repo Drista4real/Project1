@@ -33,9 +33,16 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
   late final Map<String, dynamic> _schema = Map<String, dynamic>.from(
     widget.resource['schema'] as Map,
   );
-  late final Map<String, dynamic> _properties = Map<String, dynamic>.from(
-    _schema['properties'] as Map,
-  );
+  late final Map<String, dynamic> _properties =
+      Map<String, dynamic>.from(_schema['properties'] as Map)..removeWhere(
+        (key, _) =>
+            name == 'profile' &&
+            {
+              'reminder_time',
+              'biometrics_enabled',
+              'dark_mode_enabled',
+            }.contains(key),
+      );
   late final _cubit = RecordFormCubit(
     widget.repository,
     name,

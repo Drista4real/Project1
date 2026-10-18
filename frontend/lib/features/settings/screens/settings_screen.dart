@@ -36,13 +36,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? get _reminderTime => _profile?['reminder_time'] as String?;
   Future<void> _saveReminder(String? value) =>
       _saveLegacyPreference('reminder_time', value);
-  Future<void> _saveBiometrics(bool value) =>
-      _saveLegacyPreference('biometrics_enabled', value);
+  Future<void> _saveBiometrics(bool value) => _preferences.setBiometrics(value);
   Future<void> _saveLegacyPreference(String field, dynamic value) =>
       _cubit.savePreference(field, value);
   bool _updatingDevice = false;
   bool get _reminders => _reminderTime != null;
-  bool get _biometrics => _profile?['biometrics_enabled'] == true;
+  bool get _biometrics => _preferences.biometrics;
   bool get _darkMode => _preferences.darkMode;
   bool get _loading => _cubit.state.loading;
   bool get _saving => _cubit.state.saving || _updatingDevice;
@@ -675,8 +674,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 9),
           _SettingTile(
             icon: Icons.fingerprint,
-            title: 'Ưu tiên Face ID & Vân tay',
-            subtitle: 'Lưu tùy chọn; khóa sinh trắc học chưa được bật',
+            title: 'Khóa bằng Face ID & Vân tay',
+            subtitle: _preferences.security.supported
+                ? 'Xác thực khi mở app · Có thể dùng mã khóa thiết bị'
+                : 'Thiết bị này chưa hỗ trợ khóa ứng dụng',
             trailing: Switch(
               value: _biometrics,
               onChanged:
