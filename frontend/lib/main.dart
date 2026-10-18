@@ -18,14 +18,25 @@ Future<void> main() async {
   try {
     await SupabaseConfig.initialize();
     await AppDependencies.preferences.loadUser(SupabaseConfig.currentUser?.id);
-    SupabaseConfig.client.auth.onAuthStateChange.listen((event) async {
-      if (event.event.name == 'signedIn' || event.event.name == 'signedOut') {
-        await AppDependencies.preferences.loadUser(event.session?.user.id);
-      }
-    });
-  } catch (e) {
-    debugPrint('Supabase initialization error: $e');
+    runApp(KakeiboZenApp(auth: SupabaseConfig.client.auth));
+  } catch (_) {
     await AppDependencies.preferences.loadUser(null);
+    runApp(
+      const MaterialApp(
+        home: Scaffold(
+          body: SafeArea(
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Không thể khởi tạo ứng dụng. Vui lòng kiểm tra kết nối và mở lại app.',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
-  runApp(const KakeiboZenApp());
 }
