@@ -7,7 +7,7 @@
   "artifacts": {
     "encoder.int8.onnx": {
       "bytes": 12926470,
-      "sha256": "c6b237a6d2673798fbfd92d087065ed21e9f215f4b472087243152916fe7da05"
+      "sha256": "3474a3ef49289f271af4f7e562fc8b56fdd2938f7f52916770ef73f0d80ed917"
     },
     "decoder.int8.onnx": {
       "bytes": 89846458,

@@ -12,6 +12,16 @@ Install the optional runtime from the repository root:
 python -m pip install -r backend/requirements-asr.txt
 ```
 
+Download the pinned, pre-exported model from the repository root:
+
+```powershell
+python backend/scripts/download_asr_model.py
+```
+
+For private repositories, run `gh auth login` and add `--github-cli`.
+Downloads are verified against the tracked manifest. See
+[team setup and release publication](../../../../../docs/MODEL3_SETUP.md).
+
 To generate compatible INT8 exports from the official `vinai/PhoWhisper-tiny`
 checkpoint, run once from the repository root:
 

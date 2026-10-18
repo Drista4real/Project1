@@ -1,4 +1,6 @@
 # BÁO CÁO KẾ HOẠCH TRIỂN KHAI ĐỀ TÀI VÀ ĐẶC TẢ HỆ THỐNG
+
+Thiết lập giọng nói sau khi clone: [tải Model 3 từ GitHub Release](docs/MODEL3_SETUP.md).
 ## Đề tài 17: Hệ thống Quản lý Tài chính Cá nhân Dự báo Dòng tiền Thông minh (AI-driven Cash Flow Forecasting & Financial Management)
 
 ---
