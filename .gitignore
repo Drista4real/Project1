@@ -44,6 +44,11 @@ Desktop.ini
 # Downloaded model caches and exported ASR binaries
 weights/cache/
 weights/onnx/phowhisper-tiny/*.onnx
+# Locally trained LoRA adapters, tokenizer copies and training manifests
+weights/checkpoints/classifier_lora/
+
+# Evaluation delivery archives duplicate the reviewable source files
+/data/evaluation/**/*.zip
 
 # Dataset bundles/review exports can contain private financial text.
 /data/prepared/*
