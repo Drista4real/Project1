@@ -31,20 +31,31 @@ _UNITS = {
     "ngàn": 1000,
     "lít": 100_000,
     "loét": 100_000,
+    "xị": 100_000,
     "củ": 1_000_000,
     "triệu": 1_000_000,
     "tr": 1_000_000,
+    "tỷ": 1_000_000_000,
+    "tỉ": 1_000_000_000,
     "đồng": 1,
+    "vnđ": 1,
     "vnd": 1,
     "đ": 1,
 }
+_UNIT = "(?:" + "|".join(sorted(_UNITS, key=len, reverse=True)) + ")"
+_SEGMENT = re.compile(rf"(?P<number>{_NUMBER})\s*(?P<unit>{_UNIT})(?!\w)")
+_SEGMENTS = rf"{_NUMBER}\s*{_UNIT}(?!\w)(?:\s+{_NUMBER}\s*{_UNIT}(?!\w))*"
 _MONEY = re.compile(
-    rf"(?<![\w+\-])(?:"
+    rf"(?<!\w)(?:"
     rf"(?P<compact>\d+)\s*tr(?P<fraction>\d{{1,3}})"
-    rf"|(?P<number>{_NUMBER})\s*(?P<unit>{'|'.join(_UNITS)})"
-    rf"(?:\s+(?P<half>rưỡi))?"
+    rf"|(?P<segments>{_SEGMENTS})"
+    rf"(?:\s+(?P<half>rưỡi)"
+    # '1 triệu 2' only at a clause end, so '3 triệu một tháng' keeps its meaning.
+    rf"|(?:{'|'.join(f'(?<={u})' for u in _UNITS if _UNITS[u] >= 100_000)})"
+    rf"\s+(?P<rest>\d{{1,3}}|{_NUMBER_WORD}(?:\s+{_NUMBER_WORD}){{0,3}})"
+    rf"(?=\s*(?:[,.;!?]|$)))?"
     rf"|(?P<tens>{_DIGIT_WORD}|\d+)\s+chục"
-    rf")(?!\w)",
+    rf")(?:\s*(?:đồng|vnđ|vnd|đ)(?!\w))?(?!\w)",
 )
 
 
@@ -73,10 +84,10 @@ def _spoken_integer(words: list[str]) -> int:
 
 
 def _number(value: str) -> Decimal:
-    """Use decimal arithmetic; dots in groups of three denote thousands."""
+    """Use decimal arithmetic; '.' or ',' before groups of three are thousands."""
     if value[0].isdigit():
-        if re.fullmatch(r"\d{1,3}(?:\.\d{3})+", value):
-            return Decimal(value.replace(".", ""))
+        if re.fullmatch(r"[1-9]\d{0,2}(?:([.,])\d{3})(?:\1\d{3})*", value):
+            return Decimal(re.sub(r"[.,]", "", value))
         return Decimal(value.replace(",", "."))
     return Decimal(_spoken_integer(value.split()))
 
@@ -84,8 +95,10 @@ def _number(value: str) -> Decimal:
 class VietnameseFinancialSlangNormalizer:
     """Normalize money to '<integer> đồng'; return the first amount, without summing.
 
-    k/cành/nghìn/ngàn = 1,000; lít/loét = 100,000; củ/triệu/tr = 1,000,000.
-    A bare spoken 'năm chục' means 50,000. Compact '1tr5' means 1,500,000.
+    k/cành/nghìn/ngàn = 1,000; lít/loét/xị = 100,000; củ/triệu/tr = 1,000,000;
+    tỷ/tỉ = 1,000,000,000. A bare spoken 'năm chục' means 50,000. Compact '1tr5'
+    and a clause-final '1 triệu 2' mean 1,500,000 and 1,200,000. Descending
+    units form one amount: '2 triệu 500 nghìn' is 2,500,000.
     Bare numerals without a monetary unit are never interpreted as money.
     """
 
@@ -97,32 +110,49 @@ class VietnameseFinancialSlangNormalizer:
         first_amount: int | None = None
 
         def replace(match: re.Match[str]) -> str:
-            """Convert one unambiguous positive monetary phrase into integer VND."""
+            """Convert unambiguous positive monetary phrases into integer VND."""
             nonlocal first_amount
             if re.search(r"[+\-]\s*$", text[: match.start()]):
                 return match.group(0)
             try:
                 if match.group("compact") is not None:
                     fraction = match.group("fraction")
-                    amount = (
-                        Decimal(match.group("compact")) + Decimal("0." + fraction)
-                    ) * 1_000_000
+                    amounts = [
+                        (Decimal(match.group("compact")) + Decimal("0." + fraction))
+                        * 1_000_000
+                    ]
                 elif match.group("tens") is not None:
-                    amount = _number(match.group("tens")) * 10_000
+                    amounts = [_number(match.group("tens")) * 10_000]
                 else:
-                    number = _number(match.group("number"))
+                    # [total, smallest unit]; a non-descending unit starts a new amount.
+                    runs: list[list] = []
+                    for segment in _SEGMENT.finditer(match.group("segments")):
+                        unit = _UNITS[segment.group("unit")]
+                        value = _number(segment.group("number")) * unit
+                        if runs and unit < runs[-1][1]:
+                            runs[-1] = [runs[-1][0] + value, unit]
+                        else:
+                            runs.append([value, unit])
+                    unit = runs[-1][1]
                     if match.group("half"):
-                        number += Decimal("0.5")
-                    amount = number * _UNITS[match.group("unit")]
-                if amount != amount.to_integral_value():
+                        runs[-1][0] += Decimal(unit) / 2
+                    elif rest := match.group("rest"):
+                        if not rest[0].isdigit():
+                            words = rest.split()
+                            if words[0] in {"linh", "lẻ"}:
+                                raise ValueError("Ambiguous spoken remainder")
+                            rest = str(_spoken_integer(words))
+                        runs[-1][0] += Decimal("0." + rest) * unit
+                    amounts = [total for total, _ in runs]
+                if any(a != a.to_integral_value() for a in amounts):
                     return match.group(0)
-                integer = int(amount)
+                integers = [int(a) for a in amounts]
             except (ValueError, KeyError, InvalidOperation):
                 # Preserve unrecognized grammar instead of inventing a transaction.
                 return match.group(0)
             if first_amount is None:
-                first_amount = integer
-            return f"{integer} đồng"
+                first_amount = integers[0]
+            return " ".join(f"{integer} đồng" for integer in integers)
 
         normalized = _MONEY.sub(replace, text)
         return normalized, first_amount

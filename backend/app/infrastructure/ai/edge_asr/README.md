@@ -77,16 +77,23 @@ Deterministic conventions:
 | Input convention | VND multiplier / interpretation |
 |---|---|
 | `k`, `cành`, `nghìn`, `ngàn` | 1,000 |
-| `lít`, `loét` | 100,000, following the Northern financial slang convention |
+| `lít`, `loét`, `xị` | 100,000 (Northern `lít`, Southern `xị`) |
 | `củ`, `triệu`, `tr` | 1,000,000 |
+| `tỷ`, `tỉ` | 1,000,000,000 |
 | `rưỡi` after a unit | Add half of that unit |
 | `1tr5`, `3tr5` | 1,500,000 and 3,500,000 |
+| `1 triệu 2`, `một củ hai` at a clause end | 1,200,000 (units ≥ 100,000 only) |
+| `2 triệu 500 nghìn`, `1 tỷ 200 triệu` | One amount when units descend |
+| `50k đồng`, `50 nghìn vnđ` | 50,000 (trailing currency word is absorbed) |
 | `năm chục`, `ba chục` without another unit | 50,000 and 30,000 |
 | `ba lăm k`, `ba mươi lăm k` | 35,000 |
 
 Spoken numbers support single digits, tens, and hundreds. Bare numbers with
 no currency unit are not interpreted as money. Signed or unsupported phrases
-remain unchanged. Dots in groups of three indicate thousands (`50.000 đồng`);
+remain unchanged. `3 triệu một tháng` stays 3,000,000 because the remainder is
+not at a clause end; `50k 20k` stays two amounts because the units do not
+descend. Dots or commas in groups of three indicate thousands (`50.000 đồng`,
+`1,500,000đ`);
 decimal commas/dots support forms such as `12,5k` and `1.5 triệu`. `lít` is
 interpreted as a money unit in this financial normalizer, not as a volume unit.
 

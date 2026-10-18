@@ -43,6 +43,18 @@ from app.infrastructure.ai.edge_asr.recognizer import SherpaOnnxRecognizer
         ("giá 50000đ", "giá 50000 đồng", 50_000),
         ("giá 0k", "giá 0 đồng", 0),
         ("  CÀ PHÊ\n 55 K  ", "cà phê 55000 đồng", 55_000),
+        ("giá 50,000 đồng", "giá 50000 đồng", 50_000),
+        ("giá 1,500,000đ", "giá 1500000 đồng", 1_500_000),
+        ("bún 50k đồng", "bún 50000 đồng", 50_000),
+        ("trà sữa 5 xị", "trà sữa 500000 đồng", 500_000),
+        ("mua xe 1 tỷ 200 triệu", "mua xe 1200000000 đồng", 1_200_000_000),
+        ("lương hai triệu năm trăm nghìn", "lương 2500000 đồng", 2_500_000),
+        ("tiền trọ 1 triệu 2", "tiền trọ 1200000 đồng", 1_200_000),
+        (
+            "tiền trọ một củ hai, ăn 50k",
+            "tiền trọ 1200000 đồng, ăn 50000 đồng",
+            1_200_000,
+        ),
     ],
 )
 def test_money_normalization(raw: str, expected: str, amount: int) -> None:
@@ -63,6 +75,7 @@ def test_money_normalization(raw: str, expected: str, amount: int) -> None:
         "phòng 55kabc",
         "tiền -55k",
         "tiền - 55k",
+        "tiền -2 triệu 500k",
         "khẩu ngữ ba mươi mươi k",
     ],
 )
@@ -78,6 +91,16 @@ def test_multiple_amounts_and_unicode() -> None:
         "cà phê 55000 đồng, bánh mì 20000 đồng",
         55_000,
     )
+
+
+def test_remainder_and_repeated_units_stay_separate() -> None:
+    """'một tháng' is a period, and equal units are two amounts, never a sum."""
+    normalizer = VietnameseFinancialSlangNormalizer()
+    assert normalizer.normalize("tiền nhà 3 triệu một tháng") == (
+        "tiền nhà 3000000 đồng một tháng",
+        3_000_000,
+    )
+    assert normalizer.normalize("50k 20k") == ("50000 đồng 20000 đồng", 50_000)
 
 
 def test_normalizer_type_validation() -> None:
