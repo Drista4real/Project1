@@ -147,12 +147,24 @@ class SettingsCubit extends Cubit<SettingsState> {
         repository.references('tags'),
         repository.references('transactions'),
         repository.references('transaction_tags'),
+        repository.references('accounts'),
       ]);
       if (isClosed || generation != _generation) return;
+      final accounts = {
+        for (final account in values[4] as List<FinanceRecord>)
+          account['id']: account,
+      };
       final data = SettingsData(
         profile: values[0] as FinanceRecord,
         tags: values[1] as List<FinanceRecord>,
-        transactions: values[2] as List<FinanceRecord>,
+        transactions: (values[2] as List<FinanceRecord>)
+            .map(
+              (item) => <String, dynamic>{
+                ...item,
+                'accounts': accounts[item['account_id']] ?? item['accounts'],
+              },
+            )
+            .toList(),
         transactionTags: values[3] as List<FinanceRecord>,
       );
       emit(

@@ -16,11 +16,18 @@ import 'package:project_one/app/widgets/app_screen_navigation.dart';
 import 'package:project_one/shared/widgets/kakeibo_card.dart';
 import 'package:project_one/shared/formatters/currency_formatter.dart';
 import 'package:project_one/features/settings/cubit/app_preferences.dart';
+import 'package:project_one/features/settings/services/report_exporter.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, this.repository, this.preferences});
+  const SettingsScreen({
+    super.key,
+    this.repository,
+    this.preferences,
+    this.exporter,
+  });
   final ManagementRepository? repository;
   final AppPreferences? preferences;
+  final ReportExporter? exporter;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -33,11 +40,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String get _range => _cubit.state.range;
   AppPreferences get _preferences =>
       widget.preferences ?? AppDependencies.preferences;
-  String? get _reminderTime => _preferences.reminderTime;
-  Future<void> _saveReminder(String? value) => _preferences.setReminder(value);
-  Future<void> _saveBiometrics(bool value) => _preferences.setBiometrics(value);
   bool _updatingDevice = false;
-  bool get _reminders => _reminderTime != null;
+  bool _exporting = false;
+  bool get _reminders => _preferences.reminderTime != null;
   bool get _biometrics => _preferences.biometrics;
   bool get _darkMode => _preferences.darkMode;
   bool get _loading => _cubit.state.loading;
@@ -67,6 +72,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) _notice('$error');
     } finally {
       if (mounted) setState(() => _updatingDevice = false);
+    }
+  }
+
+  Future<void> _exportReport() async {
+    if (_exporting || _loading || _profile == null) return;
+    final items = _filteredTransactions;
+    if (items.isEmpty) {
+      _notice('Không có giao dịch phù hợp để xuất.');
+      return;
+    }
+    final filter = [
+      _range,
+      if (_range == 'Tùy chọn' && _customRange != null)
+        '${_customRange!.start.toIso8601String().split('T').first} — ${_customRange!.end.toIso8601String().split('T').first}',
+      if (_cubit.state.query.trim().isNotEmpty)
+        'Tìm: ${_cubit.state.query.trim()}',
+      if (_tags.isNotEmpty) 'Thẻ: ${_tags.join(', ')}',
+    ].join(' · ');
+    final format = await showModalBottomSheet<ReportFormat>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Xuất ${items.length} giao dịch theo bộ lọc hiện tại',
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.table_chart_outlined),
+              title: const Text('Excel (.xlsx)'),
+              onTap: () => Navigator.pop(context, ReportFormat.excel),
+            ),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_outlined),
+              title: const Text('PDF (.pdf)'),
+              onTap: () => Navigator.pop(context, ReportFormat.pdf),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (format == null || !mounted) return;
+    setState(() => _exporting = true);
+    try {
+      final box = context.findRenderObject() as RenderBox?;
+      final exported = await (widget.exporter ?? ReportExporter()).export(
+        format,
+        items,
+        filter,
+        origin: box == null ? null : box.localToGlobal(Offset.zero) & box.size,
+      );
+      if (exported && mounted) _notice('Đã xuất ${items.length} giao dịch.');
+    } catch (error) {
+      if (mounted) _notice('Không thể xuất báo cáo: $error');
+    } finally {
+      if (mounted) setState(() => _exporting = false);
     }
   }
 
@@ -536,9 +600,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           Text(
                             !_preferences.reminders.supported
                                 ? 'Nhắc hằng ngày hỗ trợ Android, iOS và macOS'
-                                : _reminderTime == null
+                                : _preferences.reminderTime == null
                                 ? 'Chưa đặt giờ nhắc'
-                                : _reminderTime!.substring(0, 5),
+                                : _preferences.reminderTime!.substring(0, 5),
                             style: TextStyle(
                               fontSize: 11,
                               color: AppTheme.expenseCoral,
@@ -557,7 +621,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               !_preferences.reminders.supported
                           ? null
                           : (value) => _updateDevice(
-                              () => _saveReminder(value ? '20:30:00' : null),
+                              () => _preferences.setReminder(
+                                value ? '20:30:00' : null,
+                              ),
                             ),
                       activeThumbColor: AppTheme.primaryForestGreen,
                     ),
@@ -571,9 +637,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           !_preferences.reminders.supported
                       ? null
                       : () async {
-                          final stored = (_reminderTime ?? '20:30:00').split(
-                            ':',
-                          );
+                          final stored =
+                              (_preferences.reminderTime ?? '20:30:00').split(
+                                ':',
+                              );
                           final picked = await showTimePicker(
                             context: context,
                             initialTime: TimeOfDay(
@@ -589,7 +656,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           );
                           if (picked != null && mounted) {
                             await _updateDevice(
-                              () => _saveReminder(
+                              () => _preferences.setReminder(
                                 '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}:00',
                               ),
                             );
@@ -664,9 +731,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _SettingTile(
             icon: Icons.receipt_long_outlined,
             title: 'Xuất báo cáo Excel / PDF',
-            subtitle: 'Hỗ trợ đối soát thuế, chia sẻ gia đình...',
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _notice('Tính năng xuất báo cáo đang được chuẩn bị.'),
+            subtitle: 'Xuất tất cả giao dịch khớp bộ lọc hiện tại',
+            trailing: _exporting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.chevron_right),
+            onTap: _loading || _exporting || _profile == null
+                ? null
+                : _exportReport,
           ),
           const SizedBox(height: 9),
           _SettingTile(
@@ -683,7 +758,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       _profile == null ||
                       !_preferences.security.supported
                   ? null
-                  : (value) => _updateDevice(() => _saveBiometrics(value)),
+                  : (value) =>
+                        _updateDevice(() => _preferences.setBiometrics(value)),
               activeThumbColor: AppTheme.primaryForestGreen,
             ),
           ),
