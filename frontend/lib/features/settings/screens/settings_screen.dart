@@ -3,12 +3,11 @@ import 'package:project_one/features/settings/cubit/settings_cubit.dart';
 import 'package:flutter/material.dart';
 
 import 'package:project_one/core/theme/app_theme.dart';
-import 'package:project_one/core/config/supabase_config.dart';
 import 'package:project_one/app/app_dependencies.dart';
 import 'package:project_one/features/finance/domain/repositories/management_repository.dart';
 import 'package:project_one/features/finance/domain/usecases/finance_insights.dart';
 import 'package:project_one/features/transactions/screens/transaction_detail_screen.dart';
-import 'package:project_one/features/auth/screens/auth_screen.dart';
+import 'package:project_one/features/auth/widgets/account_access_card.dart';
 import 'package:project_one/features/management/screens/management_screen.dart';
 import 'package:project_one/features/management/open_finance_module.dart';
 import 'package:project_one/app/widgets/app_screen_header.dart';
@@ -180,34 +179,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
         children: [
-          Card(
-            child: ListTile(
-              leading: Icon(
-                Icons.person_outline,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-              title: Text(
-                SupabaseConfig.currentUser?.email ??
-                    'Đăng nhập để quản lý giao dịch',
-              ),
-              trailing: TextButton(
-                onPressed: () async {
-                  if (SupabaseConfig.isAuthenticated) {
-                    await SupabaseConfig.client.auth.signOut();
-                  } else {
-                    if (!context.mounted) return;
-                    await Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const AuthScreen()),
-                    );
-                  }
-                  if (mounted) await _loadSettings();
-                },
-                child: Text(
-                  SupabaseConfig.isAuthenticated ? 'Đăng xuất' : 'Đăng nhập',
-                ),
-              ),
-            ),
-          ),
+          const AccountAccessCard(),
           if (_loading) const LinearProgressIndicator(),
           if (_preferences.error != null)
             Card(

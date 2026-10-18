@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:project_one/core/config/supabase_config.dart';
 import 'package:project_one/features/settings/cubit/app_preferences.dart';
+import 'package:project_one/features/auth/widgets/confirm_guest_exit.dart';
 
 /// Covers all routes, including dialogs, when the app loses focus.
 class AppLockGate extends StatefulWidget {
@@ -47,6 +48,13 @@ class _AppLockGateState extends State<AppLockGate> with WidgetsBindingObserver {
   }
 
   Future<void> _signOut() async {
+    final accountId = SupabaseConfig.currentUser?.id;
+    if (SupabaseConfig.currentUser?.isAnonymous == true &&
+        !await confirmGuestExit(context)) {
+      return;
+    }
+    if (SupabaseConfig.currentUser?.id != accountId) return;
+    if (!mounted) return;
     setState(() {
       _signingOut = true;
       _signOutError = null;
