@@ -68,18 +68,19 @@ python backend/scripts/train_classifier.py
 python backend/scripts/train_forecaster.py
 ```
 
-To prepare the actual PhoWhisper-tiny INT8 model once:
+To download the published PhoWhisper-tiny INT8 model once:
 
 ```powershell
-python -m pip install -r backend/requirements-asr-export.txt
-python backend/scripts/prepare_asr_model.py
+python backend/scripts/download_asr_model.py
+python -m pip install -r backend/requirements-asr.txt
 ```
 
-This downloads the official VinAI checkpoint, remaps its tensors with strict
-shape/key checks, and uses a pinned, checksum-verified sherpa-onnx exporter.
-The three runtime files are installed under `weights/onnx/phowhisper-tiny/`.
-`manifest.json` records provenance and artifact hashes. Afterwards, click
-`Nạp lại model ASR` in the Voice tab; inference runs without downloads.
+For private repository access, run `gh auth login` and add `--github-cli` to
+that download command. The downloader checks sizes and SHA256 against the
+tracked manifest before installing runtime files under
+`weights/onnx/phowhisper-tiny/`. Afterwards, reload ASR in the Voice tab;
+inference runs offline. See [Model 3 setup](../docs/MODEL3_SETUP.md) for release
+publication and the optional source export workflow.
 
 Missing files/dependencies and malformed uploads produce friendly messages.
 This page is a local model demo; results are not written to financial accounts.

@@ -115,12 +115,12 @@ Xem [tài liệu adapter Model 4](app/infrastructure/ai/cloud_vlm/README.md).
 Từ thư mục gốc, chuẩn bị model và đóng gói asset trước khi build APK:
 
 ```powershell
-.\backend\.venv\Scripts\python.exe -m pip install -r backend/requirements-asr-export.txt
-.\backend\.venv\Scripts\python.exe backend/scripts/prepare_asr_model.py
+.\backend\.venv\Scripts\python.exe backend/scripts/download_asr_model.py
 .\backend\.venv\Scripts\python.exe frontend/scripts/prepare_voice_assets.py
 ```
 
-Hai script kiểm tra checkpoint, ONNX INT8 và checksum trước khi cài asset.
+Script tải kiểm tra kích thước/SHA256; script đóng gói kiểm tra lại trước khi cài asset.
+Xem [hướng dẫn Model 3](../docs/MODEL3_SETUP.md) cho repo private và cách phát hành.
 Model tải một lần lúc chuẩn bị; ứng dụng phiên âm tiếng Việt trên thiết bị
 bằng sherpa-onnx, không tải âm thanh lên backend. Bấm **Nói nhanh**, cấp quyền
 micro, chờ thông báo micro đã bật và thanh âm lượng rồi nói tối đa 20 giây.

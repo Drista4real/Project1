@@ -1,7 +1,13 @@
 # Offline Vietnamese speech model
 
-Run `backend/scripts/prepare_asr_model.py`, then
-`frontend/scripts/prepare_voice_assets.py` from the repository root.
-The latter verifies the export manifest before copying the INT8 encoder,
-decoder, tokens and manifest into this directory for the Android build.
-Model binaries are generated locally and are ignored by Git.
+From the repository root, run:
+
+```powershell
+python backend/scripts/download_asr_model.py
+python frontend/scripts/prepare_voice_assets.py
+```
+
+For private repositories, authenticate with `gh auth login` and add
+`--github-cli` to the download command. The scripts verify SHA256 before
+installing/bundling files for Android. Model binaries stay ignored by Git.
+See [team setup](../../../../docs/MODEL3_SETUP.md).
