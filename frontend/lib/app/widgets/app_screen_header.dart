@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:project_one/core/theme/app_theme.dart';
-
 class AppScreenHeader extends StatelessWidget implements PreferredSizeWidget {
   final String subtitle;
 
@@ -19,12 +17,12 @@ class AppScreenHeader extends StatelessWidget implements PreferredSizeWidget {
           width: 32,
           height: 32,
           decoration: BoxDecoration(
-            color: AppTheme.lightMintBg,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(
+          child: Icon(
             Icons.spa,
-            color: AppTheme.primaryForestGreen,
+            color: Theme.of(context).colorScheme.primary,
             size: 20,
           ),
         ),
@@ -33,36 +31,39 @@ class AppScreenHeader extends StatelessWidget implements PreferredSizeWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Kakeibo Zen',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
-                  color: AppTheme.primaryForestGreen,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
               Text(
                 subtitle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
         ),
       ],
     ),
-    actions: const [
+    actions: [
       Padding(
         padding: EdgeInsets.only(right: 16),
         child: CircleAvatar(
           radius: 16,
-          backgroundColor: AppTheme.secondaryMint,
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
           child: Icon(
             Icons.person,
-            color: AppTheme.primaryForestGreen,
+            color: Theme.of(context).colorScheme.primary,
             size: 19,
           ),
         ),

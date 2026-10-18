@@ -1,5 +1,54 @@
 import 'package:flutter/material.dart';
 
+/// Generated data is available for reading, never manual CRUD in the app.
+const generatedFinanceResources = {
+  'cashflow_forecasts',
+  'cashflow_alerts',
+  'ai_consultations',
+  'ai_chat_sessions',
+  'ai_chat_messages',
+};
+
+/// Task descriptions help people choose a module without knowing table names.
+const managementDescriptions = {
+  'accounts': 'Số dư tiền mặt, ngân hàng và ví điện tử',
+  'recurring_transactions': 'Theo dõi lịch lương, tiền nhà và hóa đơn',
+  'debts_loans': 'Ghi nhớ khoản đi vay và tiền người khác còn nợ',
+  'budgets': 'Đặt hạn mức chi tiêu theo tháng và danh mục',
+  'saving_goals': 'Theo dõi tiến độ cho những dự định của bạn',
+  'categories': 'Sắp xếp khoản thu chi và phong bao ngân sách',
+  'tags': 'Tạo thẻ cho chuyến đi, sự kiện hoặc gia đình',
+  'transaction_tags': 'Gắn thẻ đã tạo vào từng giao dịch',
+  'profile': 'Tên, ngày nhận lương và mục tiêu hằng tháng',
+  'cashflow_forecasts': 'Xem các dự báo số dư đã được lưu',
+  'cashflow_alerts': 'Xem lại cảnh báo tài chính của bạn',
+  'ai_consultations': 'Đọc lại lời khuyên tài chính đã lưu',
+  'ai_chat_sessions': 'Xem các cuộc trò chuyện tư vấn',
+  'ai_chat_messages': 'Đọc nội dung tin nhắn đã lưu',
+};
+
+String managementTitle(Map<String, dynamic> resource) =>
+    resource['name'] == 'transaction_tags'
+    ? 'Gắn thẻ giao dịch'
+    : '${resource['title']}';
+
+/// Vietnamese task search also accepts text typed without tone marks.
+String managementSearchText(String value) {
+  var result = value.toLowerCase().trim();
+  for (final entry in const {
+    'àáạảãâầấậẩẫăằắặẳẵ': 'a',
+    'èéẹẻẽêềếệểễ': 'e',
+    'ìíịỉĩ': 'i',
+    'òóọỏõôồốộổỗơờớợởỡ': 'o',
+    'ùúụủũưừứựửữ': 'u',
+    'ỳýỵỷỹ': 'y',
+    'đ': 'd',
+  }.entries) {
+    result = result.replaceAll(RegExp('[${entry.key}]'), entry.value);
+  }
+  return result;
+}
+
 const managementLabels = <String, String>{
   'name': 'Tên',
   'account_type': 'Loại tài khoản',

@@ -5,6 +5,7 @@ import 'package:project_one/app/app_dependencies.dart';
 import 'package:project_one/features/management/screens/record_form_screen.dart';
 import 'package:project_one/features/management/screens/resource_list_screen.dart';
 import 'package:project_one/features/budget/screens/category_envelopes_screen.dart';
+import 'package:project_one/features/management/config/management_metadata.dart';
 
 /// Reuse the authenticated CRUD forms from the existing feature screens.
 Future<void> openFinanceModule(
@@ -16,6 +17,12 @@ Future<void> openFinanceModule(
   ManagementRepository? repository,
 }) async {
   final source = repository ?? AppDependencies.managementRepository;
+  if (create && generatedFinanceResources.contains(name)) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Dữ liệu do hệ thống tạo, chỉ có thể xem.')),
+    );
+    return;
+  }
   if ((name == 'categories' || name == 'budgets') &&
       !create &&
       record == null) {

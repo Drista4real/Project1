@@ -33,12 +33,14 @@ class EnvelopePillarGroup extends StatelessWidget {
           children: [
             CircleAvatar(
               radius: 12,
-              backgroundColor: pillar?.tint ?? EnvelopeStyle.border,
+              backgroundColor:
+                  pillar?.tint ?? Theme.of(context).colorScheme.outlineVariant,
               child: Text(
                 pillar == null ? '?' : '${pillar!.index + 1}',
                 style: TextStyle(
                   fontSize: 12,
-                  color: pillar?.color ?? EnvelopeStyle.ink,
+                  color:
+                      pillar?.color ?? Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),
@@ -49,7 +51,8 @@ class EnvelopePillarGroup extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 17,
                   fontWeight: FontWeight.w600,
-                  color: pillar?.color ?? EnvelopeStyle.ink,
+                  color:
+                      pillar?.color ?? Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),
@@ -57,7 +60,7 @@ class EnvelopePillarGroup extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: EnvelopeStyle.border,
+                color: Theme.of(context).colorScheme.outlineVariant,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -89,11 +92,14 @@ class EnvelopePillarGroup extends StatelessWidget {
             onDisable: () => onDisable(category),
           ),
         if (categories.isEmpty)
-          const Padding(
+          Padding(
             padding: EdgeInsets.only(bottom: 10),
             child: Text(
               'Chưa có danh mục trong phong bao này.',
-              style: TextStyle(fontSize: 12, color: EnvelopeStyle.muted),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
         SizedBox(
@@ -105,7 +111,9 @@ class EnvelopePillarGroup extends StatelessWidget {
               'Thêm vào ${pillar?.shortLabel.toLowerCase() ?? 'thiết yếu'}',
             ),
             style: TextButton.styleFrom(
-              backgroundColor: EnvelopeStyle.soft,
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest,
               foregroundColor: pillar?.color ?? EnvelopeStyle.primary,
               minimumSize: const Size(0, 44),
               shape: RoundedRectangleBorder(

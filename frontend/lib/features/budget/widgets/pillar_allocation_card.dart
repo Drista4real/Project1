@@ -9,19 +9,19 @@ class PillarAllocationCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: EnvelopeStyle.border),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            const Icon(
+            Icon(
               Icons.account_balance_outlined,
               size: 22,
-              color: EnvelopeStyle.primary,
+              color: Theme.of(context).colorScheme.primary,
             ),
             const SizedBox(width: 8),
             const Expanded(
@@ -34,7 +34,10 @@ class PillarAllocationCard extends StatelessWidget {
             Text(
               '${data.suggested ? 'Gợi ý' : 'Tổng'}:\n100%',
               textAlign: TextAlign.right,
-              style: const TextStyle(fontSize: 11, color: EnvelopeStyle.muted),
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ],
         ),
@@ -82,16 +85,16 @@ class PillarAllocationCard extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: EnvelopeStyle.soft,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Icon(
+              Icon(
                 Icons.spa_outlined,
                 size: 18,
-                color: EnvelopeStyle.primary,
+                color: Theme.of(context).colorScheme.primary,
               ),
               const SizedBox(width: 8),
               Expanded(

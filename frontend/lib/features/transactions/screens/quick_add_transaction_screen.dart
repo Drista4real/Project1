@@ -187,7 +187,9 @@ class _QuickAddTransactionScreenState extends State<QuickAddTransactionScreen> {
                             Container(
                               padding: const EdgeInsets.all(4),
                               decoration: BoxDecoration(
-                                color: AppTheme.lightMintBg,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.surfaceContainerHighest,
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Row(
@@ -226,7 +228,7 @@ class _QuickAddTransactionScreenState extends State<QuickAddTransactionScreen> {
                               fontWeight: FontWeight.w800,
                               color: income
                                   ? AppTheme.incomeEmerald
-                                  : AppTheme.primaryForestGreen,
+                                  : Theme.of(context).colorScheme.primary,
                             ),
                             decoration: financeInputDecoration(
                               'Số tiền *',
@@ -382,7 +384,9 @@ class _QuickAddTransactionScreenState extends State<QuickAddTransactionScreen> {
                                   side: BorderSide(
                                     color: selected
                                         ? AppTheme.primaryForestGreen
-                                        : AppTheme.borderLight,
+                                        : Theme.of(
+                                            context,
+                                          ).colorScheme.outlineVariant,
                                   ),
                                 );
                               }).toList(),
@@ -451,7 +455,9 @@ class _TypeChoice extends StatelessWidget {
           Icon(
             icon,
             size: 17,
-            color: selected ? Colors.white : AppTheme.textMuted,
+            color: selected
+                ? Colors.white
+                : Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           const SizedBox(width: 6),
           Text(
@@ -459,7 +465,9 @@ class _TypeChoice extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: selected ? Colors.white : AppTheme.textMuted,
+              color: selected
+                  ? Colors.white
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ],

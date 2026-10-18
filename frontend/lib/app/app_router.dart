@@ -8,7 +8,8 @@ import 'package:project_one/features/transactions/screens/quick_add_transaction_
 import 'package:project_one/features/ai/screens/ai_quick_input_screen.dart';
 import 'package:project_one/features/forecast/screens/cashflow_forecast_screen.dart';
 
-final GoRouter appRouter = GoRouter(
+/// Each signed-in account owns a fresh navigation tree and screen state.
+GoRouter createAppRouter() => GoRouter(
   initialLocation: AppRoutes.ledger,
   routes: [
     GoRoute(

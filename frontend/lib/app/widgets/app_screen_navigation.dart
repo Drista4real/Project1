@@ -26,9 +26,9 @@ class AppScreenNavigation extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(
+              leading: Icon(
                 Icons.auto_fix_high,
-                color: AppTheme.primaryForestGreen,
+                color: Theme.of(context).colorScheme.primary,
               ),
               title: const Text('Nhập nhanh AI'),
               subtitle: const Text('Gõ hoặc nói nội dung thu chi'),
@@ -78,7 +78,7 @@ class AppScreenNavigation extends StatelessWidget {
       'nav-settings',
     ];
     return BottomAppBar(
-      color: const Color(0xFFF6FBF5),
+      color: Theme.of(context).colorScheme.surface,
       elevation: 0,
       padding: EdgeInsets.zero,
       child: SizedBox(
@@ -130,8 +130,10 @@ class AppScreenNavigation extends StatelessWidget {
                                     ? items[i].$2
                                     : items[i].$1,
                                 color: selectedIndex == (i < 2 ? i : i - 1)
-                                    ? AppTheme.primaryForestGreen
-                                    : AppTheme.textMuted,
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
                                 size: 21,
                               ),
                               const SizedBox(height: 3),
@@ -144,8 +146,10 @@ class AppScreenNavigation extends StatelessWidget {
                                       ? FontWeight.w700
                                       : FontWeight.normal,
                                   color: selectedIndex == (i < 2 ? i : i - 1)
-                                      ? AppTheme.primaryForestGreen
-                                      : AppTheme.textMuted,
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
                                 ),
                               ),
                             ],

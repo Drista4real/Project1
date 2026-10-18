@@ -8,7 +8,6 @@ import 'package:project_one/features/management/open_finance_module.dart';
 import 'package:project_one/features/management/screens/resource_list_screen.dart';
 import 'package:project_one/shared/widgets/finance_data_view.dart';
 import '../models/budget_month_overview.dart';
-import '../models/envelope_pillar.dart';
 import '../services/category_envelopes_service.dart';
 import '../widgets/budget_overview_content.dart';
 import '../widgets/category_envelope_sheet.dart';
@@ -126,18 +125,18 @@ class _BudgetScreenState extends State<BudgetScreen> {
   Widget _buildContent(BuildContext context) => Theme(
     data: envelopeTheme(Theme.of(context)),
     child: Scaffold(
-      backgroundColor: EnvelopeStyle.canvas,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         titleSpacing: 16,
-        backgroundColor: EnvelopeStyle.canvas,
-        title: const Text(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        title: Text(
           'Ngân sách & phong bao',
           style: TextStyle(
             fontFamily: 'BeVietnamPro',
             fontSize: 17,
             fontWeight: FontWeight.w600,
-            color: EnvelopeStyle.primary,
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
         actions: [

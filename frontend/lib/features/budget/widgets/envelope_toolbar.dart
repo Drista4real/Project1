@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../models/envelope_pillar.dart';
 
 class EnvelopeToolbar extends StatelessWidget {
   const EnvelopeToolbar({
@@ -24,7 +23,10 @@ class EnvelopeToolbar extends StatelessWidget {
           Expanded(
             child: Text(
               'Phong bao tháng ${month.month}/${month.year}',
-              style: const TextStyle(fontSize: 12, color: EnvelopeStyle.muted),
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
           IconButton(
@@ -45,7 +47,10 @@ class EnvelopeToolbar extends StatelessWidget {
         onChanged: (_) => onSearch(),
         decoration: InputDecoration(
           hintText: 'Tìm kiếm danh mục chi tiêu...',
-          hintStyle: const TextStyle(fontSize: 12, color: EnvelopeStyle.muted),
+          hintStyle: TextStyle(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
           prefixIcon: const Icon(Icons.search, size: 20),
           suffixIcon: IconButton(
             tooltip: 'Xóa tìm kiếm',
@@ -56,7 +61,7 @@ class EnvelopeToolbar extends StatelessWidget {
             icon: const Icon(Icons.close, size: 17),
           ),
           filled: true,
-          fillColor: EnvelopeStyle.soft,
+          fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
           contentPadding: const EdgeInsets.symmetric(
             vertical: 12,
             horizontal: 16,

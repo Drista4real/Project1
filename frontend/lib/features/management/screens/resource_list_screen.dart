@@ -10,6 +10,8 @@ import 'package:project_one/features/management/config/management_metadata.dart'
 import 'package:project_one/features/management/widgets/management_error_panel.dart';
 import 'package:project_one/features/management/screens/record_form_screen.dart';
 import 'package:project_one/shared/formatters/currency_formatter.dart';
+import 'package:project_one/features/management/widgets/record_details_sheet.dart';
+import 'package:project_one/features/management/widgets/management_theme.dart';
 
 class ResourceListScreen extends StatefulWidget {
   const ResourceListScreen({
@@ -25,11 +27,71 @@ class ResourceListScreen extends StatefulWidget {
 
 class _ResourceListScreenState extends State<ResourceListScreen> {
   String get name => widget.resource['name'] as String;
+  bool get _readOnly => generatedFinanceResources.contains(name);
   bool get singleton => widget.resource['singleton'] == true;
   late final _cubit = ResourceListCubit(widget.repository, name)..refresh();
   int get _offset => _cubit.state.offset;
   bool get _deleting => _cubit.state.deleting;
   Future<void> _load() => _cubit.refresh();
+  bool _opening = false;
+
+  Future<void> _view(Map<String, dynamic> item) async {
+    if (_opening || _deleting) return;
+    setState(() => _opening = true);
+    Map<String, dynamic> fresh;
+    final references = <String, String>{};
+    try {
+      fresh = await widget.repository.get(
+        name,
+        widget.repository.key(name, item),
+      );
+      final fields = managementRelations.keys.where(
+        (field) => fresh[field] != null,
+      );
+      await Future.wait(
+        fields.map((field) async {
+          final records = await widget.repository.references(
+            managementRelations[field]!,
+          );
+          for (final record in records) {
+            if (record['id'] == fresh[field]) {
+              references[field] = recordCaption(record);
+            }
+          }
+        }),
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể mở chi tiết: $error')),
+        );
+      }
+      return;
+    } finally {
+      if (mounted) setState(() => _opening = false);
+    }
+    if (!mounted) return;
+    final readOnly =
+        _readOnly || (name == 'categories' && fresh['user_id'] == null);
+    final action = await showModalBottomSheet<RecordAction>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      constraints: const BoxConstraints(maxWidth: 680),
+      builder: (_) => ManagementTheme(
+        builder: (context) => RecordDetailsSheet(
+          resource: widget.resource,
+          record: fresh,
+          references: references,
+          readOnly: readOnly,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (action == RecordAction.edit) await _edit(fresh);
+    if (action == RecordAction.delete) await _delete(fresh);
+  }
 
   @override
   void dispose() {
@@ -38,6 +100,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
   }
 
   Future<void> _edit([Map<String, dynamic>? record]) async {
+    if (_readOnly && record == null) return;
     try {
       final fresh = record == null
           ? null
@@ -66,6 +129,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
   }
 
   Future<void> _delete(Map<String, dynamic> item) async {
+    if (_readOnly || singleton) return;
     final extra = name == 'ai_chat_sessions'
         ? '\nToàn bộ tin nhắn trong cuộc trò chuyện cũng sẽ bị xóa.'
         : name == 'tags'
@@ -106,11 +170,12 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
   }
 
   @override
-  Widget build(BuildContext context) =>
-      BlocBuilder<ResourceListCubit, ResourceListState>(
-        bloc: _cubit,
-        builder: (context, state) => _buildContent(context, state),
-      );
+  Widget build(BuildContext context) => ManagementTheme(
+    builder: (context) => BlocBuilder<ResourceListCubit, ResourceListState>(
+      bloc: _cubit,
+      builder: (context, state) => _buildContent(context, state),
+    ),
+  );
 
   Widget _buildContent(
     BuildContext context,
@@ -119,6 +184,18 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
     appBar: AppBar(
       title: Text(widget.resource['title'] as String),
       actions: [
+        if (_opening)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                semanticsLabel: 'Đang mở chi tiết',
+              ),
+            ),
+          ),
         IconButton(
           onPressed: _deleting ? null : _load,
           tooltip: 'Tải lại',
@@ -126,9 +203,14 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
         ),
       ],
     ),
-    floatingActionButton: singleton
+    floatingActionButton:
+        singleton ||
+            _readOnly ||
+            (state.status == DataStatus.success &&
+                (state.page!['items'] as List).isEmpty)
         ? null
         : FloatingActionButton.extended(
+            elevation: 0,
             onPressed: _deleting ? null : () => _edit(),
             icon: const Icon(Icons.add),
             label: Text(managementCreateLabels[name] ?? 'Thêm mới'),
@@ -147,30 +229,46 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
           children: [
+            Text(
+              managementDescriptions[name] ??
+                  'Xem thông tin đã lưu. Chạm vào một mục để xem chi tiết.',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 16),
             if (name == 'recurring_transactions')
               const Text(
                 'Lịch được lưu để quản lý; chưa tự động phát sinh giao dịch.',
               ),
-            if (name.startsWith('ai_') || name == 'cashflow_forecasts')
+            if (_readOnly)
               const Text(
-                'Quản lý dữ liệu đã lưu. Chức năng này không tự tạo phản hồi hay dự báo AI.',
+                'Dữ liệu do hệ thống tạo · Chỉ xem. Xử lý cảnh báo tại màn Dự báo.',
               ),
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(
                 '$total mục',
-                style: const TextStyle(color: AppTheme.textMuted),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
             if (items.isEmpty)
               FinanceFormSection(
-                title: 'Bắt đầu từ mục đầu tiên',
-                subtitle: 'Dữ liệu bạn thêm sẽ xuất hiện tại đây.',
-                child: Icon(
-                  managementModuleIcons[name] ?? Icons.folder_outlined,
-                  size: 40,
-                  color: AppTheme.primaryForestGreen,
-                ),
+                title: _readOnly
+                    ? 'Chưa có dữ liệu được lưu'
+                    : 'Bắt đầu từ mục đầu tiên',
+                subtitle: _readOnly
+                    ? 'Dự báo và tư vấn đã lưu sẽ xuất hiện tại đây.'
+                    : 'Thêm mục đầu tiên để bắt đầu theo dõi.',
+                child: _readOnly
+                    ? const Icon(Icons.history, size: 40)
+                    : FilledButton.icon(
+                        onPressed: () => _edit(),
+                        icon: const Icon(Icons.add),
+                        label: Text(managementCreateLabels[name] ?? 'Thêm mới'),
+                      ),
               ),
             for (final item in items)
               Card(
@@ -180,30 +278,40 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                     vertical: 8,
                   ),
                   leading: CircleAvatar(
-                    backgroundColor: AppTheme.lightMintBg,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     child: Icon(
-                      managementModuleIcons[name] ?? Icons.folder_outlined,
-                      color: AppTheme.primaryForestGreen,
+                      managementAppearanceIcons[item['icon']] ??
+                          managementModuleIcons[name] ??
+                          Icons.folder_outlined,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
                   title: Text(
                     recordCaption(item),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   subtitle: Text(
                     name == 'categories' && item['user_id'] == null
                         ? 'Danh mục hệ thống · Chỉ xem'
                         : _summary(item),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      height: 1.5,
+                    ),
                   ),
-                  onTap: _deleting ? null : () => _edit(item),
+                  onTap: _deleting || _opening ? null : () => _view(item),
                   trailing:
-                      singleton ||
+                      _readOnly ||
+                          singleton ||
                           (name == 'categories' && item['user_id'] == null)
                       ? const Icon(Icons.chevron_right)
                       : PopupMenuButton<String>(
                           tooltip: 'Thao tác',
-                          enabled: !_deleting,
+                          enabled: !_deleting && !_opening,
                           onSelected: (action) =>
                               action == 'edit' ? _edit(item) : _delete(item),
                           itemBuilder: (_) => [
@@ -233,26 +341,30 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
                         ),
                 ),
               ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(
-                  onPressed: _offset == 0 || _deleting
-                      ? null
-                      : () => _cubit.movePage(-1),
-                  icon: const Icon(Icons.chevron_left),
-                ),
-                Text(
-                  '${total == 0 ? 0 : _offset + 1}–${_offset + items.length} / $total',
-                ),
-                IconButton(
-                  onPressed: _offset + items.length >= total || _deleting
-                      ? null
-                      : () => _cubit.movePage(1),
-                  icon: const Icon(Icons.chevron_right),
-                ),
-              ],
-            ),
+            if (total > 30 || _offset > 0)
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  TextButton.icon(
+                    onPressed: _offset == 0 || _deleting
+                        ? null
+                        : () => _cubit.movePage(-1),
+                    icon: const Icon(Icons.chevron_left),
+                    label: const Text('Trước'),
+                  ),
+                  Text(
+                    '${total == 0 ? 0 : _offset + 1}–${_offset + items.length} / $total',
+                  ),
+                  TextButton.icon(
+                    onPressed: _offset + items.length >= total || _deleting
+                        ? null
+                        : () => _cubit.movePage(1),
+                    icon: const Icon(Icons.chevron_right),
+                    label: const Text('Tiếp'),
+                  ),
+                ],
+              ),
           ],
         );
       },

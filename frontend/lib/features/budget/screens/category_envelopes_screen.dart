@@ -170,23 +170,23 @@ class _CategoryEnvelopesScreenState extends State<CategoryEnvelopesScreen> {
   ) => Theme(
     data: envelopeTheme(Theme.of(context)),
     child: Scaffold(
-      backgroundColor: EnvelopeStyle.canvas,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: EnvelopeStyle.canvas,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         leading: IconButton(
           tooltip: 'Quay lại',
           onPressed: () => Navigator.maybePop(context),
           icon: const Icon(Icons.arrow_back_ios_new, size: 20),
         ),
         titleSpacing: 0,
-        title: const Text(
+        title: Text(
           'Quản lý danh mục & phong bao',
           maxLines: 2,
           style: TextStyle(
             fontFamily: 'BeVietnamPro',
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: EnvelopeStyle.primary,
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
         actions: [

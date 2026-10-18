@@ -22,9 +22,12 @@ class WeeklySpendingTrendCard extends StatelessWidget {
             'Xu hướng trong tuần',
             style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
           ),
-          const Text(
+          Text(
             'Chi tiêu từng ngày trong tuần được chọn',
-            style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+            style: TextStyle(
+              fontSize: 11,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 16),
           SizedBox(

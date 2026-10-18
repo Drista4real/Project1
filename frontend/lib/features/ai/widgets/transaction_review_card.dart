@@ -52,7 +52,7 @@ class TransactionReviewCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
@@ -66,8 +66,8 @@ class TransactionReviewCard extends StatelessWidget {
                   height: 44,
                   decoration: BoxDecoration(
                     color: income
-                        ? const Color(0xFFEAF2EC)
-                        : const Color(0xFFFFF0E8),
+                        ? Theme.of(context).colorScheme.surfaceContainerHighest
+                        : Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Icon(
@@ -124,9 +124,12 @@ class TransactionReviewCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 5),
-                    const Text(
+                    Text(
                       'Chờ xác nhận',
-                      style: TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     IconButton(
                       tooltip: 'Sửa giao dịch',
@@ -145,10 +148,10 @@ class TransactionReviewCard extends StatelessWidget {
               children: [
                 ActionChip(
                   label: Text(pillar, style: const TextStyle(fontSize: 11)),
-                  avatar: const Icon(
+                  avatar: Icon(
                     Icons.circle,
                     size: 7,
-                    color: AppTheme.primaryForestGreen,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                   backgroundColor: const Color(0xFFEAF1EC),
                   side: BorderSide.none,
@@ -159,7 +162,9 @@ class TransactionReviewCard extends StatelessWidget {
                     categoryName,
                     style: const TextStyle(fontSize: 11),
                   ),
-                  backgroundColor: AppTheme.lightMintBg,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHighest,
                   side: BorderSide.none,
                   onPressed: enabled ? onEdit : null,
                 ),
@@ -193,9 +198,9 @@ class TransactionReviewCard extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 item.draft.warnings.join(' '),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
-                  color: AppTheme.textMuted,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   height: 1.4,
                 ),
               ),
@@ -215,14 +220,21 @@ class _Meta extends StatelessWidget {
   Widget build(BuildContext context) => Row(
     mainAxisSize: MainAxisSize.min,
     children: [
-      Icon(icon, size: 13, color: AppTheme.textMuted),
+      Icon(
+        icon,
+        size: 13,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
       const SizedBox(width: 4),
       Flexible(
         child: Text(
           text,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+          style: TextStyle(
+            fontSize: 11,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       ),
     ],

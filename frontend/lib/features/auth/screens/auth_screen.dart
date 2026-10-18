@@ -3,7 +3,6 @@ import 'package:project_one/features/auth/cubit/auth_cubit.dart';
 import 'package:flutter/material.dart';
 
 import 'package:project_one/core/config/supabase_config.dart';
-import 'package:project_one/core/theme/app_theme.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -54,19 +53,19 @@ class _AuthScreenState extends State<AuthScreen> {
             shrinkWrap: true,
             padding: const EdgeInsets.all(24),
             children: [
-              const Icon(
+              Icon(
                 Icons.spa,
                 size: 52,
-                color: AppTheme.primaryForestGreen,
+                color: Theme.of(context).colorScheme.primary,
               ),
               const SizedBox(height: 20),
-              const Text(
+              Text(
                 'Kakeibo Zen',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.primaryForestGreen,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
               const SizedBox(height: 24),

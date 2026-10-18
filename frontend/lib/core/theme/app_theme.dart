@@ -2,6 +2,48 @@ import 'package:flutter/material.dart';
 
 /// Design System: Kakeibo Zen
 class AppTheme {
+  static ThemeData get kakeiboDarkTheme {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: primaryForestGreen,
+      brightness: Brightness.dark,
+      primary: const Color(0xFF9ED5B4),
+      surface: const Color(0xFF1C2721),
+    );
+    return ThemeData(
+      useMaterial3: true,
+      fontFamily: 'Inter',
+      brightness: Brightness.dark,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: const Color(0xFF121B16),
+      textTheme: kakeiboTheme.textTheme.apply(
+        bodyColor: scheme.onSurface,
+        displayColor: scheme.onSurface,
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: const Color(0xFF121B16),
+        foregroundColor: scheme.onSurface,
+        surfaceTintColor: Colors.transparent,
+        iconTheme: IconThemeData(color: scheme.primary),
+      ),
+      cardTheme: kakeiboTheme.cardTheme.copyWith(
+        color: scheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: scheme.outlineVariant),
+        ),
+      ),
+      filledButtonTheme: kakeiboTheme.filledButtonTheme,
+      inputDecorationTheme: InputDecorationTheme(
+        fillColor: scheme.surfaceContainerHighest,
+      ),
+      dividerColor: scheme.outlineVariant,
+      bottomSheetTheme: BottomSheetThemeData(backgroundColor: scheme.surface),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: scheme.surface,
+      ),
+    );
+  }
+
   // Brand Colors từ Stitch "Kakeibo Zen"
   static const Color primaryForestGreen = Color(0xFF2D5A43); // Deep sage
   static const Color secondaryMint = Color(0xFFD8EDE2); // Soft mint
