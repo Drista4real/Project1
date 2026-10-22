@@ -27,8 +27,9 @@ public final class Api {
     }
 
     private static String required(String name, String expected) {
-        if (!"true".equals(System.getenv("GITHUB_ACTIONS"))) {
-            throw new IllegalStateException("Run Backend Java E2E on GitHub Actions, inside Docker.");
+        if (!"true".equals(System.getenv("GITHUB_ACTIONS"))
+                && !"true".equals(System.getenv("E2E_LOCAL"))) {
+            throw new IllegalStateException("Use GitHub Actions or opt in to disposable Docker with E2E_LOCAL=true.");
         }
         String value = System.getenv(name);
         if (value == null || value.isBlank() || (expected != null && !expected.equals(value))) {

@@ -152,7 +152,8 @@ services:
       api:
         condition: service_healthy
     environment:
-      GITHUB_ACTIONS: ${GITHUB_ACTIONS:?This suite runs on GitHub Actions only}
+      GITHUB_ACTIONS: ${GITHUB_ACTIONS:-false}
+      E2E_LOCAL: ${E2E_LOCAL:-false}
       API_BASE_URL: http://api:8000
       SUPABASE_URL: http://gateway:8000
       SUPABASE_ANON_KEY: ${TEST_ANON_KEY:?}
@@ -188,7 +189,7 @@ services:
     volumes:
       - ./.certs.ci/ca.crt:/certs/ca.crt:ro
     environment:
-      GITHUB_ACTIONS: ${GITHUB_ACTIONS:?This suite runs on GitHub Actions only}
+      GITHUB_ACTIONS: ${GITHUB_ACTIONS:-false}
       TEST_ANON_KEY: ${TEST_ANON_KEY:?}
 
 volumes:
