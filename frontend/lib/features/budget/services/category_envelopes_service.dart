@@ -2,6 +2,14 @@ import 'package:project_one/features/finance/domain/repositories/management_repo
 import 'package:project_one/features/finance/domain/usecases/finance_insights.dart';
 import '../models/category_envelope_data.dart';
 import '../models/envelope_pillar.dart';
+import 'package:project_one/shared/formatters/currency_formatter.dart';
+
+class EnvelopeAllocationException implements Exception {
+  const EnvelopeAllocationException(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
 
 class CategoryEnvelopesService {
   const CategoryEnvelopesService(this.repository);
@@ -22,6 +30,48 @@ class CategoryEnvelopesService {
     required String? limit,
     FinanceRecord? category,
   }) async {
+    final effectivePillar = category != null && category['user_id'] == null
+        ? EnvelopePillar.fromKey(category['pillar'])
+        : pillar;
+    if (limit != null) {
+      final amount = financeAmount(limit);
+      final others = data.expenses.where((c) => c['id'] != category?['id']);
+      if (effectivePillar != null &&
+          data.budgets.any(
+            (b) =>
+                b['category_id'] == null &&
+                EnvelopePillar.fromKey(b['pillar']) != null,
+          )) {
+        final used = others
+            .where((c) => c['pillar'] == effectivePillar.key)
+            .fold(
+              0.0,
+              (sum, c) =>
+                  sum +
+                  financeAmount(
+                    data.budgetFor(categoryId: c['id'] as int)?['limit_amount'],
+                  ),
+            );
+        _checkCapacity(
+          effectivePillar.title,
+          used + amount,
+          data.allocation(effectivePillar),
+        );
+      }
+      final total =
+          others.fold(
+            0.0,
+            (sum, c) =>
+                sum +
+                financeAmount(
+                  data.budgetFor(categoryId: c['id'] as int)?['limit_amount'],
+                ),
+          ) +
+          amount;
+      if (data.budgetFor() != null) {
+        _checkCapacity('Ngân sách tháng', total, data.totalLimit);
+      }
+    }
     FinanceRecord? created;
     FinanceRecord? previous;
     if (category == null) {
@@ -117,6 +167,34 @@ class CategoryEnvelopesService {
     // final nonzero pillar so the sum always matches the monthly budget.
     var remaining = total * 100;
     final last = percentages.lastIndexWhere((p) => p > 0);
+    final allocations = List<int>.filled(4, 0);
+    for (var i = 0; i < 4; i++) {
+      if (percentages[i] == 0) continue;
+      allocations[i] = i == last ? remaining : total * percentages[i];
+      remaining -= allocations[i];
+    }
+    for (final pillar in EnvelopePillar.values) {
+      final used = data
+          .group(pillar)
+          .fold(
+            0.0,
+            (sum, c) =>
+                sum +
+                financeAmount(
+                  data.budgetFor(categoryId: c['id'] as int)?['limit_amount'],
+                ),
+          );
+      _checkCapacity(pillar.title, used, allocations[pillar.index] / 100);
+    }
+    final categoryTotal = data.expenses.fold(
+      0.0,
+      (sum, c) =>
+          sum +
+          financeAmount(
+            data.budgetFor(categoryId: c['id'] as int)?['limit_amount'],
+          ),
+    );
+    _checkCapacity('Ngân sách tháng', categoryTotal, total.toDouble());
     for (var i = 0; i < 4; i++) {
       final pillar = EnvelopePillar.values[i];
       final existing = data.budgets
@@ -128,8 +206,7 @@ class CategoryEnvelopesService {
         }
         continue;
       }
-      final cents = i == last ? remaining : total * percentages[i];
-      remaining -= cents;
+      final cents = allocations[i];
       await repository.save(
         'budgets',
         {
@@ -150,5 +227,14 @@ class CategoryEnvelopesService {
       'month_year': data.monthKey,
       'limit_amount': '$total',
     }, key: overall == null ? null : repository.key('budgets', overall));
+  }
+
+  void _checkCapacity(String name, double allocated, double capacity) {
+    if ((allocated * 100).round() <= (capacity * 100).round()) return;
+    throw EnvelopeAllocationException(
+      '$name: tổng hạn mức ${formatVnd(allocated)} vượt phong bao '
+      '${formatVnd(capacity)} (vượt ${formatVnd(allocated - capacity)}). '
+      'Giảm hạn mức danh mục hoặc tăng phân bổ phong bao trước khi lưu.',
+    );
   }
 }

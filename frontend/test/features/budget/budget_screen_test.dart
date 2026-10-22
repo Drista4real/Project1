@@ -136,6 +136,13 @@ void main() {
       find.byKey(const ValueKey('rebalance-total')),
       '30000000',
     );
+    await tester.enterText(find.byKey(const ValueKey('percent-needs')), '50');
+    await tester.enterText(find.byKey(const ValueKey('percent-wants')), '25');
+    await tester.enterText(find.byKey(const ValueKey('percent-culture')), '15');
+    await tester.enterText(
+      find.byKey(const ValueKey('percent-unexpected')),
+      '10',
+    );
     await tester.tap(find.text('Lưu phân bổ'));
     await tester.pumpAndSettle();
     expect(find.text('28.800.000 ₫'), findsOneWidget);
