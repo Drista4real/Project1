@@ -39,6 +39,25 @@ class AccountInput(Input):
     is_archived: bool = False
 
 
+class WalletIncomeRequest(Input):
+    client_request_id: Annotated[str, Field(pattern=r"^[a-f0-9]{32}$")]
+    expected_balance: PositiveMoney
+
+
+class AccountCreateInput(AccountInput):
+    record_initial_income: bool = False
+    client_request_id: Annotated[str, Field(pattern=r"^[a-f0-9]{32}$")] | None = None
+
+    @model_validator(mode="after")
+    def initial_income(self):
+        if self.record_initial_income:
+            if self.balance <= 0 or self.is_archived:
+                raise ValueError("Thu nhập ban đầu phải lớn hơn 0 và ví chưa lưu trữ.")
+            if self.client_request_id is None:
+                raise ValueError("Thiếu mã yêu cầu ghi nhận thu nhập.")
+        return self
+
+
 class CategoryInput(Input):
     name: Text
     parent_id: Identifier | None = None
@@ -219,6 +238,9 @@ class ManagementRepository(Protocol):
     def list(self, resource: str, limit: int, offset: int) -> dict: ...
     def get(self, resource: str, key: str) -> dict: ...
     def create(self, resource: str, data: dict) -> dict: ...
+    def record_wallet_initial_income(
+        self, data: dict | None, request_id: str, account_id: int | None = None
+    ) -> dict: ...
     def update(self, resource: str, key: str, data: dict) -> dict: ...
     def delete(self, resource: str, key: str) -> None: ...
     def referenced(self, table: str, column: str, value: int) -> bool: ...

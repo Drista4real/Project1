@@ -53,6 +53,7 @@ const managementLabels = <String, String>{
   'name': 'Tên',
   'account_type': 'Loại tài khoản',
   'balance': 'Số dư',
+  'record_initial_income': 'Ghi nhận số tiền này là thu nhập mới',
   'currency': 'Tiền tệ',
   'icon': 'Biểu tượng',
   'color': 'Màu sắc',

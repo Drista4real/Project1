@@ -40,6 +40,8 @@ def api(monkeypatch):
             )
         assert request.headers["authorization"] == "Bearer valid-token"
         path = request.url.path
+        if path.endswith("/rpc/record_wallet_initial_income"):
+            return httpx.Response(200, json={"id": 8, "balance": "10000000.00"})
         if path.endswith("/profiles"):
             assert request.url.params["id"] == f"eq.{USER}"
             return httpx.Response(200, json=[{"current_balance": "25000.00"}])
@@ -294,6 +296,75 @@ def test_profile_total_matches_overview_even_when_cached_total_is_stale(api):
     assert profile.status_code == 200, profile.text
     assert profile.json()["current_balance"] == "300.75"
     assert client.get("/api/v1/overview").json()["current_balance"] == "300.75"
+
+
+def test_wallet_income_create_contract_and_atomic_rpc(api):
+    client, _, requests = api
+    response = client.post(
+        "/api/v1/manage/accounts",
+        json={
+            "name": "Ví điện tử",
+            "account_type": "e_wallet",
+            "balance": "10000000",
+            "record_initial_income": True,
+            "client_request_id": "a" * 32,
+        },
+    )
+    assert response.status_code == 201, response.text
+    rpc = [r for r in requests if "/rpc/record_wallet_initial_income" in r.url.path]
+    assert len(rpc) == 1
+    body = json.loads(rpc[0].content)
+    assert body["p_account"]["balance"] == "10000000"
+    assert "record_initial_income" not in body["p_account"]
+    assert body["p_request_id"] == "a" * 32
+
+
+@pytest.mark.parametrize("amount", ["0", "-1"])
+def test_new_wallet_income_requires_positive_amount(api, amount):
+    response = api[0].post(
+        "/api/v1/manage/accounts",
+        json={
+            "name": "Ví",
+            "account_type": "cash",
+            "balance": amount,
+            "record_initial_income": True,
+            "client_request_id": "a" * 32,
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_income_creation_option_cannot_be_used_as_account_edit(api):
+    assert (
+        api[0]
+        .patch(
+            "/api/v1/manage/accounts/1",
+            json={
+                "record_initial_income": True,
+            },
+        )
+        .status_code
+        == 422
+    )
+
+
+def test_existing_wallet_income_requires_and_forwards_confirmed_balance(api):
+    client, _, requests = api
+    path = "/api/v1/manage/accounts/1/initial-income"
+    assert client.post(path, json={"client_request_id": "b" * 32}).status_code == 422
+    response = client.post(
+        path,
+        json={
+            "client_request_id": "b" * 32,
+            "expected_balance": "10000000",
+        },
+    )
+    assert response.status_code == 200, response.text
+    rpc = [r for r in requests if "/rpc/record_wallet_initial_income" in r.url.path]
+    assert len(rpc) == 1
+    body = json.loads(rpc[0].content)
+    assert body["p_existing_account_id"] == 1
+    assert body["p_account"] == {"expected_balance": "10000000"}
 
 
 def test_list_pagination_and_filters(api):

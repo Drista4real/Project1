@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:project_one/features/management/config/management_metadata.dart';
 import 'package:project_one/shared/formatters/currency_formatter.dart';
 
-enum RecordAction { edit, delete }
+enum RecordAction { edit, delete, initialIncome }
 
 /// Read a record without entering a form or accidentally changing a value.
 class RecordDetailsSheet extends StatelessWidget {
@@ -60,6 +60,8 @@ class RecordDetailsSheet extends StatelessWidget {
         'reminder_time',
         'dark_mode_enabled',
         'biometrics_enabled',
+        'record_initial_income',
+        'client_request_id',
       }.contains(key),
     );
     if (resource['name'] == 'accounts' &&
@@ -184,6 +186,16 @@ class RecordDetailsSheet extends StatelessWidget {
                   spacing: 12,
                   runSpacing: 8,
                   children: [
+                    if (resource['name'] == 'accounts' &&
+                        record['is_archived'] != true &&
+                        record['initial_income_request_id'] == null &&
+                        (num.tryParse('${record['balance']}') ?? 0) > 0)
+                      OutlinedButton.icon(
+                        onPressed: () =>
+                            Navigator.pop(context, RecordAction.initialIncome),
+                        icon: const Icon(Icons.add_chart),
+                        label: const Text('Ghi nhận số dư ban đầu là thu nhập'),
+                      ),
                     FilledButton.icon(
                       onPressed: () =>
                           Navigator.pop(context, RecordAction.edit),

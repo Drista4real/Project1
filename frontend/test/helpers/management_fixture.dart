@@ -50,6 +50,8 @@ class ManagementFixture extends MemoryManagementRepository {
           ],
         },
         'balance': {'type': 'number', 'default': 0},
+        'record_initial_income': {'type': 'boolean', 'default': false},
+        'client_request_id': optional('string'),
         'currency': {
           'type': 'string',
           'pattern': r'^[A-Z]{3}$',

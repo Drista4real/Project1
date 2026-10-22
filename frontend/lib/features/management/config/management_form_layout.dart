@@ -1,7 +1,7 @@
 /// The first view contains decisions needed for the task; defaults stay editable
 /// under advanced options and are still included in the saved payload.
 const managementPrimaryFields = <String, Set<String>>{
-  'accounts': {'name', 'account_type', 'balance'},
+  'accounts': {'name', 'account_type', 'balance', 'record_initial_income'},
   'categories': {'name', 'is_income', 'pillar'},
   'tags': {'name'},
   'transaction_tags': {'transaction_id', 'tag_id'},
