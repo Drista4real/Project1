@@ -12,6 +12,7 @@ import 'package:project_one/features/management/screens/record_form_screen.dart'
 import 'package:project_one/shared/formatters/currency_formatter.dart';
 import 'package:project_one/features/management/widgets/record_details_sheet.dart';
 import 'package:project_one/features/management/widgets/management_theme.dart';
+import 'package:project_one/core/network/finance_request_id.dart';
 
 class ResourceListScreen extends StatefulWidget {
   const ResourceListScreen({
@@ -34,6 +35,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
   bool get _deleting => _cubit.state.deleting;
   Future<void> _load() => _cubit.refresh();
   bool _opening = false;
+  final _incomeRequests = <String, String>{};
 
   Future<void> _view(Map<String, dynamic> item) async {
     if (_opening || _deleting) return;
@@ -91,6 +93,60 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
     if (!mounted) return;
     if (action == RecordAction.edit) await _edit(fresh);
     if (action == RecordAction.delete) await _delete(fresh);
+    if (action == RecordAction.initialIncome) await _recordInitialIncome(fresh);
+  }
+
+  Future<void> _recordInitialIncome(Map<String, dynamic> wallet) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Ghi nhận thu nhập ban đầu?'),
+        content: Text(
+          'Ghi nhận ${formatVnd(num.parse('${wallet['balance']}'))} là thu nhập hôm nay. '
+          'Số dư ví giữ nguyên. Chỉ áp dụng cho ví chưa có giao dịch.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Hủy'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Ghi nhận thu nhập'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || _opening || _deleting) return;
+    setState(() => _opening = true);
+    try {
+      final key = widget.repository.key('accounts', wallet);
+      await widget.repository.create('accounts/$key/initial-income', {
+        'expected_balance': '${wallet['balance']}',
+        'client_request_id': _incomeRequests.putIfAbsent(
+          key,
+          newFinanceRequestId,
+        ),
+      });
+      if (mounted) {
+        await _load();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Đã ghi nhận thu nhập. Số dư ví giữ nguyên.'),
+            ),
+          );
+        }
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$error')));
+      }
+    } finally {
+      if (mounted) setState(() => _opening = false);
+    }
   }
 
   @override

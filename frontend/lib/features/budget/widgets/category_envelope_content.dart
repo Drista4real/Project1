@@ -6,6 +6,7 @@ import 'envelope_banner.dart';
 import 'envelope_pillar_group.dart';
 import 'envelope_toolbar.dart';
 import 'pillar_allocation_card.dart';
+import 'envelope_funding_card.dart';
 
 class CategoryEnvelopeContent extends StatelessWidget {
   const CategoryEnvelopeContent({
@@ -59,6 +60,7 @@ class CategoryEnvelopeContent extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             PillarAllocationCard(data: data),
+            EnvelopeFundingCard(data: data),
             if (query.isNotEmpty && categories.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 28),

@@ -162,8 +162,13 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('percent-needs')), '60');
     await tester.tap(find.text('Lưu phân bổ'));
     await tester.pumpAndSettle();
-    expect(find.text('Tổng phân bổ phải bằng 100%.'), findsOneWidget);
+    expect(find.text('Tổng phân bổ phải bằng 100%.'), findsWidgets);
     await tester.enterText(find.byKey(const ValueKey('percent-wants')), '15');
+    await tester.enterText(find.byKey(const ValueKey('percent-culture')), '12');
+    await tester.enterText(
+      find.byKey(const ValueKey('percent-unexpected')),
+      '13',
+    );
     await tester.tap(find.text('Lưu phân bổ'));
     await tester.pumpAndSettle();
     expect(
@@ -178,6 +183,38 @@ void main() {
           .single['limit_amount'],
       '20000000',
     );
+  });
+
+  testWidgets('over-allocation keeps the form and allows correction', (
+    tester,
+  ) async {
+    final repo = fixture();
+    await open(tester, repo, size: const Size(390, 1100));
+    await tester.tap(find.byTooltip('Chỉnh sửa Ăn uống gia đình'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('envelope-limit')),
+      '5000001',
+    );
+    await tester.tap(find.text('Lưu hạn mức'));
+    await tester.pumpAndSettle();
+    expect(repo.tables['budgets']!.first['limit_amount'], '4500000');
+    expect(find.textContaining('vượt phong bao'), findsWidgets);
+    expect(
+      tester
+          .widget<TextFormField>(find.byKey(const ValueKey('envelope-limit')))
+          .controller!
+          .text,
+      '5.000.001',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('envelope-limit')),
+      '5000000',
+    );
+    await tester.tap(find.text('Lưu hạn mức'));
+    await tester.pumpAndSettle();
+    expect(repo.tables['budgets']!.first['limit_amount'], '5000000');
+    expect(find.byKey(const ValueKey('envelope-limit')), findsNothing);
   });
 
   testWidgets('form actions remain visible at 320px with keyboard', (
@@ -249,7 +286,7 @@ void main() {
     );
     await tester.tap(find.text('Lưu danh mục'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Không thể lưu.'), findsOneWidget);
+    expect(find.textContaining('Không thể lưu.'), findsWidgets);
     expect(repo.tables['categories']!.length, 8);
     repo.failBudgetSave = false;
     await tester.tap(find.text('Lưu danh mục'));

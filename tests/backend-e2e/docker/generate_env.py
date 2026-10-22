@@ -1,4 +1,4 @@
-"""Generate disposable credentials on the Actions runner, with no repo secrets."""
+"""Generate disposable credentials for Actions or explicitly enabled local Docker."""
 
 import base64
 import hashlib
@@ -14,8 +14,12 @@ def encode(value):
     return base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
 
 
-if os.environ.get("GITHUB_ACTIONS") != "true":
-    raise SystemExit("Run the Backend Java E2E workflow on GitHub Actions.")
+is_actions = os.environ.get("GITHUB_ACTIONS") == "true"
+is_local = os.environ.get("E2E_LOCAL") == "true"
+if not (is_actions or is_local):
+    raise SystemExit(
+        "Use GitHub Actions or explicitly set E2E_LOCAL=true for disposable Docker tests."
+    )
 
 jwt_secret = secrets.token_hex(32)
 issued_at = int(time.time())
@@ -30,8 +34,11 @@ values = {
     "TEST_JWT_SECRET": jwt_secret,
     "TEST_ANON_KEY": f"{message}.{signature}",
 }
-for value in values.values():
-    print(f"::add-mask::{value}")
+if is_actions:
+    for value in values.values():
+        print(f"::add-mask::{value}")
+values["E2E_LOCAL"] = "true" if is_local else "false"
+values["GITHUB_ACTIONS"] = "true" if is_actions else "false"
 destination = Path(__file__).resolve().parents[1] / ".env.ci"
 destination.write_text("".join(f"{key}={value}\n" for key, value in values.items()))
 destination.chmod(0o600)

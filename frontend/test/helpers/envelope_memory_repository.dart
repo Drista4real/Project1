@@ -10,6 +10,11 @@ class EnvelopeMemoryRepository extends MemoryManagementRepository {
   bool failBudgetSave = false;
   bool failLoad = false;
   int nextId = 100;
+  FinanceRecord profile = {};
+
+  @override
+  Future<FinanceRecord> get(String resource, String key) async =>
+      resource == 'profile' ? Map.of(profile) : super.get(resource, key);
 
   @override
   Future<FinanceRecord> page(String resource, {int offset = 0}) async => {

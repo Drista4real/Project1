@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:project_one/features/finance/domain/repositories/management_repository.dart';
 import 'package:project_one/shared/state/async_data_cubit.dart';
+import 'package:project_one/core/network/finance_request_id.dart';
 
 class RecordFormState {
   const RecordFormState({
@@ -50,6 +51,7 @@ class RecordFormCubit extends Cubit<RecordFormState> {
   final Set<String> targets;
   final String? recordKey;
   int _generation = 0;
+  final _clientRequestId = newFinanceRequestId();
 
   Future<void> loadReferences() async {
     if (isClosed) return;
@@ -82,7 +84,13 @@ class RecordFormCubit extends Cubit<RecordFormState> {
     if (isClosed || state.saving || state.status != DataStatus.success) return;
     emit(state.copyWith(saving: true, clearSaveError: true));
     try {
-      await repository.save(resource, data, key: recordKey);
+      await repository.save(resource, {
+        ...data,
+        if (resource == 'accounts' &&
+            recordKey == null &&
+            data['record_initial_income'] == true)
+          'client_request_id': _clientRequestId,
+      }, key: recordKey);
       if (!isClosed) emit(state.copyWith(saving: false, saved: true));
     } catch (error) {
       if (!isClosed) emit(state.copyWith(saving: false, saveError: '$error'));

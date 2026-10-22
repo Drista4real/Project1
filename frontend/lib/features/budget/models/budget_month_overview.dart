@@ -9,6 +9,11 @@ class BudgetMonthOverview {
         month,
         data.spending.categories.values.toList(),
         data.records,
+        monthlyIncome: data.spending.total(
+          data.spending.month(month),
+          'income',
+        ),
+        availableBalance: data.currentBalance,
       );
   final BudgetData data;
   final DateTime month, today;

@@ -34,6 +34,36 @@ Các lệnh gọi PostgREST trực tiếp trong `IsolationIT` sử dụng JWT ng
 
 ## Chạy trên GitHub Actions
 
+### Chạy Docker tạm trên máy cá nhân
+
+Có thể bật rõ `E2E_LOCAL=true` để chạy cùng stack trên Docker Desktop.
+URL của Java vẫn bị khóa vào `http://api:8000` và `http://gateway:8000`;
+không dùng `backend/.env` hoặc database đang deploy. Khóa thử nghiệm được
+sinh riêng trong `.env.ci`, không in ra terminal khi chạy local.
+
+Từ `tests/backend-e2e`, dùng PowerShell:
+
+```powershell
+$env:E2E_LOCAL = 'true'
+python docker/generate_env.py
+docker compose --project-name project1-finance-audit --env-file .env.ci build api tests backend-checks
+docker compose --project-name project1-finance-audit --env-file .env.ci run --name project1-finance-audit-checks --no-deps backend-checks
+docker compose --project-name project1-finance-audit --env-file .env.ci up --detach --wait --wait-timeout 240 api
+docker compose --project-name project1-finance-audit --env-file .env.ci run --name project1-finance-audit-tests --no-deps tests
+```
+
+Sau khi thu báo cáo bằng `docker cp`, dọn đúng project tạm:
+
+```powershell
+docker compose --project-name project1-finance-audit --env-file .env.ci down --volumes --remove-orphans
+Remove-Item -LiteralPath .env.ci
+```
+
+Postman vẫn dùng workflow CI và chứng chỉ TLS tạm theo quy trình bên dưới.
+Không đặt `GITHUB_ACTIONS=true` để giả môi trường CI trên máy cá nhân.
+
+### Workflow
+
 Workflow: [Backend Java E2E](../../.github/workflows/backend-java-e2e.yml).
 
 1. Push nhánh có thay đổi backend, schema, bộ test hoặc workflow; hoặc mở PR.
@@ -95,6 +125,7 @@ không chạy `mvn test` trên máy cá nhân (`test` cũng chưa đến pha Fai
 | `AuthIT` | Health; thiếu/sai JWT; đăng ký + đăng nhập thật; trigger tạo profile/ví; danh mục hệ thống |
 | `TransactionsIT` | CRUD; tiền có phần thập phân; hoàn số dư khi sửa/xóa; chuyển ví; tổng tháng UTC; phân trang/lọc/sắp xếp; dữ liệu không hợp lệ |
 | `ManagementIT` | CRUD 11 tài nguyên độc lập; profile; composite key của thẻ giao dịch; tin nhắn; cascade; dữ liệu đang được sử dụng; danh mục hệ thống; validation |
+| `WalletIncomeIT` | Tạo ví với thu nhập mới; tổng tiền chỉ tăng một lần; retry; ghi nhận số dư cũ giữ nguyên tài sản; cách ly người dùng; từ chối ví đã có giao dịch/số dư thay đổi; rollback ví nếu ghi ledger thất bại |
 | `IsolationIT` | Chặn đọc/sửa/xóa và liên kết chéo người dùng; kiểm tra RLS và migration guard qua PostgREST thật |
 | `IngestionIT` | JWT thật; tiền tiếng Việt; phân tích không lưu; review sửa tiền trước lưu; đối soát số dư; người dùng khác không sửa/xóa được; input lỗi không thay đổi dữ liệu |
 

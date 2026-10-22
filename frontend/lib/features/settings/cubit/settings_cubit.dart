@@ -2,6 +2,8 @@ import 'package:flutter/material.dart' show DateTimeRange;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:project_one/features/finance/domain/repositories/management_repository.dart';
 import 'package:project_one/features/finance/domain/usecases/finance_insights.dart';
+import 'package:project_one/features/management/config/management_metadata.dart'
+    show managementSearchText;
 
 class SettingsData {
   SettingsData({
@@ -98,13 +100,31 @@ class SettingsState {
         .where((item) => tagIds.contains(item['tag_id']))
         .map((item) => item['transaction_id'])
         .toSet();
-    final search = query.trim().toLowerCase().replaceFirst('#', '');
+    final hashtag = query.trim().startsWith('#');
+    final search = managementSearchText(
+      query,
+    ).replaceFirst(RegExp(r'^#\s*'), '');
+    final matchingTagIds = tagRecords
+        .where(
+          (tag) => managementSearchText('${tag['name']}')
+              .replaceAll(RegExp(r'\s+'), '')
+              .contains(search.replaceAll(RegExp(r'\s+'), '')),
+        )
+        .map((tag) => tag['id'])
+        .toSet();
+    final matchingTaggedIds = links
+        .where((link) => matchingTagIds.contains(link['tag_id']))
+        .map((link) => link['transaction_id'])
+        .toSet();
     return (data?.transactions ?? <FinanceRecord>[]).where((item) {
       final date = financeDate(item['transaction_date']);
       if (date == null || date.isBefore(start) || !date.isBefore(end)) {
         return false;
       }
       if (tags.isNotEmpty && !taggedIds.contains(item['id'])) return false;
+      if (hashtag && search.isNotEmpty) {
+        return matchingTaggedIds.contains(item['id']);
+      }
       final category = item['categories'];
       final relatedNames = links
           .where((link) => link['transaction_id'] == item['id'])
@@ -115,9 +135,9 @@ class SettingsState {
                 .join(' '),
           )
           .join(' ');
-      final text =
-          '${item['clean_description'] ?? ''} ${item['raw_description'] ?? ''} ${item['amount']} ${category is Map ? category['name'] : ''} $relatedNames'
-              .toLowerCase();
+      final text = managementSearchText(
+        '${item['clean_description'] ?? ''} ${item['raw_description'] ?? ''} ${item['amount']} ${category is Map ? category['name'] : ''} $relatedNames',
+      );
       return search.isEmpty || text.contains(search);
     }).toList();
   }

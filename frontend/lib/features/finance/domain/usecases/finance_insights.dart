@@ -30,10 +30,14 @@ class FinanceInsights {
     final results = await Future.wait([
       spending(),
       repository.references('budgets'),
+      repository.get('profile', 'me'),
     ]);
     return BudgetData(
       results[0] as SpendingData,
       results[1] as List<FinanceRecord>,
+      currentBalance: (results[2] as FinanceRecord)['current_balance'] == null
+          ? null
+          : financeAmount((results[2] as FinanceRecord)['current_balance']),
     );
   }
 
@@ -128,7 +132,8 @@ class CategorySpend {
 }
 
 class BudgetData {
-  const BudgetData(this.spending, this.records);
+  const BudgetData(this.spending, this.records, {this.currentBalance});
+  final double? currentBalance;
   final SpendingData spending;
   final List<FinanceRecord> records;
 

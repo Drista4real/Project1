@@ -93,12 +93,16 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
   late final Map<String, dynamic> _properties =
       Map<String, dynamic>.from(_schema['properties'] as Map)..removeWhere(
         (key, _) =>
+            (name == 'accounts' &&
+                (key == 'client_request_id' ||
+                    (widget.record != null &&
+                        key == 'record_initial_income'))) ||
             name == 'profile' &&
-            {
-              'reminder_time',
-              'biometrics_enabled',
-              'dark_mode_enabled',
-            }.contains(key),
+                {
+                  'reminder_time',
+                  'biometrics_enabled',
+                  'dark_mode_enabled',
+                }.contains(key),
       );
   late final _cubit = RecordFormCubit(
     widget.repository,
@@ -299,8 +303,14 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
     }
     if (type['type'] == 'boolean') {
       return SwitchListTile(
+        key: ValueKey(key),
         contentPadding: EdgeInsets.zero,
         title: Text(label),
+        subtitle: key == 'record_initial_income'
+            ? const Text(
+                'Tạo giao dịch thu hôm nay và cập nhật báo cáo. Số tiền được cộng vào ví một lần.',
+              )
+            : null,
         value: _values[key] == true,
         onChanged: disabled ? null : (value) => _choose(key, value),
       );
@@ -509,6 +519,12 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
         }
         if (numeric) {
           final number = num.tryParse(text.replaceAll(',', '.'));
+          if (name == 'accounts' &&
+              key == 'balance' &&
+              _values['record_initial_income'] == true &&
+              (number == null || number <= 0)) {
+            return 'Thu nhập phải lớn hơn 0.';
+          }
           if (number != null &&
               type['minimum'] != null &&
               number < (type['minimum'] as num)) {

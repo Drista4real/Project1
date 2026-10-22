@@ -72,8 +72,14 @@ class _CategoryEnvelopeSheetState extends State<CategoryEnvelopeSheet> {
   Widget build(BuildContext context) =>
       BlocConsumer<EnvelopeFormCubit, EnvelopeFormState>(
         bloc: _cubit,
-        listenWhen: (previous, current) => !previous.saved && current.saved,
-        listener: (context, state) => Navigator.pop(context, true),
+        listener: (context, state) {
+          if (state.saved) Navigator.pop(context, true);
+          if (state.error != null) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(state.error!)));
+          }
+        },
         builder: (context, state) => _buildContent(context),
       );
 

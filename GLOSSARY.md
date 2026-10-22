@@ -1,5 +1,20 @@
 # Shared domain glossary
 
+- **Current assets**: the sum of wallet balances owned by the user and marked
+  `is_included_in_total`. Opening wallet balances contribute to assets; monthly
+  income is calculated from income transactions. Archiving a wallet does not
+  change its inclusion flag.
+- **Envelope capacity**: an explicitly configured pillar allocation or monthly
+  budget against which the sum of category limits is checked. Category and parent
+  limits describe nested allocations and are not added together as assets.
+- **Initial wallet income**: newly received money explicitly recorded as a ledger
+  income while creating a wallet. It increases assets once and contributes to
+  income reports. An unused existing opening balance can be explicitly
+  reclassified once as income, preserving the wallet balance.
+- **Transaction tag**: a user-owned label linked to a transaction through
+  `transaction_tags`. A `#hashtag` search matches attached tag names, ignoring
+  Vietnamese tone marks and spaces; ordinary search also examines notes.
+
 - **Guest**: a Supabase anonymous user with a private UID and server-stored finance
   data. It requires a network connection and a retained session until linked.
 - **Email linking**: verifying an email on the current guest identity, retaining
