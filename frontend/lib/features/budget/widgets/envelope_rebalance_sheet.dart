@@ -8,6 +8,7 @@ import '../models/envelope_pillar.dart';
 import '../services/category_envelopes_service.dart';
 import 'envelope_amount_field.dart';
 import 'envelope_sheet_frame.dart';
+import 'envelope_funding_card.dart';
 
 class EnvelopeRebalanceSheet extends StatefulWidget {
   const EnvelopeRebalanceSheet({
@@ -28,6 +29,8 @@ class _EnvelopeRebalanceSheetState extends State<EnvelopeRebalanceSheet> {
         ? envelopeAmountText(widget.data.totalLimit)
         : widget.data.allocated > 0
         ? envelopeAmountText(widget.data.allocated)
+        : (widget.data.availableBalance ?? 0) > 0
+        ? envelopeAmountText(widget.data.availableBalance!)
         : '',
   );
   late final _percent = List.generate(
@@ -82,6 +85,7 @@ class _EnvelopeRebalanceSheetState extends State<EnvelopeRebalanceSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          EnvelopeFundingCard(data: widget.data),
           Text(
             'Phân chia ngân sách tháng ${widget.data.month.month}/${widget.data.month.year} theo 4 trụ cột. Hạn mức riêng của danh mục được giữ nguyên.',
             style: TextStyle(
@@ -96,6 +100,19 @@ class _EnvelopeRebalanceSheetState extends State<EnvelopeRebalanceSheet> {
             enabled: !_busy,
             fieldKey: 'rebalance-total',
           ),
+          if ((widget.data.availableBalance ?? 0) > 0)
+            TextButton.icon(
+              key: const ValueKey('use-wallet-balance'),
+              onPressed: _busy
+                  ? null
+                  : () => setState(() {
+                      _total.text = envelopeAmountText(
+                        widget.data.availableBalance!,
+                      );
+                    }),
+              icon: const Icon(Icons.account_balance_wallet_outlined),
+              label: const Text('Dùng số dư ví làm ngân sách'),
+            ),
           const SizedBox(height: 12),
           for (final pillar in EnvelopePillar.values)
             Padding(

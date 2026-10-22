@@ -7,6 +7,7 @@ import 'envelope_banner.dart';
 import 'budget_summary_card.dart';
 import 'budget_pillar_card.dart';
 import 'budget_category_limit_row.dart';
+import 'envelope_funding_card.dart';
 
 class BudgetOverviewContent extends StatelessWidget {
   const BudgetOverviewContent({
@@ -61,6 +62,7 @@ class BudgetOverviewContent extends StatelessWidget {
               ],
             ),
             BudgetSummaryCard(overview: overview),
+            EnvelopeFundingCard(data: overview.envelopes),
             if (overview.daily != null) ...[
               const SizedBox(height: 12),
               BudgetDailyAllowance(overview: overview),

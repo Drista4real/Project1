@@ -16,11 +16,24 @@ class CategoryEnvelopesService {
   final ManagementRepository repository;
 
   Future<CategoryEnvelopeData> load(DateTime month) async {
-    final lists = await Future.wait([
+    final lists = await Future.wait<Object>([
       repository.references('categories'),
       repository.references('budgets'),
+      repository.references('transactions'),
+      repository.get('profile', 'me'),
     ]);
-    return CategoryEnvelopeData(month, lists[0], lists[1]);
+    final categories = lists[0] as List<FinanceRecord>;
+    final spending = SpendingData(lists[2] as List<FinanceRecord>, categories);
+    final profile = lists[3] as FinanceRecord;
+    return CategoryEnvelopeData(
+      month,
+      categories,
+      lists[1] as List<FinanceRecord>,
+      monthlyIncome: spending.total(spending.month(month), 'income'),
+      availableBalance: profile['current_balance'] == null
+          ? null
+          : financeAmount(profile['current_balance']),
+    );
   }
 
   Future<void> saveCategory({

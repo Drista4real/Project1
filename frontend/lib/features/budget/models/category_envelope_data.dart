@@ -2,13 +2,20 @@ import 'package:project_one/features/finance/domain/usecases/finance_insights.da
 import 'envelope_pillar.dart';
 
 class CategoryEnvelopeData {
-  CategoryEnvelopeData(this.month, this.categories, List<FinanceRecord> records)
-    : budgets = records.where((record) {
-        final date = financeDate(record['month_year']);
-        return date?.year == month.year && date?.month == month.month;
-      }).toList()..sort((a, b) => (b['id'] as int).compareTo(a['id'] as int));
+  CategoryEnvelopeData(
+    this.month,
+    this.categories,
+    List<FinanceRecord> records, {
+    this.monthlyIncome = 0,
+    this.availableBalance,
+  }) : budgets = records.where((record) {
+         final date = financeDate(record['month_year']);
+         return date?.year == month.year && date?.month == month.month;
+       }).toList()..sort((a, b) => (b['id'] as int).compareTo(a['id'] as int));
 
   final DateTime month;
+  final double monthlyIncome;
+  final double? availableBalance;
   final List<FinanceRecord> categories, budgets;
   List<FinanceRecord> get expenses =>
       categories.where((c) => c['is_income'] != true).toList();
