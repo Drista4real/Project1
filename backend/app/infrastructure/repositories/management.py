@@ -2,6 +2,7 @@ from postgrest.exceptions import APIError
 from supabase import Client
 
 from app.domain.transactions import TransactionError
+from app.infrastructure.repositories.account_totals import included_account_total
 
 
 class SupabaseManagementRepository:
@@ -71,7 +72,13 @@ class SupabaseManagementRepository:
         result = self.identify(self.query(resource), resource, key).execute()
         if not result.data:
             raise TransactionError(404, "Record not found")
-        return result.data[0]
+        record = result.data[0]
+        if resource == "profile":
+            record = {
+                **record,
+                "current_balance": included_account_total(self.client, self.user_id),
+            }
+        return record
 
     def create(self, resource: str, data: dict) -> dict:
         if resource not in {"ai_chat_messages", "transaction_tags"}:

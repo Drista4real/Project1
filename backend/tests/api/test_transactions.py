@@ -45,6 +45,12 @@ def api(monkeypatch):
             return httpx.Response(200, json=[{"current_balance": "25000.00"}])
         if path.endswith("/accounts"):
             assert request.url.params["user_id"] == f"eq.{USER}"
+            if request.url.params.get("select") == "balance":
+                assert request.url.params["is_included_in_total"] == "eq.true"
+                assert "is_archived" not in request.url.params
+                return httpx.Response(
+                    200, json=[{"balance": "100.25"}, {"balance": "200.50"}]
+                )
             rows = [
                 {
                     "id": 1,
@@ -276,10 +282,18 @@ def test_transfer_and_finance_lookups(api):
     overview = client.get("/api/v1/overview")
     assert overview.status_code == 200, overview.text
     assert overview.json() == {
-        "current_balance": "25000.00",
+        "current_balance": "300.75",
         "monthly_income": "0",
         "monthly_expense": "0",
     }
+
+
+def test_profile_total_matches_overview_even_when_cached_total_is_stale(api):
+    client, _, _ = api
+    profile = client.get("/api/v1/manage/profile/me")
+    assert profile.status_code == 200, profile.text
+    assert profile.json()["current_balance"] == "300.75"
+    assert client.get("/api/v1/overview").json()["current_balance"] == "300.75"
 
 
 def test_list_pagination_and_filters(api):
