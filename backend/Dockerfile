@@ -5,9 +5,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY requirements.txt ./requirements.txt
+COPY requirements-docker.txt ./requirements-docker.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m pip install -r requirements.txt \
+    python -m pip install --require-hashes --only-binary=:all: \
+        -r requirements-docker.txt \
     && addgroup --system app \
     && adduser --system --ingroup app app
 

@@ -184,6 +184,15 @@ Compose builds the API and worker from the current source on `docker compose up`
 keeps unchanged layers fast; a BuildKit pip cache also retains downloads across
 dependency installation retries without including them in the final image.
 Source is copied into the image; it is not mounted or reloaded live.
+Docker installs only prebuilt wheels verified with SHA-256 hashes from
+`requirements-docker.txt`. This Linux/Python 3.13 lock preserves the runtime
+versions in `requirements.txt` and includes platform-specific dependencies.
+Refresh it from the repository root after changing runtime pins:
+
+```powershell
+uv pip compile backend/requirements.txt --generate-hashes --no-header --no-annotate --python-version 3.13 --python-platform x86_64-unknown-linux-gnu --output-file backend/requirements-docker.txt
+```
+
 After pulling or editing code, run this from `backend/`:
 
 ```powershell
