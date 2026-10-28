@@ -16,4 +16,4 @@ COPY backend/scripts ./scripts
 COPY backend/tests ./tests
 COPY data/taxonomy /workspace/data/taxonomy
 USER checks
-CMD ["sh", "-c", "ruff check app tests && pytest --junitxml=/reports/backend.xml"]
+CMD ["sh", "-c", "ruff check app tests && pytest -o 'required_plugins=pytest-asyncio>=1.4' --strict-markers --junitxml=/reports/backend.xml"]

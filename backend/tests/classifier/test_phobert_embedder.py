@@ -1,5 +1,6 @@
 """Unit tests for PhoBERT embedder."""
 
+from inspect import signature
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -13,6 +14,10 @@ from app.infrastructure.ai.classifier.phobert_embedder import PhoBERTEmbedder
 class TestPhoBERTEmbedder:
     """Tests for PhoBERTEmbedder class."""
 
+    @pytest.fixture(autouse=True)
+    def isolated_cache(self, tmp_path):
+        self.cache_dir = tmp_path / "model-cache"
+
     def test_init_with_defaults(self) -> None:
         """Test initialization with default parameters."""
         with (
@@ -24,9 +29,14 @@ class TestPhoBERTEmbedder:
             mock_model.from_pretrained.return_value = MagicMock(
                 config=MagicMock(hidden_size=768)
             )
-            embedder = PhoBERTEmbedder(local_files_only=True)
+            embedder = PhoBERTEmbedder(cache_dir=self.cache_dir, local_files_only=True)
             assert embedder.config.model_name == "vinai/phobert-base"
-            assert embedder.cache_dir == MODEL_CACHE_DIR
+            assert (
+                signature(PhoBERTEmbedder).parameters["cache_dir"].default
+                == MODEL_CACHE_DIR
+            )
+            assert embedder.cache_dir == self.cache_dir
+            assert self.cache_dir.is_dir()
 
     def test_init_with_custom_config(self) -> None:
         """Test initialization with custom config."""
@@ -40,7 +50,9 @@ class TestPhoBERTEmbedder:
             mock_model.from_pretrained.return_value = MagicMock(
                 config=MagicMock(hidden_size=768)
             )
-            embedder = PhoBERTEmbedder(config=config, local_files_only=True)
+            embedder = PhoBERTEmbedder(
+                config=config, cache_dir=self.cache_dir, local_files_only=True
+            )
             assert embedder.config.revision == "custom_rev"
 
     def test_init_with_custom_cache_dir(self, tmp_path: Path) -> None:
@@ -74,7 +86,7 @@ class TestPhoBERTEmbedder:
                 config=MagicMock(hidden_size=768)
             )
 
-            PhoBERTEmbedder(local_files_only=True)
+            PhoBERTEmbedder(cache_dir=self.cache_dir, local_files_only=True)
             mock_tokenizer.from_pretrained.assert_called_once()
             mock_model.from_pretrained.assert_called_once()
 
@@ -104,7 +116,7 @@ class TestPhoBERTEmbedder:
                 mock_model_remote
             ]  # Only called once (during second _load)
 
-            PhoBERTEmbedder(local_files_only=False)
+            PhoBERTEmbedder(cache_dir=self.cache_dir, local_files_only=False)
             assert mock_tokenizer.from_pretrained.call_count == 2
             assert mock_model.from_pretrained.call_count == 1
 
@@ -119,7 +131,7 @@ class TestPhoBERTEmbedder:
             mock_tokenizer.from_pretrained.side_effect = OSError("Not found")
 
             with pytest.raises(RuntimeError, match="Cannot load PhoBERT"):
-                PhoBERTEmbedder(local_files_only=True)
+                PhoBERTEmbedder(cache_dir=self.cache_dir, local_files_only=True)
 
     def test_invalid_hidden_size(self) -> None:
         """Test that wrong hidden size raises ValueError."""
@@ -134,7 +146,7 @@ class TestPhoBERTEmbedder:
             )
 
             with pytest.raises(ValueError, match="PhoBERT hidden size must be 768"):
-                PhoBERTEmbedder(local_files_only=True)
+                PhoBERTEmbedder(cache_dir=self.cache_dir, local_files_only=True)
 
     def test_embed_single_text(self) -> None:
         """Test embedding a single text."""
@@ -171,7 +183,7 @@ class TestPhoBERTEmbedder:
             )
             mock_model.from_pretrained.return_value = mock_model_instance
 
-            embedder = PhoBERTEmbedder(local_files_only=True)
+            embedder = PhoBERTEmbedder(cache_dir=self.cache_dir, local_files_only=True)
             result = embedder.embed("test text")
 
             assert isinstance(result, np.ndarray)
@@ -224,7 +236,7 @@ class TestPhoBERTEmbedder:
             )
             mock_model.from_pretrained.return_value = mock_model_instance
 
-            embedder = PhoBERTEmbedder(local_files_only=True)
+            embedder = PhoBERTEmbedder(cache_dir=self.cache_dir, local_files_only=True)
             result = embedder.embed_batch(["text1", "text2", "text3"], batch_size=2)
 
             assert isinstance(result, np.ndarray)
@@ -242,7 +254,7 @@ class TestPhoBERTEmbedder:
             mock_model.from_pretrained.return_value = MagicMock(
                 config=MagicMock(hidden_size=768)
             )
-            embedder = PhoBERTEmbedder(local_files_only=True)
+            embedder = PhoBERTEmbedder(cache_dir=self.cache_dir, local_files_only=True)
 
             with pytest.raises(
                 TypeError, match="embed_batch expects a sequence of strings"
@@ -260,7 +272,7 @@ class TestPhoBERTEmbedder:
             mock_model.from_pretrained.return_value = MagicMock(
                 config=MagicMock(hidden_size=768)
             )
-            embedder = PhoBERTEmbedder(local_files_only=True)
+            embedder = PhoBERTEmbedder(cache_dir=self.cache_dir, local_files_only=True)
 
             with pytest.raises(ValueError, match="batch_size must be positive"):
                 embedder.embed_batch(["text1"], batch_size=0)
@@ -276,7 +288,7 @@ class TestPhoBERTEmbedder:
             mock_model.from_pretrained.return_value = MagicMock(
                 config=MagicMock(hidden_size=768)
             )
-            embedder = PhoBERTEmbedder(local_files_only=True)
+            embedder = PhoBERTEmbedder(cache_dir=self.cache_dir, local_files_only=True)
             result = embedder.embed_batch([])
 
             assert isinstance(result, np.ndarray)
@@ -294,6 +306,6 @@ class TestPhoBERTEmbedder:
             mock_model_instance.config.hidden_size = 768
             mock_model.from_pretrained.return_value = mock_model_instance
 
-            PhoBERTEmbedder(local_files_only=True)
+            PhoBERTEmbedder(cache_dir=self.cache_dir, local_files_only=True)
             mock_model_instance.eval.assert_called_once()
             mock_model_instance.to.assert_called_with("cpu")

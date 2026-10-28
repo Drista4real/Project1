@@ -86,6 +86,9 @@ Hai image kiểm thử chạy bằng user không phải root. Image Python dùng
 Python 3.13/Linux amd64, cài với `--require-hashes --only-binary=:all:`.
 Nguồn dependency là `docker/requirements.in`, gồm backend dev, classifier và
 forecaster; PyTorch dùng wheel CPU cố định cho Python 3.13/Linux amd64.
+Các dependency test như `pytest-asyncio`, `pandas` và `coverage` cũng phải có
+trong lockfile này. Runner yêu cầu plugin `pytest-asyncio>=1.4` và bật
+`--strict-markers` để báo lỗi ngay nếu môi trường thiếu plugin hoặc sai marker.
 Image có `libgomp1` cho LightGBM và giữ cấu trúc `backend/` cùng `data/taxonomy/`
 để các test import training scripts và đọc taxonomy được như trong repo.
 Sau khi cập nhật các requirements nguồn hoặc phiên bản PyTorch CPU, chạy
