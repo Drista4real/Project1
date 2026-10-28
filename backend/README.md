@@ -181,12 +181,32 @@ API process.
 
 ## Checks
 
+Install the development dependencies plus the optional ML stacks before running
+the complete test suite (from `backend/`):
+
+```powershell
+python -m pip install -r requirements-dev.txt -r requirements-classifier.txt -r requirements-forecaster.txt
+```
+
 ```powershell
 python -m pytest
 python -m ruff check .
 python -m ruff format --check .
 python -m pip check
 ```
+
+To measure coverage across all application modules:
+
+```powershell
+python -m coverage run --branch --source=app -m pytest
+python -m coverage report
+python -m coverage json -o .coverage.summary.json
+```
+
+The report's total combines statement and branch coverage. For branch coverage
+alone, use `totals.percent_branches_covered` in `.coverage.summary.json`; the
+target is greater than 85%. Unit tests use temporary configuration files and
+mocks and do not require provider credentials or downloaded model weights.
 
 Runtime packages are constrained in `requirements.in` and pinned in
 `requirements.txt`. Development tools are declared in `requirements-dev.in`
