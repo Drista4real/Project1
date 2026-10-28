@@ -157,7 +157,10 @@ Swagger ở `http://localhost:8000/docs`. Health thành công chỉ xác nhận 
 chạy; các endpoint tài chính còn cần Supabase được cấu hình và JWT hợp lệ.
 
 Có thể chạy cả API, Redis và worker bằng `docker compose up --build` từ
-`backend/`. Luồng CRUD tài chính và phân tích text hiện không cần worker để xử lý
+`backend/` bằng Docker Compose v2 của Docker Desktop. Sau khi cập nhật code, chạy lại
+`docker compose up --build -d --wait`; nút Start/Restart trong Docker Desktop
+chỉ dùng lại image cũ và có thể gây 404 ở các route mới dù `/health` vẫn OK.
+Luồng CRUD tài chính và phân tích text hiện không cần worker để xử lý
 request. Xem thêm [hướng dẫn backend](backend/README.md).
 
 ### 4. Flutter
