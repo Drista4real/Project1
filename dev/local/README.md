@@ -66,6 +66,8 @@ API: `http://localhost:18000`; Auth/PostgREST: `http://localhost:18001`;
 Mailpit thử email: `http://localhost:18025`. Chỉ bind loopback. File cấu hình và
 tài khoản sinh trong `runtime/` được Git bỏ qua. Không dùng `backend/.env`, không
 trỏ frontend demo vào Supabase thật và không seed dữ liệu vào tài khoản thật.
+URL HTTP chỉ dùng cho cổng Docker bind loopback. Android emulator dùng alias
+`10.0.2.2` để truy cập chính các cổng đó; đây không phải cấu hình LAN/production.
 Khóa local giữ nguyên giữa các lần chạy; app/test account không bị đổi khi start.
 Base schema chỉ chạy một lần. Migrations được theo dõi theo tên và checksum;
 script dừng nếu sửa một migration đã áp dụng thay vì tự ghi đè cấu trúc cũ.

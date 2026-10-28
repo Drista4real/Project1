@@ -27,6 +27,20 @@ def write_json(path, value):
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def flutter_config(anon_key, *, android=False):
+    """Use loopback services; the Android emulator maps its host to 10.0.2.2."""
+    config = {
+        "API_BASE_URL": "http://localhost:18000",
+        "SUPABASE_URL": "http://localhost:18001",
+        "SUPABASE_ANON_KEY": anon_key,
+    }
+    if android:
+        # This fixed emulator alias reaches the same loopback-only Docker ports.
+        for key in ("API_BASE_URL", "SUPABASE_URL"):
+            config[key] = config[key].replace("localhost", "10.0.2.2")
+    return config
+
+
 def configure():
     RUNTIME.mkdir(exist_ok=True)
     if ENV.exists():
@@ -80,14 +94,10 @@ def configure():
                 "password": "Local!" + secrets.token_hex(12),
             },
         )
-    for target, host in [("web", "localhost"), ("android", "10.0.2.2")]:
+    for target in ("web", "android"):
         write_json(
             RUNTIME / f"flutter-{target}.json",
-            {
-                "API_BASE_URL": f"http://{host}:18000",
-                "SUPABASE_URL": f"http://{host}:18001",
-                "SUPABASE_ANON_KEY": values["TEST_ANON_KEY"],
-            },
+            flutter_config(values["TEST_ANON_KEY"], android=target == "android"),
         )
     return values
 
