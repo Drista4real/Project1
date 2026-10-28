@@ -179,7 +179,47 @@ Compose exposes the API on port `8000` and Redis on `6379`. Its health check
 waits for Redis before starting the API and worker; `/health` checks only the
 API process.
 
+Compose builds the API and worker from the current source on `docker compose up`
+(`pull_policy: build`, use Docker Compose v2 from Docker Desktop). Build cache
+keeps unchanged layers fast; a BuildKit pip cache also retains downloads across
+dependency installation retries without including them in the final image.
+Source is copied into the image; it is not mounted or reloaded live.
+Docker installs only prebuilt wheels verified with SHA-256 hashes from
+`requirements-docker.txt`. This Linux/Python 3.13 lock preserves the runtime
+versions in `requirements.txt` and includes platform-specific dependencies.
+Refresh it from the repository root after changing runtime pins:
+
+```powershell
+uv pip compile backend/requirements.txt --generate-hashes --no-header --no-annotate --python-version 3.13 --python-platform x86_64-unknown-linux-gnu --output-file backend/requirements-docker.txt
+```
+
+After pulling or editing code, run this from `backend/`:
+
+```powershell
+docker compose up --build -d --wait
+docker compose logs --tail 50 api
+```
+
+Starting/restarting an existing container in Docker Desktop does not rebuild its
+image. An old image may report `/health` as OK while returning 404 for newer
+routes. Open `http://localhost:8000/openapi.json` and check that it contains
+`/api/v1/transactions`, `/api/v1/manage/categories` and `/api/v1/ingestion/text`.
+A request to a protected route without a token should return 401, not 404.
+For Flutter web, an OPTIONS preflight from `http://localhost:5173` should return
+200 with the matching `Access-Control-Allow-Origin` header.
+
+Stop any locally running Uvicorn process using port `8000` before starting the
+Docker API. Set Flutter's `API_BASE_URL` to `http://localhost:8000` (Android
+emulator: `http://10.0.2.2:8000`), without an `/api/v1` suffix.
+
 ## Checks
+
+Install the development dependencies plus the optional ML stacks before running
+the complete test suite (from `backend/`):
+
+```powershell
+python -m pip install -r requirements-dev.txt -r requirements-classifier.txt -r requirements-forecaster.txt
+```
 
 ```powershell
 python -m pytest
@@ -187,6 +227,19 @@ python -m ruff check .
 python -m ruff format --check .
 python -m pip check
 ```
+
+To measure coverage across all application modules:
+
+```powershell
+python -m coverage run --branch --source=app -m pytest
+python -m coverage report
+python -m coverage json -o .coverage.summary.json
+```
+
+The report's total combines statement and branch coverage. For branch coverage
+alone, use `totals.percent_branches_covered` in `.coverage.summary.json`; the
+target is greater than 85%. Unit tests use temporary configuration files and
+mocks and do not require provider credentials or downloaded model weights.
 
 Runtime packages are constrained in `requirements.in` and pinned in
 `requirements.txt`. Development tools are declared in `requirements-dev.in`
