@@ -119,6 +119,19 @@ class TestLoRAClassifier:
         with pytest.raises(ValueError, match="Unsupported LoRA artifact metadata"):
             LoRAClassifier(artifact_dir, device="cpu", local_files_only=True)
 
+    @patch("app.infrastructure.ai.classifier.lora.AutoTokenizer")
+    @patch("app.infrastructure.ai.classifier.lora.AutoModelForSequenceClassification")
+    def test_optional_merge_keeps_original_artifacts(self, model, tokenizer, tmp_path):
+        """Only the in-memory inference model is merged, with finite-weight checks."""
+        artifact_dir = self.create_mock_artifact_dir(tmp_path)
+        adapter = self.peft_mock.PeftModel.from_pretrained.return_value
+        classifier = LoRAClassifier(
+            artifact_dir, local_files_only=True, merge_adapter=True
+        )
+        adapter.merge_and_unload.assert_called_once_with(safe_merge=True)
+        assert classifier.model is adapter.merge_and_unload.return_value
+        adapter.save_pretrained.assert_not_called()
+
     def test_init_invalid_labels_raises(self, tmp_path):
         """Test initialization raises ValueError for invalid labels."""
         metadata = {**self.mock_metadata, "labels": ["wrong", "labels"]}

@@ -32,6 +32,10 @@ __pycache__/
 .coverage.*
 htmlcov/
 coverage.xml
+# Local inference benchmark reports and Python profiler dumps
+/benchmark-results/
+*.prof
+*.pstats
 *.egg-info/
 /build/
 /dist/
