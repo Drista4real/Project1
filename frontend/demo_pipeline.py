@@ -6,7 +6,6 @@ import asyncio
 import io
 import math
 import os
-import re
 import sys
 import wave
 from collections.abc import Callable
@@ -203,6 +202,28 @@ def receipt_arithmetic(receipt: DemoReceipt) -> DemoReceipt:
     return receipt.model_copy(update={"is_arithmetic_valid": valid})
 
 
+def count_normalized_amounts(text: str) -> int:
+    """Count standalone decimal amounts ending in đồng without regex backtracking."""
+    count = 0
+    position = 0
+    suffix = " đồng"
+    while (end := text.find(suffix, position)) != -1:
+        after = end + len(suffix)
+        start = end
+        while start > position and text[start - 1].isdecimal():
+            start -= 1
+        before = text[start - 1] if start else ""
+        following = text[after] if after < len(text) else ""
+        if (
+            start < end
+            and not (before and (before.isalnum() or before in "_+-"))
+            and not (following and (following.isalnum() or following == "_"))
+        ):
+            count += 1
+        position = after
+    return count
+
+
 class DemoPipeline:
     """Orchestrate demo Models 1/3/4; Model 2 and Advisor are outside this module."""
 
@@ -224,9 +245,9 @@ class DemoPipeline:
             raise ValueError("Enter 1 to 2000 characters")
         start = perf_counter()
         normalized, amount = VietnameseFinancialSlangNormalizer().normalize(text)
-        amounts = re.findall(r"(?<![\w+\-])\d++ đồng(?!\w)", normalized)
+        amount_count = count_normalized_amounts(normalized)
         warnings: list[str] = []
-        if len(amounts) != 1 or amount is None or not 0 < amount <= 9_999_999_999_999:
+        if amount_count != 1 or amount is None or not 0 < amount <= 9_999_999_999_999:
             amount = None
             warnings.append("Chưa xác định được một số tiền duy nhất; hãy kiểm tra.")
         category, confidence, source = None, 0.0, "UNAVAILABLE"

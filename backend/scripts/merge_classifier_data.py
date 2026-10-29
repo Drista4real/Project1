@@ -63,7 +63,7 @@ def merge(teacher_dir: Path, imports_dir: Path, output: Path) -> dict:
         )
         for i in range(1, 5)
     ]
-    expected = Counter({label: 200 for label in taxonomy.labels})
+    expected = Counter(dict.fromkeys(taxonomy.labels, 200))
     for source_id, path, rows in inputs:
         if Counter(r["category"] for r in rows) != expected:
             raise ValueError(f"{source_id}: expected 200 rows per taxonomy label")

@@ -85,6 +85,45 @@ _ADJUSTMENT = re.compile(
     r"đính chính|thành|mỗi|từ|đến|hoặc)\b",
     re.I,
 )
+_CONJUNCTION = re.compile(r"(?:và|rồi)(?=\s)", re.I)
+
+
+def _explicit_clauses(text: str) -> list[str]:
+    """Split punctuation and whitespace-delimited conjunctions in linear time."""
+    clauses: list[str] = []
+    start = position = 0
+    while position < len(text):
+        end = position
+        if text[position] in ";\n":
+            while end < len(text) and text[end] in ";\n":
+                end += 1
+        elif text[position] == "," and (
+            position + 1 == len(text) or not text[position + 1].isdecimal()
+        ):
+            end += 1
+        elif text[position].isspace() and (
+            position == 0 or not text[position - 1].isspace()
+        ):
+            while end < len(text) and text[end].isspace():
+                end += 1
+            word = _CONJUNCTION.match(text, end)
+            if word:
+                end = word.end()
+                while end < len(text) and text[end].isspace():
+                    end += 1
+            else:
+                end = position
+        if end > position:
+            clause = text[start:position].strip()
+            if clause:
+                clauses.append(clause)
+            start = position = end
+        else:
+            position += 1
+    clause = text[start:].strip()
+    if clause:
+        clauses.append(clause)
+    return clauses
 
 
 def split_transactions(text: str) -> list[str]:
@@ -93,13 +132,7 @@ def split_transactions(text: str) -> list[str]:
     Normalizing money is deterministic. Adjustment/total phrases deliberately
     remain ambiguous, rather than turning totals or change into new expenses.
     """
-    explicit = [
-        s.strip()
-        for s in re.split(
-            r"[;\n]+|,(?!\d)|(?<!\s)\s+(?:và|rồi)\s+", text, flags=re.I
-        )
-        if s.strip()
-    ]
+    explicit = _explicit_clauses(text)
     result: list[str] = []
     if any(
         re.match(r"^(?:tổng|tất cả|giảm|còn|tiền thừa|tiền trả lại)\b", c, re.I)
