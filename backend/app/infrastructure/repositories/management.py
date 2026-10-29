@@ -2,6 +2,7 @@ from postgrest.exceptions import APIError
 from supabase import Client
 
 from app.domain.transactions import TransactionError
+from app.infrastructure.repositories.account_totals import included_account_total
 
 
 class SupabaseManagementRepository:
@@ -71,7 +72,13 @@ class SupabaseManagementRepository:
         result = self.identify(self.query(resource), resource, key).execute()
         if not result.data:
             raise TransactionError(404, "Record not found")
-        return result.data[0]
+        record = result.data[0]
+        if resource == "profile":
+            record = {
+                **record,
+                "current_balance": included_account_total(self.client, self.user_id),
+            }
+        return record
 
     def create(self, resource: str, data: dict) -> dict:
         if resource not in {"ai_chat_messages", "transaction_tags"}:
@@ -80,6 +87,32 @@ class SupabaseManagementRepository:
         if not result.data:
             raise TransactionError(409, "Unable to create record")
         return result.data[0]
+
+    def record_wallet_initial_income(
+        self, data: dict | None, request_id: str, account_id: int | None = None
+    ) -> dict:
+        try:
+            return (
+                self.client.rpc(
+                    "record_wallet_initial_income",
+                    {
+                        "p_account": data,
+                        "p_request_id": request_id,
+                        "p_existing_account_id": account_id,
+                    },
+                )
+                .execute()
+                .data
+            )
+        except APIError as error:
+            if error.code == "PGRST202":
+                raise TransactionError(
+                    503,
+                    "Chưa cập nhật chức năng thu nhập ví. Cần áp dụng migration mới.",
+                ) from error
+            if error.code in {"23514", "22023", "P0001", "42501"}:
+                raise TransactionError(422, error.message) from error
+            raise
 
     def mutation(self, resource: str, key: str, data: dict | None):
         # Parent ownership was checked by the service; RLS rechecks it atomically.

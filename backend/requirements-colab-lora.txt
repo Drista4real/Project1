@@ -1,0 +1,8 @@
+# Model 1 PhoBERT LoRA training and standalone adapter inference.
+-r requirements-colab.txt
+# This Transformers/PEFT pair is exercised by the offline tiny-model tests.
+transformers>=4.57,<4.58
+peft>=0.18,<0.19
+accelerate>=1,<2
+# Optional notebook data tooling; training uses PyTorch DataLoader directly.
+datasets>=3,<5

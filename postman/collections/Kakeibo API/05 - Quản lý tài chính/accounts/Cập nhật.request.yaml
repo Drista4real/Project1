@@ -1,0 +1,19 @@
+$kind: http-request
+description: ""
+url: "{{base_url}}/api/v1/manage/accounts/{{manage_accounts_id}}"
+method: PATCH
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "Ví thử Postman (đã sửa)"
+    }
+scripts:
+  - type: afterResponse
+    code: |
+      pm.test("HTTP 200", function () { pm.response.to.have.status(200); });
+    language: text/javascript
+order: 4000

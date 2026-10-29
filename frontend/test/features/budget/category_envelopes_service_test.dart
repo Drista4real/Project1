@@ -120,13 +120,23 @@ void main() {
         'month_year': '2026-10-01',
         'limit_amount': '1000000',
       });
-      await service.rebalance(data, 10000001, [60, 25, 15, 0]);
+      await expectLater(
+        service.rebalance(await service.load(month), 10000001, [60, 25, 15, 0]),
+        throwsA(isA<EnvelopeAllocationException>()),
+      );
+      await service.saveLimit(await service.load(month), 1, null);
+      await service.rebalance(await service.load(month), 10000001, [
+        60,
+        25,
+        15,
+        0,
+      ]);
       final updated = await service.load(month);
       expect(updated.budgetFor(pillar: 'unexpected'), isNull);
       expect(updated.allocated, 10000001);
       expect(updated.percent(EnvelopePillar.unexpected), 0);
-      expect(updated.budgetFor(categoryId: 1)!['limit_amount'], '1000000');
-      expect(repository.tables['budgets']!.length, 5);
+      expect(updated.budgetFor(categoryId: 1), isNull);
+      expect(repository.tables['budgets']!.length, 4);
     },
   );
 

@@ -1,0 +1,13 @@
+$kind: http-request
+description: ""
+url: "{{base_url}}/api/v1/transactions?limit={{limit}}&offset={{offset}}"
+method: GET
+headers:
+  Accept: application/json
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 200", function () { pm.response.to.have.status(200); });
+      pm.test("Danh sách phân trang", function () { const data = pm.response.json(); pm.expect(data.items).to.be.an("array"); pm.expect(data.total).to.be.a("number"); });
+    language: text/javascript
+order: 1000

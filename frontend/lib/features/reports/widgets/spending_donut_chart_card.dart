@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:project_one/core/theme/app_theme.dart';
 import 'package:project_one/shared/widgets/kakeibo_card.dart';
 import 'package:project_one/shared/formatters/currency_formatter.dart';
 
@@ -27,10 +26,10 @@ class SpendingDonutChartCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.incomplete_circle,
                 size: 19,
-                color: AppTheme.primaryForestGreen,
+                color: Theme.of(context).colorScheme.primary,
               ),
               const SizedBox(width: 8),
               const Expanded(
@@ -55,10 +54,10 @@ class SpendingDonutChartCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                icon: const Icon(
+                icon: Icon(
                   Icons.info_outline,
                   size: 18,
-                  color: AppTheme.textMuted,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
                 visualDensity: VisualDensity.compact,
               ),
@@ -73,31 +72,38 @@ class SpendingDonutChartCard extends StatelessWidget {
               children: [
                 CustomPaint(
                   size: const Size.square(180),
-                  painter: _DonutPainter(shares: shares, colors: colors),
+                  painter: _DonutPainter(
+                    shares: shares,
+                    colors: colors,
+                    emptyColor: Theme.of(context).colorScheme.outlineVariant,
+                  ),
                 ),
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       totalLabel,
-                      style: TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       formatVnd(totalExpense),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 19,
                         fontWeight: FontWeight.w800,
-                        color: AppTheme.primaryForestGreen,
+                        color: Theme.of(context).colorScheme.primary,
                       ),
                     ),
                     const SizedBox(height: 3),
                     if (totalExpense == 0)
-                      const Text(
+                      Text(
                         'Chưa có chi tiêu',
                         style: TextStyle(
                           fontSize: 10,
-                          color: AppTheme.textMuted,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                   ],
@@ -119,9 +125,9 @@ class SpendingDonutChartCard extends StatelessWidget {
                   const SizedBox(width: 5),
                   Text(
                     names[i],
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 10,
-                      color: AppTheme.textMuted,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -138,7 +144,12 @@ class SpendingDonutChartCard extends StatelessWidget {
 class _DonutPainter extends CustomPainter {
   final List<num> shares;
   final List<Color> colors;
-  _DonutPainter({required this.shares, required this.colors});
+  final Color emptyColor;
+  _DonutPainter({
+    required this.shares,
+    required this.colors,
+    required this.emptyColor,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -151,7 +162,7 @@ class _DonutPainter extends CustomPainter {
         6.28318,
         false,
         Paint()
-          ..color = AppTheme.borderLight
+          ..color = emptyColor
           ..style = PaintingStyle.stroke
           ..strokeWidth = 17,
       );
@@ -177,5 +188,7 @@ class _DonutPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DonutPainter oldDelegate) =>
-      oldDelegate.shares != shares || oldDelegate.colors != colors;
+      oldDelegate.shares != shares ||
+      oldDelegate.colors != colors ||
+      oldDelegate.emptyColor != emptyColor;
 }

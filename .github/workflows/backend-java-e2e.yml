@@ -5,14 +5,18 @@ on:
   push:
     paths:
       - 'backend/**'
+      - 'data/taxonomy/**'
       - 'frontend/supabase/**'
       - 'tests/backend-e2e/**'
+      - 'postman/ci/**'
       - '.github/workflows/backend-java-e2e.yml'
   pull_request:
     paths:
       - 'backend/**'
+      - 'data/taxonomy/**'
       - 'frontend/supabase/**'
       - 'tests/backend-e2e/**'
+      - 'postman/ci/**'
       - '.github/workflows/backend-java-e2e.yml'
 
 permissions:
@@ -33,20 +37,42 @@ jobs:
       COMPOSE_PROJECT_NAME: e2e-${{ github.run_id }}-${{ github.run_attempt }}
       COMPOSE_FILE: compose.yaml
       COMPOSE_ENV_FILES: .env.ci
+      COMPOSE_PROFILES: postman
     steps:
       - uses: actions/checkout@v4
       - name: Generate disposable test credentials
         run: python3 docker/generate_env.py
+      - name: Generate disposable CA and TLS server certificate
+        run: |
+          mkdir -p .certs.ci
+          chmod 700 .certs.ci
+          openssl req -x509 -newkey rsa:2048 -sha256 -days 1 -noenc \
+            -subj '/CN=Kakeibo CI CA' \
+            -addext 'basicConstraints=critical,CA:TRUE' \
+            -addext 'keyUsage=critical,keyCertSign,cRLSign' \
+            -keyout .certs.ci/ca.key -out .certs.ci/ca.crt
+          openssl req -newkey rsa:2048 -sha256 -noenc \
+            -subj '/CN=postman-gateway' \
+            -keyout .certs.ci/server.key -out .certs.ci/server.csr
+          openssl x509 -req -sha256 -days 1 \
+            -in .certs.ci/server.csr -CA .certs.ci/ca.crt -CAkey .certs.ci/ca.key \
+            -CAcreateserial -extfile docker/postman-tls.ext -out .certs.ci/server.crt
+          chmod 600 .certs.ci/server.key
+          rm -f .certs.ci/ca.key .certs.ci/server.csr .certs.ci/ca.srl
       - name: Validate Compose configuration
         run: docker compose config --quiet
-      - name: Build backend and Java runner
-        run: docker compose build --pull api tests backend-checks
+      - name: Build backend and test runners
+        run: docker compose build --pull api tests backend-checks postman
       - name: Check backend lint and existing Python tests in Docker
         run: docker compose run --name "${COMPOSE_PROJECT_NAME}-checks" --no-deps backend-checks
       - name: Start isolated backend and database
-        run: docker compose up --detach --wait --wait-timeout 240 api
+        id: stack
+        run: docker compose up --detach --wait --wait-timeout 240 api postman-gateway
       - name: Run Java integration and API tests in Docker
         run: docker compose run --name "${COMPOSE_PROJECT_NAME}-tests" --no-deps tests
+      - name: Run Postman API regression in Docker
+        if: ${{ !cancelled() && steps.stack.outcome == 'success' }}
+        run: docker compose run --name "${COMPOSE_PROJECT_NAME}-postman" --no-deps postman
       - name: Collect test reports and container logs
         if: always()
         run: |
@@ -58,6 +84,7 @@ jobs:
           done > artifacts/healthchecks.txt
           docker cp "${COMPOSE_PROJECT_NAME}-tests:/tests/target/failsafe-reports" artifacts/failsafe-reports || true
           docker cp "${COMPOSE_PROJECT_NAME}-checks:/reports" artifacts/backend-reports || true
+          docker cp "${COMPOSE_PROJECT_NAME}-postman:/reports" artifacts/postman-reports || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -69,3 +96,4 @@ jobs:
         run: |
           docker compose down --volumes --remove-orphans
           rm -f .env.ci
+          rm -rf .certs.ci

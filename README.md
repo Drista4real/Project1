@@ -1,322 +1,255 @@
-# BÁO CÁO KẾ HOẠCH TRIỂN KHAI ĐỀ TÀI VÀ ĐẶC TẢ HỆ THỐNG
-## Đề tài 17: Hệ thống Quản lý Tài chính Cá nhân Dự báo Dòng tiền Thông minh (AI-driven Cash Flow Forecasting & Financial Management)
+﻿# Kakeibo Zen — Quản lý tài chính cá nhân và dự báo dòng tiền
 
----
+Đề tài 17: **Hệ thống Quản lý Tài chính Cá nhân Dự báo Dòng tiền Thông minh**
+(AI-driven Cash Flow Forecasting & Financial Management).
 
-## 1. TỔNG QUAN DỰ ÁN (PROJECT OVERVIEW)
+Dự án gồm ứng dụng Flutter, backend FastAPI và demo AI độc lập bằng Streamlit.
+Ứng dụng quản lý thu/chi theo phương pháp Kakeibo, ngân sách, ví và các kế hoạch
+cá nhân. Phần AI hỗ trợ tạo nháp giao dịch từ ngôn ngữ tự nhiên và nghiên cứu
+các mô hình dự báo dòng tiền, nhận dạng giọng nói, đọc hóa đơn.
 
-### 1.1. Bối cảnh & Vấn đề thực tế
-Quản lý tài chính cá nhân là nhu cầu thiết yếu đối với người đi làm và sinh viên. Tuy nhiên, các giải pháp hiện nay trên thị trường (Money Lover, Spendee, Sổ Thu Chi...) đều tồn tại ba rào cản lớn:
-1. **Nút thắt nhập liệu thủ công:** Người dùng phải tự tay nhập số tiền, chọn danh mục chi tiêu cho từng giao dịch. Hành vi chuyển khoản ngân hàng thường có nội dung ngắn gọn, không dấu hoặc viết tắt khiến việc tự động hóa gặp khó khăn.
-2. **Thiếu khả năng nhìn về tương lai (Reactive vs. Proactive):** Hầu hết các ứng dụng chỉ thống kê lịch sử quá khứ ("tháng này đã tiêu bao nhiêu"), không thể trả lời câu hỏi cốt lõi: *"Với tốc độ chi tiêu này, liệu 10-20 ngày tới tài khoản có bị thâm hụt trước khi nhận lương không?"*.
-3. **Chi phí & Độ trễ tích hợp AI:** Việc phụ thuộc hoàn toàn vào các mô hình ngôn ngữ lớn trên đám mây (Cloud LLMs như OpenAI GPT-4, Google Gemini) cho mọi tác vụ gán nhãn giao dịch gây ra độ trễ cao (>1-2s), chi phí đắt đỏ và dễ chạm giới hạn tần suất (rate-limit).
+## Hiện trạng triển khai
 
-### 1.2. Giải pháp đề xuất: Kiến trúc Hybrid AI & Hệ thống Bất đồng bộ
-Hệ thống giải quyết bài toán bằng cách kết hợp:
-* **Kiến trúc AI phân tầng (Tiered Hybrid AI):**
-  * *Tầng 1 (Local/Edge - Low Latency < 50ms):* Fine-tune mô hình ngôn ngữ nhỏ gọn tiếng Việt (PhoBERT) để gán nhãn tự động nội dung chuyển khoản và mô hình học sâu chuỗi thời gian (DLinear/LSTM) để dự báo số dư/dòng tiền 7–30 ngày.
-  * *Tầng 2 (Cloud LLM - Reasoning Engine):* Gemini API đóng vai trò Chuyên gia tư vấn tài chính (Financial Advisor), chỉ kích hoạt khi fallback gán nhãn ca khó và phân tích thói quen, lập kế hoạch tiết kiệm chuyên sâu.
-* **Hạ tầng Dữ liệu & Backend Hiện đại (Supabase & PostgreSQL):**
-  * Sử dụng **Supabase Cloud (PostgreSQL)** làm cơ sở dữ liệu chính: hỗ trợ Row Level Security (RLS) bảo mật tuyệt đối cho dữ liệu tài chính từng người dùng, Realtime subscriptions, Auth đa phương thức và Auto-generated RESTful APIs.
-* **Đa nền tảng (Cross-platform Flutter App):**
-  * Ứng dụng client phát triển trên **Flutter (Dart)** hỗ trợ mượt mà trên Mobile (Android, iOS) và Web với kiến trúc Module hóa (Feature-first).
+| Phân hệ | Chức năng trong mã nguồn hiện tại |
+| --- | --- |
+| Tài khoản người dùng | Supabase Auth: đăng nhập mật khẩu, đăng ký/xác nhận email, OTP email, khôi phục mật khẩu; khách ẩn danh có UID riêng và có thể liên kết email. |
+| Sổ thu chi | Xem, thêm, sửa, xóa giao dịch; chọn ví, danh mục, ngày; hỗ trợ thu, chi và chuyển ví. Trigger PostgreSQL cập nhật số dư. |
+| Quản lý tài chính | Quản lý ví, danh mục, thẻ, ngân sách, mục tiêu tiết kiệm, sổ nợ và lịch giao dịch định kỳ. Lưu lịch định kỳ chưa đồng nghĩa tự động tạo giao dịch. |
+| Ngân sách và báo cáo | Tổng hợp giao dịch thật theo kỳ, danh mục và trụ cột Kakeibo; xuất XLSX/PDF theo bộ lọc. Chuyển ví không tính vào tổng thu/chi. |
+| Cài đặt thiết bị | Giao diện sáng/tối, khóa ứng dụng bằng xác thực thiết bị và nhắc nhập liệu hằng ngày. Tùy chọn lưu cục bộ theo UID; nhắc hằng ngày hỗ trợ Android/iOS/macOS. |
+| Nhập nhanh AI | Flutter gọi `POST /api/v1/ingestion/text` để tạo một hoặc nhiều nháp; người dùng kiểm tra, sửa và xác nhận trước khi lưu. Có phiên âm PhoWhisper trên Android sau khi chuẩn bị assets. |
+| Dự báo trong Flutter | Đọc dự báo, cảnh báo và tư vấn đã lưu; cập nhật trạng thái đã đọc/đã xử lý của cảnh báo. Chưa có luồng tự chạy Model 2 từ màn hình dự báo. |
+| Demo AI | Streamlit nạp trực tiếp adapter Model 1–4 để thử phân loại, phiên âm, đọc hóa đơn, dự báo và Advisor; có thử nghiệm fallback Gemini cho text/audio/ảnh. |
 
----
+Lịch sử dự báo, cảnh báo, tư vấn và hội thoại do hệ thống sinh ra được hiển thị
+để đọc trong Flutter; ứng dụng không cung cấp CRUD thủ công chung cho các nhóm
+này. Backend vẫn giữ các hợp đồng quản lý dữ liệu tương ứng.
 
-## 2. KẾ HOẠCH THỰC HIỆN CHI TIẾT THEO GIAI ĐOẠN
+Khách ẩn danh vẫn dùng Supabase và backend qua mạng. Phiên âm offline không có
+nghĩa phân loại và lưu giao dịch đều chạy offline. Mất phiên khách trước khi liên
+kết email có thể khiến dữ liệu không còn truy cập được.
 
-```
-                  ┌─────────────────────────────────────────────────────────┐
-                  │                 GIAI ĐOẠN 1: GIỮA KỲ                    │
-                  │        Nghiên cứu, Huấn luyện & Bàn giao AI             │
-                  └───────────────────────────┬─────────────────────────────┘
-                                              │ Pipeline, Weights, Evaluated Models
-                                              ▼
-                  ┌─────────────────────────────────────────────────────────┐
-                  │                 GIAI ĐOẠN 2: CUỐI KỲ                    │
-                  │       Đóng gói App Flutter, Supabase & AI Backend       │
-                  └─────────────────────────────────────────────────────────┘
-```
+## Kiến trúc và các mô hình AI
 
-### 2.1. GIAI ĐOẠN 1: GIỮA KỲ (Nghiên cứu & Thực nghiệm Mô hình AI)
-* **Dataset:** Xây dựng tập dữ liệu 5,000 - 10,000 giao dịch ngân hàng thực tế (sao kê MBBank, Vietcombank, Techcombank...). Chuẩn hóa teencode, viết tắt, danh mục 8-10 nhóm chi tiêu.
-* **NLP Model:** `vinai/phobert-base-v2` kết hợp LoRA (Parameter-Efficient Fine-Tuning) phân loại nội dung chuyển khoản tiếng Việt với F1-Score $\ge 88\%$. Fallback sang Gemini khi độ tin cậy thấp.
-* **Time-Series Forecasting:** So sánh thực nghiệm ARIMA vs. LSTM/Bi-LSTM vs. DLinear để dự báo số dư và xu hướng thâm hụt 7 - 30 ngày.
+Luồng dữ liệu tài chính hiện tại:
 
-### 2.2. GIAI ĐOẠN 2: CUỐI KỲ (Hệ thống Flutter App & Supabase BaaS)
-* **Frontend:** Ứng dụng Flutter trực quan: Dashboard tài chính, quản lý thu/chi, cảnh báo thâm hụt và biểu đồ dự báo.
-* **Database & BaaS:** Supabase PostgreSQL với đầy đủ RLS, Functions và Edge Triggers.
-* **AI Service:** Tích hợp API dự báo dòng tiền và trợ lý tài chính thông minh Gemini.
-
----
-
-## 3. THIẾT KẾ CƠ SỞ DỮ LIỆU & KIẾN TRÚC DỮ LIỆU (POSTGRESQL & SUPABASE)
-
-Cơ sở dữ liệu được triển khai trực tiếp trên **Supabase PostgreSQL** với mô hình quan hệ chuẩn hóa và bảo mật đa tầng bằng **Row Level Security (RLS)**:
-
-```mermaid
-erDiagram
-    PROFILES ||--o{ ACCOUNTS : owns
-    PROFILES ||--o{ TRANSACTIONS : owns
-    PROFILES ||--o{ BUDGETS : sets
-    PROFILES ||--o{ SAVING_GOALS : sets
-    PROFILES ||--o{ DEBTS_LOANS : manages
-    PROFILES ||--o{ RECURRING_TRANSACTIONS : schedules
-    PROFILES ||--o{ CASHFLOW_FORECASTS : receives
-    PROFILES ||--o{ CASHFLOW_ALERTS : receives
-    PROFILES ||--o{ AI_CHAT_SESSIONS : conducts
-    
-    ACCOUNTS ||--o{ TRANSACTIONS : logs
-    ACCOUNTS ||--o{ SAVING_GOALS : links
-    CATEGORIES ||--o{ TRANSACTIONS : categorizes
-    CATEGORIES ||--o{ BUDGETS : limits
-    CATEGORIES ||--o{ RECURRING_TRANSACTIONS : classifies
-    CATEGORIES ||--o{ CATEGORIES : parent_child
-
-    TRANSACTIONS ||--o{ TRANSACTION_TAGS : labeled
-    TAGS ||--o{ TRANSACTION_TAGS : attaches
-    AI_CHAT_SESSIONS ||--o{ AI_CHAT_MESSAGES : contains
-
-    PROFILES {
-        uuid id PK
-        text email
-        text full_name
-        decimal current_balance
-        int payroll_day
-        decimal monthly_savings_target
-    }
-
-    ACCOUNTS {
-        bigint id PK
-        uuid user_id FK
-        text name
-        text account_type
-        decimal balance
-        text currency
-    }
-
-    CATEGORIES {
-        bigint id PK
-        uuid user_id FK
-        bigint parent_id FK
-        text name
-        text pillar
-        boolean is_income
-    }
-
-    TRANSACTIONS {
-        bigint id PK
-        uuid user_id FK
-        bigint account_id FK
-        bigint to_account_id FK
-        bigint category_id FK
-        decimal amount
-        text transaction_type
-        text raw_description
-        text clean_description
-        text category_predicted
-        numeric confidence_score
-        boolean is_verified
-        text pillar
-        timestamptz transaction_date
-    }
-
-    BUDGETS {
-        bigint id PK
-        uuid user_id FK
-        bigint category_id FK
-        text pillar
-        date month_year
-        decimal limit_amount
-        int alert_threshold_percent
-    }
-
-    SAVING_GOALS {
-        bigint id PK
-        uuid user_id FK
-        text name
-        decimal target_amount
-        decimal current_amount
-        date target_date
-        text status
-    }
-
-    DEBTS_LOANS {
-        bigint id PK
-        uuid user_id FK
-        text type
-        text person_name
-        decimal amount
-        decimal paid_amount
-        date due_date
-        text status
-    }
-
-    RECURRING_TRANSACTIONS {
-        bigint id PK
-        uuid user_id FK
-        text frequency
-        decimal amount
-        date next_execution_date
-        boolean is_active
-    }
-
-    CASHFLOW_FORECASTS {
-        bigint id PK
-        uuid user_id FK
-        date forecast_date
-        decimal predicted_balance
-        decimal predicted_income
-        decimal predicted_expense
-        text risk_level
-        text model_name
-    }
-
-    CASHFLOW_ALERTS {
-        bigint id PK
-        uuid user_id FK
-        text alert_type
-        text severity
-        date predicted_deficit_date
-        decimal predicted_deficit_amount
-        text suggested_action
-    }
-
-    AI_CHAT_SESSIONS {
-        bigint id PK
-        uuid user_id FK
-        text title
-        timestamptz created_at
-    }
-
-    AI_CHAT_MESSAGES {
-        bigint id PK
-        bigint session_id FK
-        text sender
-        text content
-        jsonb context_snapshot
-    }
+```text
+Flutter ── đăng nhập / xác minh email ──> Supabase Auth
+Flutter ── HTTP + access token ────────> FastAPI ── JWT người dùng ──> Supabase PostgreSQL / RLS
+Streamlit ── gọi trực tiếp ───────────> Adapter AI / trọng số local / API cloud
 ```
 
-### Các phân hệ dữ liệu chính (13 Bảng & 3 Analytics Views):
-1. **Phân hệ Core & Tài khoản:**
-   * `public.profiles`: Thông tin cá nhân, cài đặt tiền tệ, ngày nhận lương (`payroll_day`), mục tiêu tiết kiệm, giờ nhắc nhở.
-   * `public.accounts`: Đa tài khoản/ví tiền (Tiền mặt, Ngân hàng MB/VCB, Ví MoMo, Thẻ tín dụng, Đầu tư) với số dư và hạn mức riêng.
-2. **Phân hệ Thu/Chi & Phương pháp Kakeibo:**
-   * `public.categories`: Danh mục hỗ trợ đa cấp (Cha - Con) và tích hợp 4 trụ cột Kakeibo Nhật Bản (*Thiết yếu - Needs, Mong muốn - Wants, Văn hóa - Culture, Dự phòng - Unexpected*).
-   * `public.transactions`: Lịch sử giao dịch thu, chi, và chuyển khoản giữa các ví. Lưu trữ dữ liệu sao kê SMS gốc, kết quả tiền xử lý NLP và gán nhãn PhoBERT/Gemini.
-   * `public.tags` & `public.transaction_tags`: Quản lý hashtag sự kiện (#dulich, #damcuoi, #quatet...).
-3. **Phân hệ Kế hoạch Tài chính:**
-   * `public.budgets`: Quản lý hạn mức chi tiêu theo tháng, theo danh mục hoặc theo trụ cột Kakeibo với ngưỡng cảnh báo động.
-   * `public.saving_goals`: Heo đất / Hũ tiết kiệm tích lũy cho mục tiêu cụ thể (quỹ khẩn cấp, mua sắm lớn...).
-   * `public.debts_loans`: Sổ ghi nợ và cho vay, theo dõi kỳ hạn thanh toán và nhắc nợ.
-   * `public.recurring_transactions`: Quản lý hóa đơn định kỳ, thuê bao tháng (tiền nhà, internet, gym...).
-4. **Phân hệ AI Dự báo & Trợ lý Thông minh:**
-   * `public.cashflow_forecasts`: Chuỗi thời gian dự báo số dư 7 - 30 ngày (DLinear / LSTM) kèm khoảng tin cậy.
-   * `public.cashflow_alerts`: Cảnh báo nguy cơ thâm hụt số dư trước ngày nhận lương kèm hành động đề xuất.
-   * `public.ai_consultations`, `public.ai_chat_sessions`, `public.ai_chat_messages`: Hệ thống lưu trữ phiên tư vấn tài chính thông minh của Google Gemini AI kèm snapshot tài chính.
-   * `public.notes`: Bảng kiểm tra kết nối nhanh giữa Flutter và PostgreSQL.
+Backend tổ chức theo các lớp `domain`, `application`, `infrastructure` và `api`.
+Frontend tổ chức theo chức năng trong `frontend/lib/features/`, dùng BLoC/Cubit
+cho nhiều luồng trạng thái. Redis/Celery đã có cấu hình nền tảng; hàng đợi xử lý
+media theo kiến trúc đích còn cần tích hợp.
 
-### Tối ưu hóa hiệu năng & Tự động hóa (Automation & Performance):
-* **Tối ưu RLS Policies:** Sử dụng biểu thức `(SELECT auth.uid())` giúp Postgres cache kết quả phiên đăng nhập, tăng tốc độ truy vấn từ 10x đến 100x.
-* **Tự động hóa Trigger nghiệp vụ:**
-  * `trg_sync_transaction_balance`: Tự động cộng/trừ số dư ví (`accounts.balance`) và đồng bộ về tổng tài sản (`profiles.current_balance`) mỗi khi thêm/sửa/xóa giao dịch hoặc chuyển ví.
-  * `on_auth_user_created`: Tự động tạo hồ sơ profile và ví mặc định "Ví Tiền Mặt" ngay khi người dùng đăng ký tài khoản.
-  * `handle_updated_at`: Tự động cập nhật mốc thời gian sửa đổi cho tất cả các bảng.
-* **Đánh chỉ mục (Indexing):** Toàn bộ khóa ngoại và các trường thời gian / trạng thái thường xuyên lọc (`user_id`, `transaction_date`, `pillar`, `status`) đều được lập B-Tree Indexes tối ưu.
-* **Analytics Views:** Cung cấp sẵn các view báo cáo: `v_current_month_spending_by_category`, `v_kakeibo_monthly_summary`, `v_monthly_budget_progress`.
+Ba tầng vật lý theo [ADR 0004](docs/adr/0004-three-tier-ai-and-modality-fallback.md)
+là **thiết bị Flutter**, **backend CPU**, và **cloud GPU/Foundation API**.
+Bốn mô hình bên dưới là các phân hệ logic, không phải bốn tầng triển khai.
 
-> [!TIP]
-> Toàn bộ script DDL, triggers, indexes và RLS policies đầy đủ được lưu trữ tại: [`supabase/schema.sql`](file:///d:/Project1/supabase/schema.sql). Bạn có thể sao chép và dán trực tiếp vào **SQL Editor** trên Supabase Dashboard để kích hoạt ngay.
+| Mô hình | Vai trò | Cách sử dụng hiện tại |
+| --- | --- | --- |
+| Model 1 | Phân loại giao dịch tiếng Việt | PhoBERT + LightGBM là cấu hình mặc định; có backend PhoBERT + LoRA tùy chọn. API nhập nhanh và demo có thể dùng classifier này. |
+| Model 2 | Dự báo và chỉ số tài chính | LightGBM cho nhóm thu nhập cố định, EWMA cho nhóm linh hoạt; chạy trong demo/use case. Gemini Advisor diễn giải chỉ số đã tính. |
+| Model 3 | Phiên âm tiếng nói | PhoWhisper-tiny INT8 qua sherpa-onnx; Android chạy trên thiết bị, Python có adapter riêng cho demo. Transcript dùng được chuyển sang luồng phân loại. |
+| Model 4 | Trích xuất hóa đơn | Qwen Document VLM đọc ảnh thành dữ liệu có cấu trúc trong demo/adapter. FastAPI chưa đăng ký endpoint tải hóa đơn. |
 
----
+API nhập văn bản có fallback Gemini cho phân loại khi classifier thiếu tự tin
+hoặc không khả dụng; trích xuất số tiền dùng quy tắc cục bộ. Demo Streamlit có
+fallback riêng cho audio/ảnh gốc, dùng chung tối đa một yêu cầu Gemini mỗi lượt
+phân tích. Fallback media chưa được đấu nối vào Flutter/FastAPI. Luồng gộp trích
+xuất và phân loại từ media cùng các kiểm tra chất lượng ASR nâng cao cần đánh giá
+trước khi bật.
 
-## 4. CẤU TRÚC KHO CHỨA MÃ NGUỒN (REPOSITORY STRUCTURE)
+Số dư, dự báo, runway và safe-to-spend do logic định lượng tính; LLM chỉ diễn giải
+hoặc đề xuất dữ liệu cần kiểm tra. SQLCipher, nháp offline và bộ điều phối fallback
+media chung là yêu cầu kiến trúc đích. Các ngưỡng F1, độ trễ và chất lượng trong
+[đặc tả](docs/SPECIFICATION.md) là mục tiêu, không phải kết quả đã đo của toàn hệ thống.
 
-Dự án được cấu trúc theo mô hình **Feature-Driven Architecture** chuẩn mực cho ứng dụng Flutter và dịch vụ backend Supabase:
+## Cấu trúc repository
 
 ```text
 Project1/
-├── .agents/                          # Agent skills & workflows
-├── android/                          # Cấu hình Native Android
-├── ios/                              # Cấu hình Native iOS
-├── web/                              # Cấu hình Web App
-├── supabase/                         # Database Migration & Schema
-│   └── schema.sql                    # Script DDL PostgreSQL & RLS Policies
-├── lib/
-│   ├── core/
-│   │   ├── constants/
-│   │   │   └── supabase_config.dart  # URL, API Keys & Supabase Client
-│   │   ├── theme/
-│   │   │   └── app_theme.dart        # Bảng màu tài chính & Typography (Material 3)
-│   │   └── utils/
-│   ├── models/
-│   │   ├── category_model.dart       # Data model danh mục thu/chi
-│   │   └── transaction_model.dart    # Data model giao dịch tài chính
-│   ├── services/
-│   │   └── supabase_service.dart     # Service đóng gói các câu lệnh truy vấn PostgreSQL
-│   ├── features/
-│   │   ├── dashboard/                # Màn hình tổng quan số dư, biểu đồ và kiểm tra kết nối
-│   │   │   └── dashboard_screen.dart
-│   │   ├── transactions/             # Quản lý nhập liệu, danh sách thu/chi
-│   │   └── forecast/                 # Trực quan hóa dự báo dòng tiền
-│   ├── supabase_config.dart          # Export tương thích cấu hình
-│   └── main.dart                     # Điểm khởi chạy ứng dụng (Entry point)
-├── test/
-│   └── widget_test.dart              # Kiểm thử Widget tự động
-├── pubspec.yaml                      # Khai báo thư viện (supabase_flutter, etc.)
-└── README.md                         # Báo cáo đề tài & hướng dẫn dự án
+├── frontend/                  # Flutter và demo Streamlit
+│   ├── lib/                   # app/, core/, features/, shared/
+│   ├── test/                  # Unit/widget tests Flutter
+│   ├── supabase/schema.sql    # Schema PostgreSQL, triggers, RLS và views
+│   ├── app.py                 # Điểm khởi chạy Streamlit
+│   └── demo_pipeline.py       # Điều phối fallback riêng cho demo
+├── backend/
+│   ├── app/                   # api/, application/, domain/, infrastructure/, workers/
+│   ├── scripts/               # Chuẩn bị dữ liệu, tải/huấn luyện/export model
+│   ├── tests/                 # Kiểm thử Python
+│   ├── supabase/migrations/   # Migration bổ sung cho schema gốc
+│   └── compose.yaml           # API, Redis và Celery worker
+├── data/                      # Dữ liệu và các bộ đánh giá
+├── weights/                   # Checkpoint, cache và model tải riêng
+├── notebooks/                 # Thực nghiệm/huấn luyện
+├── tests/                     # Dataset, browser và Java backend E2E
+├── postman/                   # Collection và mẫu môi trường API
+├── docs/                      # Đặc tả, ADR và hướng dẫn
+├── GLOSSARY.md                 # Thuật ngữ miền dùng chung
+└── render.yaml                # Cấu hình triển khai backend trên Render
 ```
 
----
+## Thiết lập ứng dụng cục bộ
 
-## 5. HƯỚNG DẪN CÀI ĐẶT & CHẠY ỨNG DỤNG (GETTING STARTED)
+Các lệnh bên dưới dùng PowerShell. Bắt đầu tại thư mục gốc repository.
 
-### 5.1. Yêu cầu môi trường
-* **Flutter SDK:** $\ge 3.24.0$ (Đã kiểm tra trên Flutter 3.41.x & Dart 3.11.x)
-* **Tài khoản Supabase:** Miễn phí tại [supabase.com](https://supabase.com)
+### 1. Môi trường
 
-### 5.2. Các bước thiết lập
+- Python **3.12 trở lên**, theo `backend/pyproject.toml`.
+- Flutter có Dart tương thích **`^3.11.1`**, theo `frontend/pubspec.yaml`.
+  CI hiện dùng Flutter **3.41.3**.
+- Một project Supabase cho Auth và PostgreSQL.
+- Docker Desktop/Compose nếu chạy Redis, worker hoặc backend bằng container.
 
-#### 1. Khởi tạo Database trên Supabase
-1. Vào [Supabase Dashboard](https://supabase.com/dashboard) -> Tạo project mới.
-2. Vào mục **SQL Editor**, dán toàn bộ nội dung từ file [`supabase/schema.sql`](file:///d:/Project1/supabase/schema.sql) và nhấn **Run** để khởi tạo cấu trúc bảng và RLS.
+### 2. Database và Auth
 
-#### 2. Cấu hình Khóa API
-Mở file [`lib/core/constants/supabase_config.dart`](file:///d:/Project1/lib/core/constants/supabase_config.dart) và đảm bảo các thông số chính xác:
-```dart
-class SupabaseConfig {
-  static const String supabaseUrl = 'https://syjigvtyxfkmmqipxufm.supabase.co';
-  static const String supabaseAnonKey = 'sb_publishable_gexOlWlrEdiPuyda9jixOA_cujZIIOX';
-  ...
-}
+Trong SQL Editor của project Supabase mới, chạy
+[`frontend/supabase/schema.sql`](frontend/supabase/schema.sql), sau đó lần lượt
+chạy các migration trong [`backend/supabase/migrations/`](backend/supabase/migrations/):
+
+1. `202610030001_transaction_reference_guard.sql`
+2. `202610030002_management_guards.sql`
+3. `202610060001_management_category_parent_guard.sql`
+4. `202610180001_auth_profile_email_sync.sql`
+
+Với database đã có dữ liệu, kiểm tra các migration đã áp dụng và chạy phần còn
+thiếu. Khởi động FastAPI không tự áp dụng schema/migration.
+
+Cấu hình SMTP, mẫu email OTP, URL chuyển hướng và Anonymous Sign-Ins theo
+[`frontend/supabase/README.md`](frontend/supabase/README.md). Các thiết lập này
+thực hiện trên Supabase; sửa `.env` không tự cập nhật dịch vụ Auth.
+
+### 3. Backend FastAPI
+
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements-dev.txt
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-#### 3. Chạy ứng dụng
-Cài đặt thư viện và khởi chạy trên Chrome hoặc Thiết bị mô phỏng:
-```bash
-# Tải các dependencies
+Điền cấu hình trong `backend/.env`:
+
+```dotenv
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+REDIS_URL=redis://localhost:6379/0
+```
+
+Backend và Flutter phải trỏ tới cùng project. Dùng publishable key hoặc legacy
+anon key; dữ liệu tài chính được truy cập theo JWT người dùng và RLS. Giữ khóa
+cloud thật trong `.env`, không commit và không đưa service role key vào Flutter.
+
+Từ thư mục `backend/`, chạy API:
+
+```powershell
+python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+Kiểm tra `http://localhost:8000/health` trả `{"status":"ok"}`;
+Swagger ở `http://localhost:8000/docs`. Health thành công chỉ xác nhận API đang
+chạy; các endpoint tài chính còn cần Supabase được cấu hình và JWT hợp lệ.
+
+Có thể chạy cả API, Redis và worker bằng `docker compose up --build` từ
+`backend/` bằng Docker Compose v2 của Docker Desktop. Sau khi cập nhật code, chạy lại
+`docker compose up --build -d --wait`; nút Start/Restart trong Docker Desktop
+chỉ dùng lại image cũ và có thể gây 404 ở các route mới dù `/health` vẫn OK.
+Luồng CRUD tài chính và phân tích text hiện không cần worker để xử lý
+request. Xem thêm [hướng dẫn backend](backend/README.md).
+
+### 4. Flutter
+
+Mở terminal thứ hai, từ thư mục gốc:
+
+```powershell
+cd frontend
 flutter pub get
-
-# Chạy ứng dụng (trên Chrome Web hoặc Device)
-flutter run -d chrome
+flutter run -d chrome --web-port=5173 --dart-define=API_BASE_URL=http://localhost:8000 --dart-define=SUPABASE_URL=https://your-project.supabase.co --dart-define=SUPABASE_ANON_KEY=your-publishable-key
 ```
 
----
+`SUPABASE_ANON_KEY` là tên biến phía Flutter, có thể nhận publishable key của
+project. Hai biến Supabase trên ghi đè giá trị mặc định trong
+[`supabase_config.dart`](frontend/lib/core/config/supabase_config.dart).
 
-## 6. BẢNG PHÂN BỔ NHIỆM VỤ THỰC HIỆN TRONG NHÓM
+Với Android emulator, đổi URL API thành `http://10.0.2.2:8000` và chọn thiết bị
+Android bằng `-d <device-id>`. Điện thoại thật dùng IP LAN của máy chạy backend.
+`API_BASE_URL` là URL gốc, không thêm `/api/v1`. Khi đổi `--dart-define`, chạy lại
+ứng dụng. Bản production dùng API HTTPS.
 
-| Thành viên | Trách nhiệm chính | Giai đoạn 1 (Giữa kỳ) | Giai đoạn 2 (Cuối kỳ) |
-| :--- | :--- | :--- | :--- |
-| **Thành viên 1** | Team Lead & AI Engineer | Xây dựng dataset, huấn luyện PhoBERT + LoRA phân loại giao dịch | Tích hợp Gemini Fallback & API Endpoint AI |
-| **Thành viên 2** | Time-Series & Data Pipeline | Tiền xử lý chuỗi thời gian, huấn luyện ARIMA, LSTM & DLinear | Đóng gói pipeline dự báo dòng tiền 7-30 ngày |
-| **Thành viên 3** | Backend & Database (Supabase) | Thiết kế Data Schema, đặc tả quan hệ thực thể | Triển khai PostgreSQL trên Supabase, viết RLS, Indexes |
-| **Thành viên 4** | Mobile/Web Frontend (Flutter) | Thiết kế Wireframe giao diện, luồng người dùng | Xây dựng Flutter UI/UX, tích hợp Supabase SDK & Charts |
+Backend mặc định cho phép web origin `http://localhost:5173` và
+`http://127.0.0.1:5173`; cổng/origin khác cần cấu hình `CORS_ORIGINS` dưới dạng
+mảng JSON trong `backend/.env` rồi khởi động lại backend.
 
----
+## Chuẩn bị model và chạy demo AI
 
-## 7. TIÊU CHÍ NGHIỆM THU (ACCEPTANCE CRITERIA)
+CRUD tài chính không cần tải toàn bộ model. Để API phân loại bằng PhoBERT +
+LightGBM, dùng môi trường Python của backend, chạy từ thư mục gốc:
 
-* **NLP Model:** PhoBERT đạt F1-Score $\ge 88\%$ trên tập dữ liệu tiếng Việt; độ trễ suy luận $< 50\text{ms}$.
-* **Time-Series:** Mô hình DLinear / LSTM đạt chỉ số MAPE tối ưu hơn mô hình truyền thống ARIMA.
-* **Hệ thống Frontend & Backend:** Ứng dụng Flutter tương tác mượt mà với cơ sở dữ liệu Supabase PostgreSQL, bảo mật phân quyền theo từng User ID, phản hồi thời gian thực và đồng bộ dữ liệu đa nền tảng.
+```powershell
+python -m pip install -r backend/requirements-classifier.txt
+python backend/scripts/download_classifier_model.py
+```
+
+Script tải cache PhoBERT còn thiếu và kiểm tra checkpoint, không huấn luyện lại.
+Cấu hình `CLASSIFIER_BACKEND=lightgbm` hoặc `lora` trong `backend/.env`;
+[README classifier](backend/app/infrastructure/ai/classifier/README.md) có hướng
+dẫn chuẩn bị adapter/cache riêng cho LoRA. Thiếu model/khóa cloud thì kết quả có
+thể cần sửa thủ công; không coi nháp đó là suy luận thành công từ model local.
+
+Để dùng phiên âm offline trên Android, tải model rồi chuẩn bị assets:
+
+```powershell
+python backend/scripts/download_asr_model.py
+python frontend/scripts/prepare_voice_assets.py
+```
+
+Sau đó build/chạy lại Flutter. Xem [hướng dẫn Model 3](docs/MODEL3_SETUP.md)
+cho kiểm tra SHA256, tải từ repository private và cài runtime Python ASR.
+
+Demo Streamlit chạy độc lập, từ thư mục gốc trong môi trường Python đã chọn:
+
+```powershell
+python -m pip install -r frontend/requirements-demo.txt
+python -m streamlit run frontend/app.py
+```
+
+Mở `http://localhost:8501`. Demo không cần khởi động FastAPI. Làm theo
+[hướng dẫn Streamlit](frontend/STREAMLIT_DEMO.md) để chuẩn bị checkpoint/dữ liệu,
+cấu hình Qwen/Gemini, xem giới hạn file và nhận biết chế độ MOCK.
+Model 2 cần dữ liệu/checkpoint riêng cho kịch bản dự báo tương ứng.
+Phiên bản model cloud chọn theo tác vụ và quyền truy cập của tài khoản; không
+coi tên model trong cấu hình mẫu là bảo đảm dịch vụ đang khả dụng.
+
+## Kiểm tra và tài liệu liên quan
+
+Các lệnh kiểm tra mã chính, sau khi cài dependencies tương ứng:
+
+```powershell
+# Từ thư mục backend/
+python -m pytest
+python -m ruff check .
+
+# Từ thư mục frontend/
+flutter analyze
+flutter test
+```
+
+Kiểm thử sinh trắc học, thông báo và chia sẻ/lưu file còn cần kiểm tra trên thiết
+bị thật. Hướng dẫn các bộ kiểm thử khác nằm tại
+[Java backend E2E](tests/backend-e2e/README.md),
+[browser/Selenium](tests/browser/README.md) và [Postman](postman/README.md).
+
+- [Đặc tả hệ thống và kiến trúc đích](docs/SPECIFICATION.md)
+- [Thuật ngữ dùng chung](GLOSSARY.md) và [quyết định kiến trúc](docs/adr/)
+- [Hướng dẫn frontend](frontend/README.md) và [backend](backend/README.md)
+- [Taxonomy và quy tắc gán nhãn](docs/DATA_TAXONOMY_AND_ANNOTATION.md)
+- [Bàn giao dataset Model 1](docs/MODEL1_MERGED_DATASET.md)
+- [Phát hành Android APK và backend Render](docs/release-v1.md)
+- [Lịch sử thay đổi](CHANGELOG.md)
+- [GitHub Issues — yêu cầu và công việc triển khai](https://github.com/Drista4real/Project1/issues)

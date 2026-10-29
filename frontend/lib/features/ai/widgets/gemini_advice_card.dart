@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:project_one/core/theme/app_theme.dart';
 import 'package:project_one/features/finance/domain/usecases/finance_insights.dart';
 import 'package:project_one/shared/widgets/kakeibo_card.dart';
 
@@ -21,9 +20,12 @@ class GeminiAdviceCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.auto_awesome, color: AppTheme.primaryForestGreen),
+              Icon(
+                Icons.auto_awesome,
+                color: Theme.of(context).colorScheme.primary,
+              ),
               SizedBox(width: 8),
               Expanded(
                 child: Text(

@@ -1,6 +1,6 @@
 from pydantic import ValidationError
 
-from app.domain.management import RESOURCES, ManagementRepository
+from app.domain.management import RESOURCES, AccountCreateInput, ManagementRepository
 from app.domain.transactions import TransactionError
 
 
@@ -103,7 +103,28 @@ class ManagementService:
         self.require(resource)
         if resource == "profile":
             raise TransactionError(405, "Profiles are created by authentication")
+        if resource == "accounts":
+            account = AccountCreateInput.model_validate(data)
+            values = account.model_dump(
+                mode="json",
+                exclude={
+                    "record_initial_income",
+                    "client_request_id",
+                },
+            )
+            if account.record_initial_income:
+                return self.repository.record_wallet_initial_income(
+                    values,
+                    account.client_request_id,
+                )
+            return self.repository.create(resource, values)
         return self.repository.create(resource, self.validate(resource, data))
+
+    def record_wallet_initial_income(self, key: str, request_id: str, expected_balance):
+        self.check_key("accounts", key)
+        return self.repository.record_wallet_initial_income(
+            {"expected_balance": str(expected_balance)}, request_id, int(key)
+        )
 
     def update(self, resource: str, key: str, patch: dict):
         current = self.get(resource, key)

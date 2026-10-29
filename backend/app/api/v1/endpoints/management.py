@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, create_model
 
 from app.api.dependencies import UserDependency
 from app.application.management import ManagementService
-from app.domain.management import RESOURCES
+from app.domain.management import RESOURCES, AccountCreateInput, WalletIncomeRequest
 from app.infrastructure.repositories.management import SupabaseManagementRepository
 
 router = APIRouter(prefix="/api/v1/manage", tags=["Management"])
@@ -37,7 +37,10 @@ def register_writes(resource: str, model: type[BaseModel]):
             resource, data.model_dump(mode="json", exclude_unset=True)
         )
 
-    create_record.__annotations__ = {"data": model, "service": Service}
+    create_record.__annotations__ = {
+        "data": AccountCreateInput if resource == "accounts" else model,
+        "service": Service,
+    }
     create_record.__name__ = f"create_{resource}"
 
     def update_record(key, data, service):
@@ -68,11 +71,20 @@ def resources(context: UserDependency):
         {
             "name": name,
             "title": title,
-            "schema": model.model_json_schema(),
+            "schema": (
+                AccountCreateInput if name == "accounts" else model
+            ).model_json_schema(),
             "singleton": name == "profile",
         }
         for name, (title, model) in RESOURCES.items()
     ]
+
+
+@router.post("/accounts/{key}/initial-income")
+def record_wallet_initial_income(key: str, data: WalletIncomeRequest, service: Service):
+    return service.record_wallet_initial_income(
+        key, data.client_request_id, data.expected_balance
+    )
 
 
 @router.get("/{resource}")

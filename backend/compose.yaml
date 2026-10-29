@@ -11,13 +11,13 @@ services:
 
   api:
     build: .
+    pull_policy: build
     command:
       [
         "python",
         "-m",
-        "fastapi",
-        "run",
-        "app/main.py",
+        "uvicorn",
+        "app.main:app",
         "--host",
         "0.0.0.0",
         "--port",
@@ -28,6 +28,9 @@ services:
       SUPABASE_URL: ${SUPABASE_URL:-}
       SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-["http://localhost:5173","http://127.0.0.1:5173"]}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
+      GEMINI_INPUT_MODEL: ${GEMINI_INPUT_MODEL:-gemini-3.1-flash-lite}
     ports:
       - "8000:8000"
     depends_on:
@@ -47,6 +50,7 @@ services:
 
   worker:
     build: .
+    pull_policy: build
     command:
       [
         "python",

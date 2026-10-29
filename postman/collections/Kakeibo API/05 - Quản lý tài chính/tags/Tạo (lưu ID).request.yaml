@@ -1,0 +1,24 @@
+$kind: http-request
+description: ""
+url: "{{base_url}}/api/v1/manage/tags"
+method: POST
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "postman-test",
+      "color": "#64748B"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 201", function () { pm.response.to.have.status(201); });
+      if (pm.response.code === 201) {
+        const data = pm.response.json();
+        pm.environment.set("manage_tags_id", String(data.id));
+      }
+    language: text/javascript
+order: 2000

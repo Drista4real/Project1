@@ -30,13 +30,13 @@ extension LedgerContent on _LedgerScreenState {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Sổ thu chi',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
-                    color: AppTheme.primaryForestGreen,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
               ),
@@ -54,9 +54,13 @@ extension LedgerContent on _LedgerScreenState {
                     Text(_loadError!),
                     Row(
                       children: [
-                        TextButton(
-                          onPressed: _signIn,
-                          child: const Text('Đăng nhập'),
+                        Semantics(
+                          container: true,
+                          identifier: 'ledger-sign-in',
+                          child: TextButton(
+                            onPressed: _signIn,
+                            child: const Text('Đăng nhập'),
+                          ),
                         ),
                         TextButton(
                           onPressed: _loadAllData,
@@ -116,10 +120,10 @@ extension LedgerContent on _LedgerScreenState {
                     Flexible(
                       child: Text(
                         'Giao dịch Tháng ${_displayedMonth.month}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
-                          color: AppTheme.primaryForestGreen,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                     ),
@@ -133,7 +137,7 @@ extension LedgerContent on _LedgerScreenState {
                   vertical: 5,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF0EA),
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Text(
@@ -161,9 +165,9 @@ extension LedgerContent on _LedgerScreenState {
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: AppTheme.lightMintBg,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppTheme.borderLight),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Row(
         children: [
@@ -172,7 +176,7 @@ extension LedgerContent on _LedgerScreenState {
               label: 'Tháng này',
               icon: Icons.format_list_bulleted,
               selected: !_showCalendar,
-              onTap: () => setState(() => _showCalendar = false),
+              onTap: () => _cubit.showCalendar(false),
             ),
           ),
           Expanded(
@@ -180,7 +184,7 @@ extension LedgerContent on _LedgerScreenState {
               label: 'Lịch',
               icon: Icons.calendar_month,
               selected: _showCalendar,
-              onTap: () => setState(() => _showCalendar = true),
+              onTap: () => _cubit.showCalendar(true),
             ),
           ),
         ],
@@ -210,7 +214,9 @@ extension LedgerContent on _LedgerScreenState {
             Icon(
               icon,
               size: 15,
-              color: selected ? Colors.white : AppTheme.textMuted,
+              color: selected
+                  ? Colors.white
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             const SizedBox(width: 4),
             Flexible(
@@ -219,7 +225,9 @@ extension LedgerContent on _LedgerScreenState {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: selected ? Colors.white : AppTheme.textMuted,
+                  color: selected
+                      ? Colors.white
+                      : Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                 ),
@@ -247,9 +255,9 @@ extension LedgerContent on _LedgerScreenState {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.borderLight),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: AppTheme.primaryForestGreen.withAlpha(10),
@@ -263,32 +271,35 @@ extension LedgerContent on _LedgerScreenState {
         children: [
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.calendar_month,
                 size: 17,
-                color: AppTheme.primaryForestGreen,
+                color: Theme.of(context).colorScheme.primary,
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Tổng quan Tháng ${now.month}, ${now.year}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: AppTheme.textMuted,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),
             ],
           ),
-          const Padding(
+          Padding(
             padding: EdgeInsets.symmetric(vertical: 12),
-            child: Divider(height: 1, color: AppTheme.borderLight),
+            child: Divider(
+              height: 1,
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
           ),
-          const Text(
+          Text(
             'CÒN DƯ KHẢ DỤNG',
             style: TextStyle(
               fontSize: 11,
-              color: AppTheme.textMuted,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               letterSpacing: .4,
             ),
           ),
@@ -296,8 +307,8 @@ extension LedgerContent on _LedgerScreenState {
           Text(
             '${_overview.currentBalance < 0 ? '-' : '+'}${_formatVND(_overview.currentBalance)}',
             key: const ValueKey('availableBalance'),
-            style: const TextStyle(
-              color: AppTheme.primaryForestGreen,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.primary,
               fontSize: 29,
               fontWeight: FontWeight.w800,
               letterSpacing: -.6,
@@ -361,9 +372,9 @@ extension LedgerContent on _LedgerScreenState {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 10,
-                    color: AppTheme.textMuted,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 Text(
@@ -393,9 +404,9 @@ extension LedgerContent on _LedgerScreenState {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.borderLight),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: AppTheme.primaryForestGreen.withAlpha(8),
@@ -410,19 +421,17 @@ extension LedgerContent on _LedgerScreenState {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               IconButton(
-                onPressed: () => setState(() {
-                  _displayedMonth = DateTime(month.year, month.month - 1);
-                }),
+                onPressed: () => _cubit.moveMonth(-1),
                 icon: const Icon(Icons.chevron_left),
                 visualDensity: VisualDensity.compact,
               ),
               Expanded(
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.calendar_month,
                       size: 17,
-                      color: AppTheme.primaryForestGreen,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                     const SizedBox(width: 7),
                     Flexible(
@@ -430,10 +439,10 @@ extension LedgerContent on _LedgerScreenState {
                         'Tháng ${month.month}, ${month.year}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w700,
-                          color: AppTheme.primaryForestGreen,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                     ),
@@ -441,15 +450,16 @@ extension LedgerContent on _LedgerScreenState {
                 ),
               ),
               IconButton(
-                onPressed: () => setState(() {
-                  _displayedMonth = DateTime(month.year, month.month + 1);
-                }),
+                onPressed: () => _cubit.moveMonth(1),
                 icon: const Icon(Icons.chevron_right),
                 visualDensity: VisualDensity.compact,
               ),
             ],
           ),
-          const Divider(height: 10, color: AppTheme.borderLight),
+          Divider(
+            height: 10,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
           Row(
             children: ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
                 .map(
@@ -462,7 +472,7 @@ extension LedgerContent on _LedgerScreenState {
                           fontWeight: FontWeight.w600,
                           color: day == 'CN'
                               ? AppTheme.expenseCoral
-                              : AppTheme.textMuted,
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -540,7 +550,9 @@ extension LedgerContent on _LedgerScreenState {
               fontWeight: isToday ? FontWeight.w800 : FontWeight.w500,
               color: isToday
                   ? Colors.white
-                  : (sunday ? AppTheme.expenseCoral : AppTheme.textCharcoal),
+                  : (sunday
+                        ? AppTheme.expenseCoral
+                        : Theme.of(context).colorScheme.onSurface),
             ),
           ),
           if (dayTransactions.isNotEmpty)
@@ -564,14 +576,14 @@ extension LedgerContent on _LedgerScreenState {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.lightMintBg,
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(18),
       ),
-      child: const Row(
+      child: Row(
         children: [
           Icon(
             Icons.spa_outlined,
-            color: AppTheme.primaryForestGreen,
+            color: Theme.of(context).colorScheme.primary,
             size: 20,
           ),
           SizedBox(width: 10),
@@ -579,7 +591,7 @@ extension LedgerContent on _LedgerScreenState {
             child: Text(
               '“Mỗi ngày ghi chép là một bước hướng tới tự do và an tâm tài chính.”',
               style: TextStyle(
-                color: AppTheme.textMuted,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 13,
                 fontStyle: FontStyle.italic,
                 height: 1.4,
@@ -615,9 +627,11 @@ extension LedgerContent on _LedgerScreenState {
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.borderLight),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
             ),
             child: Row(
               children: [
@@ -626,8 +640,8 @@ extension LedgerContent on _LedgerScreenState {
                   height: 44,
                   decoration: BoxDecoration(
                     color: isIncome
-                        ? AppTheme.lightMintBg
-                        : const Color(0xFFFEE2E2),
+                        ? Theme.of(context).colorScheme.surfaceContainerHighest
+                        : Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -647,10 +661,10 @@ extension LedgerContent on _LedgerScreenState {
                     children: [
                       Text(
                         tx.rawDescription ?? tx.cleanDescription ?? 'Giao dịch',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
-                          color: AppTheme.textCharcoal,
+                          color: Theme.of(context).colorScheme.onSurface,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -658,9 +672,9 @@ extension LedgerContent on _LedgerScreenState {
                       const SizedBox(height: 3),
                       Text(
                         '${tx.categoryName ?? 'Chưa phân loại'} • ${tx.transactionDate.hour}:${tx.transactionDate.minute.toString().padLeft(2, '0')}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppTheme.textMuted,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -681,9 +695,9 @@ extension LedgerContent on _LedgerScreenState {
                   ),
                 ),
                 const SizedBox(width: 6),
-                const Icon(
+                Icon(
                   Icons.chevron_right,
-                  color: AppTheme.textMuted,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   size: 18,
                 ),
               ],

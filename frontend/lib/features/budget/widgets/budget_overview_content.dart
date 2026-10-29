@@ -7,6 +7,7 @@ import 'envelope_banner.dart';
 import 'budget_summary_card.dart';
 import 'budget_pillar_card.dart';
 import 'budget_category_limit_row.dart';
+import 'envelope_funding_card.dart';
 
 class BudgetOverviewContent extends StatelessWidget {
   const BudgetOverviewContent({
@@ -42,9 +43,9 @@ class BudgetOverviewContent extends StatelessWidget {
                 Expanded(
                   child: Text(
                     'Ngân sách tháng ${overview.month.month}/${overview.month.year}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: EnvelopeStyle.muted,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -61,6 +62,7 @@ class BudgetOverviewContent extends StatelessWidget {
               ],
             ),
             BudgetSummaryCard(overview: overview),
+            EnvelopeFundingCard(data: overview.envelopes),
             if (overview.daily != null) ...[
               const SizedBox(height: 12),
               BudgetDailyAllowance(overview: overview),
@@ -109,20 +111,20 @@ class BudgetOverviewContent extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               '4 phong bao Kakeibo',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
-                color: EnvelopeStyle.primary,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'Theo dõi chi tiêu từng trụ cột, mở rộng để xem hạn mức danh mục.',
               style: TextStyle(
                 fontSize: 12,
-                color: EnvelopeStyle.muted,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 height: 1.5,
               ),
             ),
@@ -137,9 +139,11 @@ class BudgetOverviewContent extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: EnvelopeStyle.border),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -154,9 +158,9 @@ class BudgetOverviewContent extends StatelessWidget {
                     const SizedBox(height: 6),
                     Text(
                       'Đã chi ${formatVnd(unassigned)} · Chọn trụ cột trong phần quản lý danh mục.',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: EnvelopeStyle.muted,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         height: 1.5,
                       ),
                     ),

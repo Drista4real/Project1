@@ -8,6 +8,14 @@ FastAPI and Celery foundation for the Kakeibo finance app. Flutter remains in
 Android APK + Render Docker: xem [hướng dẫn phát hành](../docs/release-v1.md).
 Blueprint ở `../render.yaml`; Docker CMD dùng `PORT` do Render cấp.
 
+## Classifier dataset preparation
+
+Taxonomy, annotation rules and grouped train/validation/test preparation are
+documented in [DATA_TAXONOMY_AND_ANNOTATION.md](../docs/DATA_TAXONOMY_AND_ANNOTATION.md).
+The preparation CLI only needs the Python standard library; it does not train
+models or modify the source CSV. Use `--dataset-dir` in `scripts/train_classifier.py`
+for verified fixed splits instead of the legacy random 80/20 mode.
+
 ## Requirements
 
 - Python 3.12 or newer
@@ -36,6 +44,110 @@ through the Supabase SQL editor. The guard checks wallet/category ownership
 before the existing balance trigger executes. These scripts are not applied
 automatically. Existing users need an account in `public.accounts`; the base
 schema creates a cash account when a new user signs up.
+
+### API AI (Model 4)
+
+Khi pull code mới, bổ sung các biến còn thiếu từ `.env.example` vào `.env`;
+giữ nguyên cấu hình Supabase, Redis và CORS đang dùng.
+
+```dotenv
+# Qwen: bóc tách ảnh hóa đơn qua FPT Cloud
+FPT_API_KEY=
+QWEN_BASE_URL=https://mkp-api.fptcloud.com/v1
+QWEN_MODEL=Qwen2.5-VL-7B-Instruct
+
+# Gemini: diễn giải chỉ số và sinh lời khuyên tài chính
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3.8-flash
+```
+
+Điền `FPT_API_KEY` từ tài khoản [FPT Cloud Marketplace](https://marketplace.fptcloud.com/en/models/qwen2.5-vl-7b-instruct)
+và tạo `GEMINI_API_KEY` tại [Google AI Studio](https://aistudio.google.com/apikey).
+Không điền key thật vào `.env.example`. Key trống giữ adapter tương ứng ở chế độ
+mock. Biến môi trường của tiến trình, kể cả giá trị rỗng, được ưu tiên hơn `.env`.
+Khởi động lại tiến trình sau khi sửa cấu hình.
+
+Cài các thư viện cloud AI từ thư mục `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements-cloud-vlm.txt
+```
+
+Adapter AI tự đọc `backend/.env` khi chạy local. Có thể thử qua demo Streamlit
+`frontend/app.py` sau khi cài `frontend/requirements-demo.txt`, từ thư mục gốc:
+
+```powershell
+.\backend\.venv\Scripts\python.exe -m pip install -r frontend/requirements-demo.txt
+.\backend\.venv\Scripts\python.exe -m streamlit run frontend/app.py
+```
+
+Cấu hình này phục vụ adapter, demo và API nhập văn bản
+`POST /api/v1/ingestion/text`. API yêu cầu Supabase access token, trả danh sách
+giao dịch nháp và không ghi vào database. Tối đa 5 khoản mỗi lần; có thể bỏ dấu
+phẩy khi mỗi khoản có nội dung và số tiền, ví dụ `cơm 30k momo sửa xe 100k tiền mặt`.
+Các câu tổng tiền, giảm giá hoặc khoảng giá vẫn cần kiểm tra để tránh ghi trùng.
+Model local được ưu tiên khi có checkpoint/cache. Quy tắc ngữ nghĩa gán các
+khoản quen thuộc vào danh mục hiện có ngay cả khi cloud lỗi (source `RULES`,
+không hiển thị như độ tin cậy của model). Các khoản chưa rõ được gửi Gemini
+trong một batch, chọn cả loại thu/chi và danh mục; `GEMINI_INPUT_MODEL` mặc định
+`gemini-3.1-flash-lite`, độc lập model tư vấn, timeout 20 giây.
+Số tiền luôn được chuẩn hóa bằng Python, không giao LLM tính số tiền, số dư
+hoặc dự báo. Chỉ các khoản chưa thể phân loại mới yêu cầu chọn danh mục.
+Phong bao tự theo danh mục đã chọn. Ví ghi rõ trong câu phải khớp ví hiện có;
+ví dụ chưa có MoMo thì ứng dụng yêu cầu chọn ví, không tự đổi thành tiền mặt.
+Flutter gửi tên danh mục thu/chi hiện có để Gemini chọn đúng nhãn của bạn;
+schema giới hạn kết quả trong các tên đã gửi. Khi lưu, API giao dịch vẫn kiểm
+tra danh mục/ví và quyền sở hữu qua Supabase, không dùng ID do LLM sinh ra.
+
+Flutter: nhấn **+ → Nhập nhanh AI**, gõ hoặc nói, nhấn **Phân tích**, kiểm tra
+từng thẻ rồi **Xác nhận & Lưu vào Sổ Thu Chi**. Có thể sửa số tiền, ngày, ví,
+danh mục hoặc vuốt bỏ khoản. Ngân sách dùng dữ liệu đang lưu; danh mục ghi nhớ
+được giới hạn theo người dùng và chỉ ghi nhớ sau khi lưu thành công. Nếu một
+yêu cầu lưu bị mất kết nối, kiểm tra sổ trước khi nhập lại để tránh lưu trùng.
+
+Model 1/2 và nhận dạng giọng nói offline không dùng hai API key này. Hóa đơn
+và dự báo không được triển khai thêm trong đợt nhập liệu này. Demo Streamlit
+vẫn chỉ hiển thị tín hiệu routing cho NLP; luồng fallback mới nằm ở API.
+Xem [tài liệu adapter Model 4](app/infrastructure/ai/cloud_vlm/README.md).
+
+### Chuẩn bị giọng nói Android offline
+
+Từ thư mục gốc, chuẩn bị model và đóng gói asset trước khi build APK:
+
+```powershell
+.\backend\.venv\Scripts\python.exe backend/scripts/download_asr_model.py
+.\backend\.venv\Scripts\python.exe frontend/scripts/prepare_voice_assets.py
+```
+
+Script tải kiểm tra kích thước/SHA256; script đóng gói kiểm tra lại trước khi cài asset.
+Xem [hướng dẫn Model 3](../docs/MODEL3_SETUP.md) cho repo private và cách phát hành.
+Model tải một lần lúc chuẩn bị; ứng dụng phiên âm tiếng Việt trên thiết bị
+bằng sherpa-onnx, không tải âm thanh lên backend. Bấm **Nói nhanh**, cấp quyền
+micro, chờ thông báo micro đã bật và thanh âm lượng rồi nói tối đa 20 giây.
+Ngừng nói khoảng 2 giây hoặc bấm **Dừng ghi âm** để phiên âm. Văn bản có thể sửa
+trước khi nhấn Phân tích. Chuyển app sang nền sẽ dừng thu âm.
+Web vẫn hỗ trợ nhập văn bản; giọng nói offline ở bản này dành cho Android.
+Trên Android Emulator, bật **Extended Controls → Microphone → Virtual microphone
+uses host audio input** (hoặc `adb emu avd hostmicon`). Nếu thanh âm lượng không
+chuyển động, kiểm tra đầu vào micro Windows và quyền micro. Hộp thoại cấp quyền
+không hủy phiên ghi âm; khi ứng dụng thật sự xuống nền thì phiên bị hủy.
+
+Để chạy backend cho điện thoại cùng mạng Wi-Fi, từ `backend/`:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Từ `frontend/`, thay địa chỉ ví dụ bằng IP LAN của máy chạy backend:
+
+```powershell
+flutter run -d <android-device-id> --dart-define=API_BASE_URL=http://192.168.1.10:8000
+```
+
+APK debug mặc định dùng `http://10.0.2.2:8000` cho Android Emulator. Điện thoại
+thật cần build với IP LAN hoặc URL backend đã cập nhật code mới. Với Docker
+Compose, `GEMINI_API_KEY` và `GEMINI_MODEL` được chuyển vào container API; trên
+Render, điền key ở Environment rồi deploy phiên bản mới khi sẵn sàng.
 
 For the remaining management modules, also apply
 [the management guards](supabase/migrations/202610030002_management_guards.sql)
@@ -67,7 +179,47 @@ Compose exposes the API on port `8000` and Redis on `6379`. Its health check
 waits for Redis before starting the API and worker; `/health` checks only the
 API process.
 
+Compose builds the API and worker from the current source on `docker compose up`
+(`pull_policy: build`, use Docker Compose v2 from Docker Desktop). Build cache
+keeps unchanged layers fast; a BuildKit pip cache also retains downloads across
+dependency installation retries without including them in the final image.
+Source is copied into the image; it is not mounted or reloaded live.
+Docker installs only prebuilt wheels verified with SHA-256 hashes from
+`requirements-docker.txt`. This Linux/Python 3.13 lock preserves the runtime
+versions in `requirements.txt` and includes platform-specific dependencies.
+Refresh it from the repository root after changing runtime pins:
+
+```powershell
+uv pip compile backend/requirements.txt --generate-hashes --no-header --no-annotate --python-version 3.13 --python-platform x86_64-unknown-linux-gnu --output-file backend/requirements-docker.txt
+```
+
+After pulling or editing code, run this from `backend/`:
+
+```powershell
+docker compose up --build -d --wait
+docker compose logs --tail 50 api
+```
+
+Starting/restarting an existing container in Docker Desktop does not rebuild its
+image. An old image may report `/health` as OK while returning 404 for newer
+routes. Open `http://localhost:8000/openapi.json` and check that it contains
+`/api/v1/transactions`, `/api/v1/manage/categories` and `/api/v1/ingestion/text`.
+A request to a protected route without a token should return 401, not 404.
+For Flutter web, an OPTIONS preflight from `http://localhost:5173` should return
+200 with the matching `Access-Control-Allow-Origin` header.
+
+Stop any locally running Uvicorn process using port `8000` before starting the
+Docker API. Set Flutter's `API_BASE_URL` to `http://localhost:8000` (Android
+emulator: `http://10.0.2.2:8000`), without an `/api/v1` suffix.
+
 ## Checks
+
+Install the development dependencies plus the optional ML stacks before running
+the complete test suite (from `backend/`):
+
+```powershell
+python -m pip install -r requirements-dev.txt -r requirements-classifier.txt -r requirements-forecaster.txt
+```
 
 ```powershell
 python -m pytest
@@ -75,6 +227,19 @@ python -m ruff check .
 python -m ruff format --check .
 python -m pip check
 ```
+
+To measure coverage across all application modules:
+
+```powershell
+python -m coverage run --branch --source=app -m pytest
+python -m coverage report
+python -m coverage json -o .coverage.summary.json
+```
+
+The report's total combines statement and branch coverage. For branch coverage
+alone, use `totals.percent_branches_covered` in `.coverage.summary.json`; the
+target is greater than 85%. Unit tests use temporary configuration files and
+mocks and do not require provider credentials or downloaded model weights.
 
 Runtime packages are constrained in `requirements.in` and pinned in
 `requirements.txt`. Development tools are declared in `requirements-dev.in`
@@ -137,6 +302,11 @@ Swagger UI: `http://127.0.0.1:8000/docs`. Use **Authorize** with a signed-in use
 access token to exercise protected endpoints. Local automated API tests use a
 mock HTTP transport for Supabase and do not modify a live project.
 
+For Postman, open the local collection and copy the environment template from
+[`../postman`](../postman/README.md).
+The Vietnamese guide covers Supabase login, automatic token storage, transaction
+CRUD and management requests. Sample environment files contain no credentials.
+
 Opening `http://127.0.0.1:8000/` redirects to Swagger. Registration and login
 currently run through the Flutter Supabase Auth SDK, not FastAPI routes;
 `/register` and `/api/v1/auth/register` are not defined in this API.
@@ -172,6 +342,23 @@ web origins, set `CORS_ORIGINS` to a JSON array in `.env`. On the Android emulat
 use `--dart-define=API_BASE_URL=http://10.0.2.2:8000`; debug builds allow local HTTP.
 Production mobile builds need an HTTPS API URL. Compose forwards Supabase and
 CORS settings from `.env` to the API container.
+
+Nếu Android build dừng với `What went wrong: 25.0.3`, kiểm tra Java mà Flutter
+đang dùng bằng `flutter doctor -v`. Cấu hình Gradle hiện tại chạy được với JDK 17.
+Trên máy đã có JDK 17, chọn thư mục cài đặt bằng
+`flutter config --jdk-dir="<đường dẫn JDK 17>"`, rồi khởi động lại IDE.
+Với giả lập đã mở, chạy từ `frontend/`:
+
+```powershell
+flutter run -d emulator-5554 --dart-define=API_BASE_URL=http://10.0.2.2:8000
+```
+
+Giữ backend chạy ở cổng 8000 trong lúc thử. `GET http://localhost:8000/health`
+phải trả `{"status":"ok"}`.
+
+Android project tắt Kotlin incremental compilation để tránh lỗi
+`this and base files have different roots` khi Pub cache ở ổ C: và repo ở ổ D:.
+Thay đổi này chỉ ảnh hưởng thời gian biên dịch Kotlin.
 
 Sign in (or register and confirm email) from the ledger prompt or Settings.
 Use the add button to create, tap a ledger row to view/edit, and confirm deletion

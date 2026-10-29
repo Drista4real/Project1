@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:project_one/core/theme/app_theme.dart';
-
 class KakeiboCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -16,9 +14,9 @@ class KakeiboCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: padding,
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(19),
-      border: Border.all(color: AppTheme.borderLight),
+      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
     child: child,
   );

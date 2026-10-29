@@ -4,10 +4,18 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links
+  file_selector_windows
+  flutter_timezone
+  local_auth_windows
+  record_windows
+  share_plus
   url_launcher_windows
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
+  flutter_local_notifications_windows
+  jni
+  sherpa_onnx_windows
 )
 
 set(PLUGIN_BUNDLED_LIBRARIES)

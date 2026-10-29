@@ -1,0 +1,6 @@
+# Install alongside backend/requirements.txt for API inference; no training tools.
+-r requirements-classifier.txt
+transformers>=4.57,<4.58
+peft>=0.18,<0.19
+# Match the segmentation version used by the approved Colab run.
+underthesea==8.3.0

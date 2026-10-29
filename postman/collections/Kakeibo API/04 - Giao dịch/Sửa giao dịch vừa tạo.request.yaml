@@ -1,0 +1,20 @@
+$kind: http-request
+description: ""
+url: "{{base_url}}/api/v1/transactions/{{transaction_id}}"
+method: PATCH
+headers:
+  Accept: application/json
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "amount": "50000.00",
+      "raw_description": "Cà phê thử Postman (đã sửa)"
+    }
+scripts:
+  - type: afterResponse
+    code: |
+      pm.test("HTTP 200", function () { pm.response.to.have.status(200); });
+    language: text/javascript
+order: 5000

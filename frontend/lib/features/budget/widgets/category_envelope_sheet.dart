@@ -1,3 +1,5 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:project_one/features/budget/cubit/envelope_form_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:project_one/features/finance/domain/usecases/finance_insights.dart';
 import 'package:project_one/shared/widgets/finance_form.dart';
@@ -32,8 +34,9 @@ class _CategoryEnvelopeSheetState extends State<CategoryEnvelopeSheet> {
   late EnvelopePillar _pillar =
       EnvelopePillar.fromKey(widget.category?['pillar']) ??
       widget.initialPillar;
-  bool _busy = false;
-  String? _error;
+  late final _cubit = EnvelopeFormCubit(widget.service, widget.data);
+  bool get _busy => _cubit.state.busy;
+  String? get _error => _cubit.state.error;
   bool get _system =>
       widget.category != null && widget.category!['user_id'] == null;
 
@@ -47,38 +50,40 @@ class _CategoryEnvelopeSheetState extends State<CategoryEnvelopeSheet> {
 
   Future<void> _save() async {
     if (_busy || !validateFinanceForm(_form)) return;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      final fresh = await widget.service.load(widget.data.month);
-      await widget.service.saveCategory(
-        data: fresh,
-        category: widget.category,
-        name: _name.text.trim(),
-        pillar: _pillar,
-        limit: _limit.text.trim().isEmpty
-            ? null
-            : '${envelopeAmount(_limit.text)}',
-      );
-      if (mounted) Navigator.pop(context, true);
-    } catch (error) {
-      if (mounted) setState(() => _error = 'Không thể lưu. $error');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    await _cubit.saveCategory(
+      category: widget.category,
+      name: _name.text.trim(),
+      pillar: _pillar,
+      limit: _limit.text.trim().isEmpty
+          ? null
+          : '${envelopeAmount(_limit.text)}',
+    );
   }
 
   @override
   void dispose() {
     _name.dispose();
     _limit.dispose();
+    _cubit.close();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => EnvelopeSheetFrame(
+  Widget build(BuildContext context) =>
+      BlocConsumer<EnvelopeFormCubit, EnvelopeFormState>(
+        bloc: _cubit,
+        listener: (context, state) {
+          if (state.saved) Navigator.pop(context, true);
+          if (state.error != null) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(state.error!)));
+          }
+        },
+        builder: (context, state) => _buildContent(context),
+      );
+
+  Widget _buildContent(BuildContext context) => EnvelopeSheetFrame(
     title: widget.category == null
         ? 'Tạo danh mục mới'
         : _system
@@ -94,10 +99,10 @@ class _CategoryEnvelopeSheetState extends State<CategoryEnvelopeSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (_system)
-            const Text(
+            Text(
               'Danh mục hệ thống chỉ đọc. Bạn có thể đặt hạn mức riêng cho tháng này.',
               style: TextStyle(
-                color: EnvelopeStyle.muted,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 12,
                 height: 1.5,
               ),
@@ -110,6 +115,7 @@ class _CategoryEnvelopeSheetState extends State<CategoryEnvelopeSheet> {
             maxLength: 500,
             textInputAction: TextInputAction.next,
             decoration: envelopeInput(
+              context,
               'Ví dụ: Tập gym, Trà chiều...',
             ).copyWith(counterText: ''),
             validator: (value) => (value ?? '').trim().isEmpty
@@ -175,14 +181,16 @@ class _CategoryEnvelopeSheetState extends State<CategoryEnvelopeSheet> {
         style: FilledButton.styleFrom(
           backgroundColor: selected
               ? EnvelopeStyle.primary
-              : EnvelopeStyle.border,
-          foregroundColor: selected ? Colors.white : EnvelopeStyle.ink,
+              : Theme.of(context).colorScheme.outlineVariant,
+          foregroundColor: selected
+              ? Colors.white
+              : Theme.of(context).colorScheme.onSurface,
           disabledBackgroundColor: selected
               ? EnvelopeStyle.primary
-              : EnvelopeStyle.border,
+              : Theme.of(context).colorScheme.outlineVariant,
           disabledForegroundColor: selected
               ? Colors.white
-              : EnvelopeStyle.muted,
+              : Theme.of(context).colorScheme.onSurfaceVariant,
           padding: const EdgeInsets.symmetric(horizontal: 4),
           minimumSize: const Size(0, 44),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

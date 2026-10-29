@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:project_one/core/theme/app_theme.dart';
 import 'package:project_one/shared/widgets/kakeibo_card.dart';
 import 'package:project_one/shared/widgets/kakeibo_progress.dart';
 import 'package:project_one/shared/formatters/currency_formatter.dart';
@@ -84,17 +83,17 @@ class _CategoryReportRow extends StatelessWidget {
                 children: [
                   Text(
                     name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w700,
-                      color: AppTheme.textCharcoal,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 9.5,
-                      color: AppTheme.textMuted,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -105,10 +104,10 @@ class _CategoryReportRow extends StatelessWidget {
               children: [
                 Text(
                   formatVnd(amount),
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,
-                    color: AppTheme.textCharcoal,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
                 Text(

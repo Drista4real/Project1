@@ -1,0 +1,8 @@
+[
+  {
+    "path": "transactions_with_provenance.csv",
+    "source_id": "codex_teacher_expense_six_20261017_v1",
+    "kind": "synthetic",
+    "usage_rights": "Original AI-generated transaction descriptions and hard labels created by the Codex assistant at the user's request on 2026-10-17 for this project. No real user transactions or external corpus used; no independent human annotation."
+  }
+]

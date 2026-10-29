@@ -76,6 +76,60 @@ Future<void> openBudget(
 void main() {
   setUpAll(loadEnvelopeFonts);
   testWidgets(
+    'new income updates funding and wallet balance can be explicitly allocated',
+    (tester) async {
+      final repo = budgetFixture();
+      repo.profile = {'current_balance': '10000000'};
+      repo.tables['transactions']!.removeWhere(
+        (t) => t['transaction_type'] == 'income',
+      );
+      repo.tables['transactions']!.add({
+        'id': 99,
+        'amount': '10000000',
+        'transaction_type': 'income',
+        'transaction_date': DateTime.now().toIso8601String(),
+      });
+      await openBudget(tester, repo);
+      expect(
+        tester
+            .widget<Text>(find.byKey(const ValueKey('envelope-monthly-income')))
+            .data,
+        '10.000.000 ₫',
+      );
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const ValueKey('envelope-available-balance')),
+            )
+            .data,
+        '10.000.000 ₫',
+      );
+      expect(find.text('18.800.000 ₫'), findsOneWidget);
+      await tester.tap(find.text('Điều chỉnh phân bổ'));
+      await tester.pumpAndSettle();
+      final field = find.byKey(const ValueKey('rebalance-total'));
+      expect(
+        tester.widget<TextFormField>(field).controller!.text,
+        '20.000.000',
+      );
+      await tester.ensureVisible(
+        find.byKey(const ValueKey('use-wallet-balance')),
+      );
+      await tester.tap(find.byKey(const ValueKey('use-wallet-balance')));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<TextFormField>(field).controller!.text,
+        '10.000.000',
+      );
+      expect(
+        repo.tables['budgets']!.firstWhere(
+          (b) => b['id'] == 50,
+        )['limit_amount'],
+        '20000000',
+      );
+    },
+  );
+  testWidgets(
     'overview shows actual remaining money and four matching envelopes',
     (tester) async {
       await openBudget(tester, budgetFixture());
@@ -135,6 +189,13 @@ void main() {
     await tester.enterText(
       find.byKey(const ValueKey('rebalance-total')),
       '30000000',
+    );
+    await tester.enterText(find.byKey(const ValueKey('percent-needs')), '50');
+    await tester.enterText(find.byKey(const ValueKey('percent-wants')), '25');
+    await tester.enterText(find.byKey(const ValueKey('percent-culture')), '15');
+    await tester.enterText(
+      find.byKey(const ValueKey('percent-unexpected')),
+      '10',
     );
     await tester.tap(find.text('Lưu phân bổ'));
     await tester.pumpAndSettle();

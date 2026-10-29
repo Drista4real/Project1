@@ -1,0 +1,20 @@
+$kind: http-request
+description: ""
+url: "{{base_url}}/api/v1/categories"
+method: GET
+headers:
+  Accept: application/json
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("HTTP 200", function () { pm.response.to.have.status(200); });
+      if (pm.response.code === 200) {
+        const items = pm.response.json();
+        pm.test("Danh sách danh mục", function () { pm.expect(items).to.be.an("array"); });
+        [["expense_category_id", false], ["income_category_id", true]].forEach(function (pair) {
+          const category = items.find(function (item) { return item.is_income === pair[1]; });
+          if (!pm.environment.get(pair[0]) && category) pm.environment.set(pair[0], String(category.id));
+        });
+      }
+    language: text/javascript
+order: 2000

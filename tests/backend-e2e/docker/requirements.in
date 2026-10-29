@@ -1,0 +1,6 @@
+# Python 3.13/Linux amd64 CPU wheel; matches the audited PyTorch version.
+--find-links https://download.pytorch.org/whl/cpu/torch/
+torch==2.14.1+cpu
+-r ../../../backend/requirements-dev.txt
+-r ../../../backend/requirements-classifier.txt
+-r ../../../backend/requirements-forecaster.txt

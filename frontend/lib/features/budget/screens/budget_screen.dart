@@ -1,3 +1,5 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:project_one/features/budget/cubit/budget_month_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:project_one/app/app_dependencies.dart';
 import 'package:project_one/app/widgets/app_screen_navigation.dart';
@@ -6,7 +8,6 @@ import 'package:project_one/features/management/open_finance_module.dart';
 import 'package:project_one/features/management/screens/resource_list_screen.dart';
 import 'package:project_one/shared/widgets/finance_data_view.dart';
 import '../models/budget_month_overview.dart';
-import '../models/envelope_pillar.dart';
 import '../services/category_envelopes_service.dart';
 import '../widgets/budget_overview_content.dart';
 import '../widgets/category_envelope_sheet.dart';
@@ -26,7 +27,14 @@ class _BudgetScreenState extends State<BudgetScreen> {
   late final _insights = widget.insights ?? AppDependencies.financeInsights;
   late final _load = _insights.budgets;
   late final _service = CategoryEnvelopesService(_insights.repository);
-  DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+  final _cubit = BudgetMonthCubit();
+  DateTime get _month => _cubit.state;
+
+  @override
+  void dispose() {
+    _cubit.close();
+    super.dispose();
+  }
 
   Future<void> _manage() async {
     await openFinanceModule(
@@ -109,21 +117,26 @@ class _BudgetScreenState extends State<BudgetScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Theme(
+  Widget build(BuildContext context) => BlocBuilder<BudgetMonthCubit, DateTime>(
+    bloc: _cubit,
+    builder: (context, state) => _buildContent(context),
+  );
+
+  Widget _buildContent(BuildContext context) => Theme(
     data: envelopeTheme(Theme.of(context)),
     child: Scaffold(
-      backgroundColor: EnvelopeStyle.canvas,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         titleSpacing: 16,
-        backgroundColor: EnvelopeStyle.canvas,
-        title: const Text(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        title: Text(
           'Ngân sách & phong bao',
           style: TextStyle(
             fontFamily: 'BeVietnamPro',
             fontSize: 17,
             fontWeight: FontWeight.w600,
-            color: EnvelopeStyle.primary,
+            color: Theme.of(context).colorScheme.primary,
           ),
         ),
         actions: [
@@ -149,9 +162,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
             children: [
               BudgetOverviewContent(
                 overview: overview,
-                onMonth: (delta) => setState(
-                  () => _month = DateTime(_month.year, _month.month + delta),
-                ),
+                onMonth: (delta) => _cubit.move(delta),
                 onManage: _manage,
                 onRebalance: () => _rebalance(overview),
                 onSavingGoals: _savingGoals,

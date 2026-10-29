@@ -1,5 +1,12 @@
 # Flutter ↔ FastAPI
 
+Đăng nhập/đăng ký, OTP email, quên mật khẩu và khách liên kết email được mô tả
+trong [hướng dẫn cấu hình Supabase Auth](supabase/README.md). Cần cấu hình SMTP,
+mẫu thư OTP và Anonymous Sign-Ins trên Supabase để sử dụng dịch vụ thực.
+
+Logo gốc và preview Android nằm trong `assets/branding/`; tái tạo PNG và native
+resources bằng `python tool/generate_branding.py` (cần Pillow).
+
 Bản v1 phát hành Android APK, backend Docker trên Render. Xem
 [hướng dẫn phát hành](../docs/release-v1.md) để tạo khóa ký và build APK với URL API thật.
 
@@ -63,6 +70,40 @@ Màn sổ thu chi nằm tại `features/ledger/screens/ledger_screen.dart`.
 `ledger_content.dart` là file `part` chứa bố cục của màn này và dùng chung state.
 Form giao dịch nằm trong `features/transactions/screens/`; form CRUD các phân
 hệ khác nằm trong `features/management/screens/record_form_screen.dart`.
+
+## Quản lý trạng thái bằng BLoC / Cubit
+
+Frontend sử dụng `flutter_bloc`. Cubit nằm trong `features/<chức năng>/cubit/`,
+nhận repository hoặc service qua constructor và phát state cho UI. Luồng hiện
+tại gọi phương thức trực tiếp nên dùng Cubit; có thể dùng `Bloc<Event, State>`
+khi một chức năng cần xử lý nhiều loại sự kiện.
+
+- **Sổ thu chi:** `LedgerCubit` quản lý số dư, giao dịch, tải/lỗi, lịch và tháng.
+- **Báo cáo / ngân sách:** `ReportsCubit` quản lý kỳ, ngày và tab;
+  `BudgetMonthCubit` quản lý tháng. `AsyncDataCubit<T>` tải dữ liệu qua
+  `FinanceDataView<T>` dùng chung, với trạng thái initial/loading/success/failure.
+- **Dự báo / cài đặt:** `ForecastCubit` quản lý số ngày và cập nhật cảnh báo;
+  `SettingsCubit` tải hồ sơ, lưu tùy chọn và lọc giao dịch theo nội dung/thẻ/ngày.
+- **Đăng nhập / giao dịch:** `AuthCubit`, `TransactionFormCubit` và
+  `TransactionDetailCubit` quản lý request, kết quả và lỗi. UI xử lý điều hướng
+  và thông báo qua `BlocConsumer`.
+- **Quản lý / phong bao:** `ResourceListCubit` quản lý danh sách, phân trang và
+  xóa; `RecordFormCubit` tải dữ liệu tham chiếu và lưu form;
+  `CategoryEnvelopesCubit` quản lý tháng, tìm kiếm và thay đổi danh mục;
+  `EnvelopeFormCubit` lưu danh mục/hạn mức và tái cân bằng phân bổ.
+
+Widget giữ Cubit theo vòng đời màn hình, truyền bằng `bloc:` vào `BlocBuilder`
+hoặc `BlocConsumer`, và gọi `close()` trong `dispose()`. Controller nhập liệu,
+`FormState`, date picker và dialog thuộc UI. `setState` chỉ còn dùng cho lựa chọn
+cục bộ trong form (màu, biểu tượng, xem trước tỷ lệ) và trạng thái mở form từ
+màn nhập nhanh AI; tải/lưu dữ liệu nằm trong Cubit.
+
+Các Cubit tải dữ liệu bỏ qua kết quả của request cũ khi đã có request mới hơn.
+Các thao tác lưu/xóa chặn gửi trùng trong lúc chờ; kết quả async sau `close()`
+không phát state. Khi bổ sung chức năng, đưa trạng thái nghiệp vụ vào Cubit
+của chức năng và giữ các hiệu ứng điều hướng/thông báo ở UI.
+
+Kiểm tra thay đổi bằng `flutter analyze` và `flutter test` từ thư mục `frontend`.
 
 ## Chạy cục bộ
 

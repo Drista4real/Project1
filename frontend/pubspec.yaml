@@ -37,6 +37,20 @@ dependencies:
   go_router: ^16.2.4
   supabase_flutter: ^2.17.2
   http: ^1.6.0
+  flutter_bloc: ^9.1.1
+  record: ^6.2.1
+  sherpa_onnx: ^1.13.8
+  path_provider: ^2.1.6
+  crypto: ^3.0.7
+  shared_preferences: ^2.5.5
+  local_auth: ^3.0.2
+  flutter_local_notifications: 21.0.0
+  timezone: ^0.11.2
+  flutter_timezone: ^5.1.1
+  excel: ^4.0.6
+  pdf: ^3.12.0
+  file_selector: ^1.1.0
+  share_plus: ^11.1.0
 
 dev_dependencies:
   flutter_test:
@@ -60,7 +74,9 @@ flutter:
   # the material Icons class.
   uses-material-design: true
   assets:
+    - assets/branding/kakeibo_mark.png
     - assets/images/envelope_zen_header.jpg
+    - assets/models/phowhisper-tiny/
   fonts:
     - family: BeVietnamPro
       fonts:

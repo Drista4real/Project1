@@ -31,7 +31,14 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+/android/build/
 /coverage/
+/test-reports/
+
+# Generated offline speech assets; prepare_voice_assets.py recreates these.
+/assets/models/phowhisper-tiny/*.onnx
+/assets/models/phowhisper-tiny/tokens.txt
+/assets/models/phowhisper-tiny/manifest.json
 
 # Symbolication related
 app.*.symbols

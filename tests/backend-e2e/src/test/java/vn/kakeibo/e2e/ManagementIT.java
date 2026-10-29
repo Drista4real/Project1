@@ -78,12 +78,32 @@ class ManagementIT {
         long first = api.account("Cash", "100.25");
         long second = api.account("Savings", "200.50");
         money(expect(api.get(MANAGE + "profile/me"), 200), "current_balance", "300.75");
+        money(expect(api.databaseApi().get("/rest/v1/profiles?select=current_balance&id=eq." + api.userId), 200), "[0].current_balance", "300.75");
+        money(expect(api.get("/api/v1/overview"), 200), "monthly_income", "0");
         expect(api.patch(MANAGE + "accounts/" + first, Map.of("balance", "150.35")), 200);
         money(expect(api.get("/api/v1/overview"), 200), "current_balance", "350.85");
         expect(api.patch(MANAGE + "accounts/" + second, Map.of("is_included_in_total", false)), 200);
         money(expect(api.get("/api/v1/overview"), 200), "current_balance", "150.35");
         expect(api.delete(MANAGE + "accounts/" + first), 204);
         money(expect(api.get(MANAGE + "profile/me"), 200), "current_balance", "0");
+        money(expect(api.databaseApi().get("/rest/v1/profiles?select=current_balance&id=eq." + api.userId), 200), "[0].current_balance", "0");
+    }
+
+    @Test
+    void walletTypeArchiveAndInclusionKeepAssetsDistinctFromIncome() {
+        Api api = Api.newUser();
+        long bank = api.create("accounts", Map.of("name", "Bank", "account_type", "bank", "balance", "123.45"));
+        long excluded = api.create("accounts", Map.of("name", "Excluded", "account_type", "e_wallet",
+            "balance", "999.99", "is_included_in_total", false));
+        money(expect(api.get("/api/v1/overview"), 200), "current_balance", "123.45");
+        money(expect(api.get("/api/v1/overview"), 200), "monthly_income", "0");
+        expect(api.patch(MANAGE + "accounts/" + bank, Map.of("is_archived", true)), 200);
+        money(expect(api.get("/api/v1/overview"), 200), "current_balance", "123.45");
+        expect(api.patch(MANAGE + "accounts/" + excluded, Map.of("is_included_in_total", true)), 200);
+        money(expect(api.get(MANAGE + "profile/me"), 200), "current_balance", "1123.44");
+        money(expect(api.databaseApi().get("/rest/v1/profiles?select=current_balance&id=eq." + api.userId), 200), "[0].current_balance", "1123.44");
+        expect(api.delete(MANAGE + "accounts/" + excluded), 204);
+        money(expect(api.get("/api/v1/overview"), 200), "current_balance", "123.45");
     }
 
     @Test

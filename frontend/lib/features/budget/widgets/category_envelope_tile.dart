@@ -23,11 +23,12 @@ class CategoryEnvelopeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = pillar?.color ?? EnvelopeStyle.muted;
+    final color =
+        pillar?.color ?? Theme.of(context).colorScheme.onSurfaceVariant;
     final system = category['user_id'] == null;
     final name = '${category['name']}';
     final tile = Material(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       borderRadius: BorderRadius.circular(14),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -40,7 +41,9 @@ class CategoryEnvelopeTile extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: pillar?.tint ?? EnvelopeStyle.soft,
+                  color:
+                      pillar?.tint ??
+                      Theme.of(context).colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(_icon, size: 22, color: color),
@@ -64,33 +67,41 @@ class CategoryEnvelopeTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     if (budget == null)
-                      const Text(
+                      Text(
                         'Chưa đặt hạn mức tháng',
                         style: TextStyle(
                           fontSize: 11,
-                          color: EnvelopeStyle.muted,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       )
                     else
                       Text.rich(
                         TextSpan(
                           children: [
-                            const TextSpan(
+                            TextSpan(
                               text: 'Hạn mức: ',
-                              style: TextStyle(color: EnvelopeStyle.muted),
+                              style: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
                             ),
                             TextSpan(
                               text: formatVnd(
                                 financeAmount(budget!['limit_amount']),
                               ),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.w600,
-                                color: EnvelopeStyle.ink,
+                                color: Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
-                            const TextSpan(
+                            TextSpan(
                               text: '/tháng',
-                              style: TextStyle(color: EnvelopeStyle.muted),
+                              style: TextStyle(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
                             ),
                           ],
                         ),
@@ -102,18 +113,18 @@ class CategoryEnvelopeTile extends StatelessWidget {
               IconButton(
                 tooltip: 'Chỉnh sửa $name',
                 onPressed: onEdit,
-                icon: const Icon(
+                icon: Icon(
                   Icons.edit_outlined,
                   size: 19,
-                  color: EnvelopeStyle.muted,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               PopupMenuButton<String>(
                 tooltip: 'Thao tác với $name',
-                icon: const Icon(
+                icon: Icon(
                   Icons.more_vert,
                   size: 19,
-                  color: EnvelopeStyle.muted,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
                 onSelected: onAction,
                 itemBuilder: (_) => [
@@ -144,7 +155,7 @@ class CategoryEnvelopeTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: EnvelopeStyle.border),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Dismissible(
         key: ValueKey('envelope-${category['id']}'),
@@ -159,7 +170,7 @@ class CategoryEnvelopeTile extends StatelessWidget {
           alignment: Alignment.centerRight,
           padding: const EdgeInsets.only(right: 16),
           decoration: BoxDecoration(
-            color: const Color(0xFFFFF1EC),
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(14),
           ),
           child: const Text(

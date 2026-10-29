@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "version": "expense_six_v1",
+  "decision_date": "2026-10-15",
+  "decision_status": "confirmed_by_user",
+  "transaction_type": "expense",
+  "description": "Phân loại mục đích chi tiêu; khoản thu, chuyển ví và câu chưa đủ thông tin được xử lý riêng.",
+  "categories": [
+    {"id": "food", "name": "Ăn uống", "legacy_encoded_id": 4},
+    {"id": "transport", "name": "Đi lại", "legacy_encoded_id": 5},
+    {"id": "shopping", "name": "Mua sắm", "legacy_encoded_id": 2},
+    {"id": "housing_utilities", "name": "Hóa đơn/Nhà ở", "legacy_encoded_id": 0},
+    {"id": "healthcare", "name": "Y tế", "legacy_encoded_id": 3},
+    {"id": "other", "name": "Khác", "legacy_encoded_id": 1}
+  ],
+  "ambiguity_policy": "quarantine",
+  "ambiguous_examples": [
+    "mua đồ", "shopee", "shope", "đơn hàng shopee", "chốt đơn shopee",
+    "grab", "be", "bao bạn bè", "bao bb", "thanh toán", "chuyển tiền"
+  ],
+  "outside_scope_patterns": [
+    "^(nhan |tien )?luong( |$)",
+    "^(nhan |thu )?(thuong|thu nhap)( |$)",
+    "^chuyen (tien )?(giua cac vi|vi|tu vi)( |$)",
+    "^(vay|tra no|cho vay|thu hoi no)( |$)"
+  ],
+  "kakeibo_policy": "contextual_separate_annotation_not_determined_by_category",
+  "unknown_policy": "review_not_other",
+  "model_label_order_policy": "persist_explicit_mapping_do_not_use_json_array_index"
+}

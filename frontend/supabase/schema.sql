@@ -397,6 +397,26 @@ CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+-- Keep the same profile/financial ownership when an anonymous user links email.
+CREATE OR REPLACE FUNCTION public.sync_auth_profile_email()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  UPDATE public.profiles SET email = NEW.email WHERE id = NEW.id;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.sync_auth_profile_email() FROM PUBLIC;
+
+CREATE OR REPLACE TRIGGER on_auth_user_email_updated
+  AFTER UPDATE OF email ON auth.users
+  FOR EACH ROW
+  WHEN (OLD.email IS DISTINCT FROM NEW.email)
+  EXECUTE FUNCTION public.sync_auth_profile_email();
+
 -- 3. Function & Trigger: Tự động cập nhật số dư Ví (accounts.balance) và Profile (profiles.current_balance) khi có giao dịch
 CREATE OR REPLACE FUNCTION public.update_account_and_profile_balance()
 RETURNS TRIGGER AS $$
@@ -482,6 +502,29 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE OR REPLACE TRIGGER trg_sync_transaction_balance
   AFTER INSERT OR UPDATE OR DELETE ON public.transactions
   FOR EACH ROW EXECUTE FUNCTION public.update_account_and_profile_balance();
+
+-- Wallet creation, balance edits and inclusion changes also affect total assets,
+-- even when no transaction has been recorded. Keep this in the base schema as
+-- well as backend/supabase/migrations/202610030002_management_guards.sql.
+CREATE OR REPLACE FUNCTION public.sync_account_profile_total()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE owner_id uuid;
+BEGIN
+  IF TG_OP = 'DELETE' THEN owner_id := OLD.user_id; ELSE owner_id := NEW.user_id; END IF;
+  PERFORM 1 FROM public.profiles WHERE id = owner_id FOR UPDATE;
+  UPDATE public.profiles SET current_balance = COALESCE((
+    SELECT SUM(balance) FROM public.accounts WHERE user_id = owner_id AND is_included_in_total
+  ), 0) WHERE id = owner_id;
+  RETURN NULL;
+END;
+$$;
+DROP TRIGGER IF EXISTS account_profile_total ON public.accounts;
+CREATE TRIGGER account_profile_total AFTER INSERT OR DELETE OR UPDATE OF balance, is_included_in_total
+  ON public.accounts FOR EACH ROW EXECUTE FUNCTION public.sync_account_profile_total();
+
+UPDATE public.profiles p SET current_balance = COALESCE((
+  SELECT SUM(a.balance) FROM public.accounts a WHERE a.user_id = p.id AND a.is_included_in_total
+), 0);
 
 -- ==============================================================================
 -- BẢO MẬT DỮ LIỆU: ROW LEVEL SECURITY (RLS) CHUẨN TỐI ƯU SUPABASE

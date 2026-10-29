@@ -43,3 +43,17 @@ def test_settings_reject_invalid_redis_url(monkeypatch: pytest.MonkeyPatch) -> N
 
     with pytest.raises(ValidationError):
         Settings(_env_file=None)
+
+
+@pytest.mark.parametrize("backend", ["lora", "lightgbm"])
+def test_classifier_backend_from_environment(monkeypatch, backend):
+    """Only supported classifier implementations can be selected."""
+    monkeypatch.setenv("CLASSIFIER_BACKEND", backend)
+    assert Settings(_env_file=None).classifier_backend == backend
+
+
+def test_classifier_rejects_unknown_backend(monkeypatch):
+    """Do not silently accept typos that select an unintended model."""
+    monkeypatch.setenv("CLASSIFIER_BACKEND", "lorra")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)

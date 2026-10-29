@@ -3,6 +3,8 @@ from decimal import Decimal
 
 from supabase import Client
 
+from app.infrastructure.repositories.account_totals import included_account_total
+
 
 class SupabaseFinanceQueries:
     def __init__(self, client: Client, user_id: str):
@@ -38,13 +40,7 @@ class SupabaseFinanceQueries:
             if start.month == 12
             else (start.replace(month=start.month + 1))
         )
-        profile = (
-            self.client.table("profiles")
-            .select("current_balance")
-            .eq("id", self.user_id)
-            .execute()
-            .data
-        )
+        current_balance = included_account_total(self.client, self.user_id)
         income = Decimal(0)
         expense = Decimal(0)
         offset = 0
@@ -69,7 +65,7 @@ class SupabaseFinanceQueries:
                 break
             offset += 500
         return {
-            "current_balance": str(profile[0]["current_balance"] if profile else 0),
+            "current_balance": current_balance,
             "monthly_income": str(income),
             "monthly_expense": str(expense),
         }

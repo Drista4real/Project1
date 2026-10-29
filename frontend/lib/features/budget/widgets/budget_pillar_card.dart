@@ -29,9 +29,9 @@ class BudgetPillarCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: EnvelopeStyle.border),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -72,11 +72,17 @@ class BudgetPillarCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
-                child: _metric('Đã chi', formatVnd(used), EnvelopeStyle.ink),
+                child: _metric(
+                  context,
+                  'Đã chi',
+                  formatVnd(used),
+                  Theme.of(context).colorScheme.onSurface,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _metric(
+                  context,
                   direct != null
                       ? 'Hạn mức trụ cột'
                       : records.isNotEmpty && limit > 0
@@ -108,7 +114,9 @@ class BudgetPillarCard extends StatelessWidget {
                 : 'Còn ${formatVnd(remaining)} · ${(progress * 100).toStringAsFixed(1)}% đã dùng',
             style: TextStyle(
               fontSize: 11,
-              color: warning ? EnvelopePillar.wants.color : EnvelopeStyle.muted,
+              color: warning
+                  ? EnvelopePillar.wants.color
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           if (warning)
@@ -133,11 +141,14 @@ class BudgetPillarCard extends StatelessWidget {
               ),
             ),
           if (records.isEmpty)
-            const Padding(
+            Padding(
               padding: EdgeInsets.symmetric(vertical: 12),
               child: Text(
                 'Chưa có hạn mức riêng cho danh mục.',
-                style: TextStyle(fontSize: 11, color: EnvelopeStyle.muted),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             )
           else
@@ -153,9 +164,9 @@ class BudgetPillarCard extends StatelessWidget {
                 childrenPadding: EdgeInsets.zero,
                 title: Text(
                   '${records.length} hạn mức danh mục',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: EnvelopeStyle.muted,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
                 children: [
@@ -175,12 +186,20 @@ class BudgetPillarCard extends StatelessWidget {
     );
   }
 
-  Widget _metric(String label, String value, Color color) => Column(
+  Widget _metric(
+    BuildContext context,
+    String label,
+    String value,
+    Color color,
+  ) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Text(
         label,
-        style: const TextStyle(fontSize: 10, color: EnvelopeStyle.muted),
+        style: TextStyle(
+          fontSize: 10,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
       ),
       const SizedBox(height: 4),
       SizedBox(

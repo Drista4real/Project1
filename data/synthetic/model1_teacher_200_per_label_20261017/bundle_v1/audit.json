@@ -1,0 +1,67 @@
+{
+  "ambiguity_policy": "quarantine",
+  "duplicate_groups": [],
+  "duplicates_removed": 0,
+  "eligible_category_counts": {
+    "Hóa đơn/Nhà ở": 200,
+    "Khác": 200,
+    "Mua sắm": 200,
+    "Y tế": 200,
+    "Ăn uống": 200,
+    "Đi lại": 200
+  },
+  "eligible_unique_rows": 1200,
+  "grouping": {
+    "algorithm": "nfc_exact_money_mask_accentfold_compact_sequence_v1",
+    "groups": 597,
+    "groups_per_category": {
+      "Hóa đơn/Nhà ở": 100,
+      "Khác": 100,
+      "Mua sắm": 100,
+      "Y tế": 98,
+      "Ăn uống": 100,
+      "Đi lại": 100
+    },
+    "largest_group_rows": 4,
+    "limitations": [
+      "Lexical matching cannot prove semantic independence or label correctness.",
+      "Money masking can conservatively group unrelated numeric descriptions.",
+      "User/source/template isolation only applies when metadata is supplied."
+    ],
+    "near_candidate_comparisons": 105963,
+    "near_pairs": [
+      {
+        "left": "rec_cacee93f058c4801484aaa71",
+        "right": "rec_1338a8f552ea944d3c07ae29",
+        "similarity": 0.916667
+      },
+      {
+        "left": "rec_aa0f98e902563286f3ffccbb",
+        "right": "rec_38d5ce86301af254222ad8e7",
+        "similarity": 0.926829
+      },
+      {
+        "left": "rec_e94500eb25c16425fb79be5c",
+        "right": "rec_9be3fea1b3e7045c961e69ca",
+        "similarity": 0.923077
+      }
+    ],
+    "near_threshold": 0.9
+  },
+  "metadata_coverage": {
+    "rows_with_source_group": 1200,
+    "rows_with_subject_id": 0,
+    "rows_with_template_id": 0
+  },
+  "raw_exact_duplicate_excess": 0,
+  "raw_rows": 1200,
+  "review_reasons": {},
+  "review_rows": 0,
+  "review_rules_are_exhaustive": false,
+  "status": "passed",
+  "warnings": [
+    "Synthetic splits are development benchmarks, not real-world evaluation.",
+    "Heuristic ambiguity checks do not replace human annotation review.",
+    "Review reports may contain sensitive text; keep this bundle private."
+  ]
+}

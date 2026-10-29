@@ -56,7 +56,7 @@ EnvelopeMemoryRepository fixture() {
       'id': 30 + i,
       'category_id': null,
       'pillar': pillars[i],
-      'limit_amount': '${[10000000, 5000000, 3000000, 2000000][i]}',
+      'limit_amount': '${[11000000, 5000000, 3000000, 2500000][i]}',
       'month_year': '2026-10-01',
     });
   }

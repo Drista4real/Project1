@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:project_one/core/theme/app_theme.dart';
 import 'package:project_one/shared/formatters/currency_formatter.dart';
 
 class ParsedTransactionItem {
@@ -60,9 +59,11 @@ class ParsedTransactionCard extends StatelessWidget {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppTheme.borderLight),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ),
         child: Column(
           children: [
@@ -74,7 +75,9 @@ class ParsedTransactionCard extends StatelessWidget {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFECE5),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -95,18 +98,20 @@ class ParsedTransactionCard extends StatelessWidget {
                           Flexible(
                             child: Text(
                               item.title,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14.5,
                                 fontWeight: FontWeight.w800,
-                                color: AppTheme.textCharcoal,
+                                color: Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
                           ),
                           const SizedBox(width: 5),
-                          const Icon(
+                          Icon(
                             Icons.edit_outlined,
                             size: 13,
-                            color: AppTheme.textMuted,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ],
                       ),
@@ -118,36 +123,46 @@ class ParsedTransactionCard extends StatelessWidget {
                                 ? Icons.payments_outlined
                                 : Icons.account_balance_outlined,
                             size: 13,
-                            color: AppTheme.textMuted,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             item.accountType,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 10.5,
-                              color: AppTheme.textMuted,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                           ),
                           const SizedBox(width: 6),
-                          const Text(
+                          Text(
                             '•',
                             style: TextStyle(
                               fontSize: 10,
-                              color: AppTheme.textMuted,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                           ),
                           const SizedBox(width: 6),
-                          const Icon(
+                          Icon(
                             Icons.access_time,
                             size: 12,
-                            color: AppTheme.textMuted,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                           const SizedBox(width: 3),
                           Text(
                             item.timeString,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 10.5,
-                              color: AppTheme.textMuted,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -173,9 +188,9 @@ class ParsedTransactionCard extends StatelessWidget {
                       item.accountType == 'Tiền mặt'
                           ? 'Chi phí tự động'
                           : 'Đã trừ tài khoản',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 9.5,
-                        color: AppTheme.textMuted,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -197,8 +212,8 @@ class ParsedTransactionCard extends StatelessWidget {
                   ),
                   decoration: BoxDecoration(
                     color: item.pillar.contains('Needs')
-                        ? const Color(0xFFEAF5EE)
-                        : const Color(0xFFFFECE5),
+                        ? Theme.of(context).colorScheme.surfaceContainerHighest
+                        : Theme.of(context).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
@@ -208,7 +223,7 @@ class ParsedTransactionCard extends StatelessWidget {
                         Icons.circle,
                         size: 7,
                         color: item.pillar.contains('Needs')
-                            ? AppTheme.primaryForestGreen
+                            ? Theme.of(context).colorScheme.primary
                             : const Color(0xFFB64F2D),
                       ),
                       const SizedBox(width: 4),
@@ -218,15 +233,15 @@ class ParsedTransactionCard extends StatelessWidget {
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
                           color: item.pillar.contains('Needs')
-                              ? AppTheme.primaryForestGreen
+                              ? Theme.of(context).colorScheme.primary
                               : const Color(0xFFB64F2D),
                         ),
                       ),
                       const SizedBox(width: 3),
-                      const Icon(
+                      Icon(
                         Icons.keyboard_arrow_down,
                         size: 14,
-                        color: AppTheme.textMuted,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ],
                   ),
@@ -240,15 +255,17 @@ class ParsedTransactionCard extends StatelessWidget {
                     vertical: 5,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F1),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Text(
                     item.subCategory,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 10.5,
                       fontWeight: FontWeight.w600,
-                      color: AppTheme.textCharcoal,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
                   ),
                 ),
@@ -267,7 +284,7 @@ class ParsedTransactionCard extends StatelessWidget {
                         size: 13,
                         color: item.isWarning
                             ? const Color(0xFFB64F2D)
-                            : AppTheme.primaryForestGreen,
+                            : Theme.of(context).colorScheme.primary,
                       ),
                       const SizedBox(width: 3),
                       Text(
@@ -277,7 +294,7 @@ class ParsedTransactionCard extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                           color: item.isWarning
                               ? const Color(0xFFB64F2D)
-                              : AppTheme.primaryForestGreen,
+                              : Theme.of(context).colorScheme.primary,
                         ),
                       ),
                     ],

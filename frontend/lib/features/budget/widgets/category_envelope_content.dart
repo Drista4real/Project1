@@ -6,12 +6,14 @@ import 'envelope_banner.dart';
 import 'envelope_pillar_group.dart';
 import 'envelope_toolbar.dart';
 import 'pillar_allocation_card.dart';
+import 'envelope_funding_card.dart';
 
 class CategoryEnvelopeContent extends StatelessWidget {
   const CategoryEnvelopeContent({
     super.key,
     required this.data,
     required this.search,
+    required this.query,
     required this.onSearch,
     required this.onMonth,
     required this.onAdd,
@@ -23,6 +25,7 @@ class CategoryEnvelopeContent extends StatelessWidget {
   });
   final CategoryEnvelopeData data;
   final TextEditingController search;
+  final String query;
   final VoidCallback onSearch, onRebalance;
   final ValueChanged<String> onAdvanced;
   final ValueChanged<int> onMonth;
@@ -33,7 +36,7 @@ class CategoryEnvelopeContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final query = search.text.trim().toLowerCase();
+    final query = this.query.trim().toLowerCase();
     final categories = data.expenses
         .where((c) => '${c['name']}'.toLowerCase().contains(query))
         .toList();
@@ -57,6 +60,7 @@ class CategoryEnvelopeContent extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             PillarAllocationCard(data: data),
+            EnvelopeFundingCard(data: data),
             if (query.isNotEmpty && categories.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 28),
@@ -89,15 +93,15 @@ class CategoryEnvelopeContent extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: EnvelopeStyle.border,
+                color: Theme.of(context).colorScheme.outlineVariant,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Row(
+              child: Row(
                 children: [
                   Icon(
                     Icons.touch_app_outlined,
                     size: 20,
-                    color: EnvelopeStyle.muted,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                   SizedBox(width: 8),
                   Expanded(
@@ -106,7 +110,7 @@ class CategoryEnvelopeContent extends StatelessWidget {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 11,
-                        color: EnvelopeStyle.muted,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                         height: 1.5,
                       ),
                     ),
@@ -127,25 +131,29 @@ class CategoryEnvelopeContent extends StatelessWidget {
                   child: Text('Hạn mức tổng & tùy chọn ngân sách'),
                 ),
               ],
-              child: const Padding(
+              child: Padding(
                 padding: EdgeInsets.symmetric(vertical: 14),
                 child: Row(
                   children: [
-                    Icon(Icons.tune, size: 18, color: EnvelopeStyle.primary),
+                    Icon(
+                      Icons.tune,
+                      size: 18,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Quản lý danh mục & ngân sách nâng cao',
                         style: TextStyle(
                           fontSize: 11,
-                          color: EnvelopeStyle.primary,
+                          color: Theme.of(context).colorScheme.primary,
                         ),
                       ),
                     ),
                     Icon(
                       Icons.expand_more,
                       size: 18,
-                      color: EnvelopeStyle.primary,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
                   ],
                 ),

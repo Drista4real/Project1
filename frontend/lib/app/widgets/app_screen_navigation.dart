@@ -17,7 +17,36 @@ class AppScreenNavigation extends StatelessWidget {
   });
 
   Future<void> _addTransaction(BuildContext context) async {
-    final saved = await context.push<bool>(AppRoutes.addTransaction);
+    final route = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(
+                Icons.auto_fix_high,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              title: const Text('Nhập nhanh AI'),
+              subtitle: const Text('Gõ hoặc nói nội dung thu chi'),
+              onTap: () => Navigator.pop(sheetContext, AppRoutes.aiQuickInput),
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Nhập thủ công'),
+              subtitle: const Text('Tự chọn số tiền, ví và danh mục'),
+              onTap: () =>
+                  Navigator.pop(sheetContext, AppRoutes.addTransaction),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (route == null || !context.mounted) return;
+    final saved = await context.push<bool>(route);
     if (saved == true) await onTransactionAdded?.call();
   }
 
@@ -41,8 +70,15 @@ class AppScreenNavigation extends StatelessWidget {
       ),
       (Icons.tune_outlined, Icons.tune, 'Cài đặt'),
     ];
+    const identifiers = [
+      'nav-ledger',
+      'nav-reports',
+      'nav-add',
+      'nav-budget',
+      'nav-settings',
+    ];
     return BottomAppBar(
-      color: const Color(0xFFF6FBF5),
+      color: Theme.of(context).colorScheme.surface,
       elevation: 0,
       padding: EdgeInsets.zero,
       child: SizedBox(
@@ -51,66 +87,75 @@ class AppScreenNavigation extends StatelessWidget {
           children: [
             for (var i = 0; i < items.length; i++)
               Expanded(
-                child: i == 2
-                    ? Align(
-                        alignment: Alignment.topCenter,
-                        child: Transform.translate(
-                          offset: const Offset(0, -12),
-                          child: SizedBox(
-                            width: 54,
-                            height: 54,
-                            child: FloatingActionButton(
-                              heroTag: 'quick-add-navigation',
-                              onPressed: () => _addTransaction(context),
-                              backgroundColor: AppTheme.primaryForestGreen,
-                              elevation: 3,
-                              shape: const CircleBorder(),
-                              child: const Icon(
-                                Icons.add,
-                                color: Colors.white,
-                                size: 29,
+                child: Semantics(
+                  container: true,
+                  identifier: identifiers[i],
+                  child: i == 2
+                      ? Align(
+                          alignment: Alignment.topCenter,
+                          child: Transform.translate(
+                            offset: const Offset(0, -12),
+                            child: SizedBox(
+                              width: 54,
+                              height: 54,
+                              child: FloatingActionButton(
+                                heroTag: 'quick-add-navigation',
+                                onPressed: () => _addTransaction(context),
+                                backgroundColor: AppTheme.primaryForestGreen,
+                                elevation: 3,
+                                shape: const CircleBorder(),
+                                child: const Icon(
+                                  Icons.add,
+                                  color: Colors.white,
+                                  size: 29,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      )
-                    : InkWell(
-                        onTap: () {
-                          final routeIndex = i < 2 ? i : i - 1;
-                          if (routeIndex != selectedIndex) {
-                            context.go(routes[i]);
-                          } else {
-                            onSelectedTab?.call();
-                          }
-                        },
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              selectedIndex == (i < 2 ? i : i - 1)
-                                  ? items[i].$2
-                                  : items[i].$1,
-                              color: selectedIndex == (i < 2 ? i : i - 1)
-                                  ? AppTheme.primaryForestGreen
-                                  : AppTheme.textMuted,
-                              size: 21,
-                            ),
-                            const SizedBox(height: 3),
-                            Text(
-                              items[i].$3,
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: selectedIndex == (i < 2 ? i : i - 1)
-                                    ? FontWeight.w700
-                                    : FontWeight.normal,
+                        )
+                      : InkWell(
+                          onTap: () {
+                            final routeIndex = i < 2 ? i : i - 1;
+                            if (routeIndex != selectedIndex) {
+                              context.go(routes[i]);
+                            } else {
+                              onSelectedTab?.call();
+                            }
+                          },
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                selectedIndex == (i < 2 ? i : i - 1)
+                                    ? items[i].$2
+                                    : items[i].$1,
                                 color: selectedIndex == (i < 2 ? i : i - 1)
-                                    ? AppTheme.primaryForestGreen
-                                    : AppTheme.textMuted,
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
+                                size: 21,
                               ),
-                            ),
-                          ],
+                              const SizedBox(height: 3),
+                              Text(
+                                items[i].$3,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight:
+                                      selectedIndex == (i < 2 ? i : i - 1)
+                                      ? FontWeight.w700
+                                      : FontWeight.normal,
+                                  color: selectedIndex == (i < 2 ? i : i - 1)
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+                ),
               ),
           ],
         ),

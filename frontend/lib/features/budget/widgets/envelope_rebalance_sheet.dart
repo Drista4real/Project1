@@ -1,3 +1,5 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:project_one/features/budget/cubit/envelope_form_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:project_one/shared/widgets/finance_form.dart';
@@ -6,6 +8,7 @@ import '../models/envelope_pillar.dart';
 import '../services/category_envelopes_service.dart';
 import 'envelope_amount_field.dart';
 import 'envelope_sheet_frame.dart';
+import 'envelope_funding_card.dart';
 
 class EnvelopeRebalanceSheet extends StatefulWidget {
   const EnvelopeRebalanceSheet({
@@ -26,45 +29,24 @@ class _EnvelopeRebalanceSheetState extends State<EnvelopeRebalanceSheet> {
         ? envelopeAmountText(widget.data.totalLimit)
         : widget.data.allocated > 0
         ? envelopeAmountText(widget.data.allocated)
+        : (widget.data.availableBalance ?? 0) > 0
+        ? envelopeAmountText(widget.data.availableBalance!)
         : '',
   );
   late final _percent = List.generate(
     4,
     (i) => TextEditingController(text: '${widget.data.roundedPercentages[i]}'),
   );
-  bool _busy = false;
-  String? _error;
+  late final _cubit = EnvelopeFormCubit(widget.service, widget.data);
+  bool get _busy => _cubit.state.busy;
+  String? get _error => _cubit.state.error;
   List<int> get _values =>
       _percent.map((c) => int.tryParse(c.text) ?? 0).toList();
   int get _sum => _values.fold(0, (a, b) => a + b);
 
   Future<void> _save() async {
     if (_busy || !validateFinanceForm(_form)) return;
-    if (_sum != 100) {
-      setState(() => _error = 'Tổng phân bổ phải bằng 100%.');
-      return;
-    }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      final fresh = await widget.service.load(widget.data.month);
-      await widget.service.rebalance(
-        fresh,
-        envelopeAmount(_total.text)!,
-        _values,
-      );
-      if (mounted) Navigator.pop(context, true);
-    } catch (error) {
-      if (mounted) {
-        setState(
-          () => _error = 'Chưa lưu xong phân bổ. Vui lòng thử lại. $error',
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    await _cubit.rebalance(envelopeAmount(_total.text)!, _values);
   }
 
   @override
@@ -73,11 +55,26 @@ class _EnvelopeRebalanceSheetState extends State<EnvelopeRebalanceSheet> {
     for (final c in _percent) {
       c.dispose();
     }
+    _cubit.close();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => EnvelopeSheetFrame(
+  Widget build(BuildContext context) =>
+      BlocConsumer<EnvelopeFormCubit, EnvelopeFormState>(
+        bloc: _cubit,
+        listener: (context, state) {
+          if (state.saved) Navigator.pop(context, true);
+          if (state.error != null) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(state.error!)));
+          }
+        },
+        builder: (context, state) => _buildContent(context),
+      );
+
+  Widget _buildContent(BuildContext context) => EnvelopeSheetFrame(
     title: 'Tái cân bằng phong bao',
     saveLabel: 'Lưu phân bổ',
     busy: _busy,
@@ -88,12 +85,13 @@ class _EnvelopeRebalanceSheetState extends State<EnvelopeRebalanceSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          EnvelopeFundingCard(data: widget.data),
           Text(
             'Phân chia ngân sách tháng ${widget.data.month.month}/${widget.data.month.year} theo 4 trụ cột. Hạn mức riêng của danh mục được giữ nguyên.',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               height: 1.5,
-              color: EnvelopeStyle.muted,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const EnvelopeFieldLabel('Ngân sách tháng (VNĐ)'),
@@ -102,6 +100,19 @@ class _EnvelopeRebalanceSheetState extends State<EnvelopeRebalanceSheet> {
             enabled: !_busy,
             fieldKey: 'rebalance-total',
           ),
+          if ((widget.data.availableBalance ?? 0) > 0)
+            TextButton.icon(
+              key: const ValueKey('use-wallet-balance'),
+              onPressed: _busy
+                  ? null
+                  : () => setState(() {
+                      _total.text = envelopeAmountText(
+                        widget.data.availableBalance!,
+                      );
+                    }),
+              icon: const Icon(Icons.account_balance_wallet_outlined),
+              label: const Text('Dùng số dư ví làm ngân sách'),
+            ),
           const SizedBox(height: 12),
           for (final pillar in EnvelopePillar.values)
             Padding(
@@ -136,7 +147,10 @@ class _EnvelopeRebalanceSheetState extends State<EnvelopeRebalanceSheet> {
                         LengthLimitingTextInputFormatter(3),
                       ],
                       onChanged: (_) => setState(() {}),
-                      decoration: envelopeInput('0').copyWith(suffixText: '%'),
+                      decoration: envelopeInput(
+                        context,
+                        '0',
+                      ).copyWith(suffixText: '%'),
                       validator: (v) =>
                           int.tryParse(v ?? '') == null || int.parse(v!) > 100
                           ? '0–100%'
@@ -152,7 +166,7 @@ class _EnvelopeRebalanceSheetState extends State<EnvelopeRebalanceSheet> {
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: _sum == 100
-                  ? EnvelopeStyle.primary
+                  ? Theme.of(context).colorScheme.primary
                   : Theme.of(context).colorScheme.error,
             ),
           ),
