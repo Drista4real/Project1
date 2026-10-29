@@ -108,6 +108,11 @@ class TestParseReceiptContent:
         result = parse_receipt_content(content)
         assert isinstance(result, ReceiptExtractionResult)
 
+    def test_fence_with_large_whitespace_and_no_end_is_rejected(self):
+        """Malformed long model responses must not cause regex backtracking."""
+        with pytest.raises(ReceiptOutputError):
+            parse_receipt_content("```json" + " " * 100_000 + "{")
+
     def test_rejects_non_string(self):
         """Test rejecting non-string input."""
         with pytest.raises(ReceiptOutputError) as exc_info:

@@ -224,7 +224,7 @@ class DemoPipeline:
             raise ValueError("Enter 1 to 2000 characters")
         start = perf_counter()
         normalized, amount = VietnameseFinancialSlangNormalizer().normalize(text)
-        amounts = re.findall(r"(?<![\w+\-])\d+ đồng(?!\w)", normalized)
+        amounts = re.findall(r"(?<![\w+\-])\d++ đồng(?!\w)", normalized)
         warnings: list[str] = []
         if len(amounts) != 1 or amount is None or not 0 < amount <= 9_999_999_999_999:
             amount = None

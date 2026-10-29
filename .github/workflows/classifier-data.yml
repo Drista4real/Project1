@@ -34,7 +34,8 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install test tools without ML dependencies
-        run: python -m pip install pytest==9.1.1 ruff==0.17.0
+        run: >-
+          python -m pip install --only-binary=:all: pytest==9.1.1 ruff==0.17.0
       - name: Lint dataset pipeline
         run: python -m ruff check --config backend/pyproject.toml backend/scripts/dataset_pipeline.py backend/scripts/prepare_classifier_data.py tests/datasets
       - name: Verify data integrity and split invariants

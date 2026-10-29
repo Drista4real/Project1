@@ -27,7 +27,9 @@ ROOT = Path(__file__).resolve().parents[2]
 TAXONOMY = ROOT / "data/taxonomy/expense_categories.v1.json"
 
 
-def test_user_scope_approval_is_limited_to_exact_text_and_category(tmp_path: Path) -> None:
+def test_user_scope_approval_is_limited_to_exact_text_and_category(
+    tmp_path: Path,
+) -> None:
     """Nine explicit decisions resolve only the scope flag, preserving other checks."""
     policy = ROOT / "data/taxonomy/expense_categories.v3_user_review.json"
     payload = json.loads(policy.read_text(encoding="utf-8"))
@@ -35,11 +37,15 @@ def test_user_scope_approval_is_limited_to_exact_text_and_category(tmp_path: Pat
              "annotation_status": "approved"}
             for e in payload["approved_scope_exceptions"]]
     path = write_input(tmp_path / "approved.csv", rows)
-    records, _ = read_sources([Source(path, "user-reviewed", "public", "user supplied")])
+    records, _ = read_sources(
+        [Source(path, "user-reviewed", "public", "user supplied")]
+    )
     eligible, review, _ = audit_records(records, Taxonomy.load(policy), "quarantine")
     assert len(eligible) == 9
     assert not review
-    records, _ = read_sources([Source(path, "user-reviewed", "public", "user supplied")])
+    records, _ = read_sources(
+        [Source(path, "user-reviewed", "public", "user supplied")]
+    )
     _, old_review, _ = audit_records(records, Taxonomy.load(TAXONOMY), "quarantine")
     assert len(old_review) == 9
     rows = [
@@ -49,7 +55,9 @@ def test_user_scope_approval_is_limited_to_exact_text_and_category(tmp_path: Pat
     ]
     write_input(path, rows)
     records, _ = read_sources([Source(path, "fixture", "synthetic", "test")])
-    eligible, review, audit = audit_records(records, Taxonomy.load(policy), "quarantine")
+    eligible, review, audit = audit_records(
+        records, Taxonomy.load(policy), "quarantine"
+    )
     assert not eligible
     assert len(review) == 3
     assert audit["review_reasons"]["possible_income_transfer_or_debt"] == 2
@@ -65,7 +73,9 @@ def test_scope_approval_requires_documented_user_decision(tmp_path: Path) -> Non
         Taxonomy.load(path)
 
 
-def test_supplied_labels_keep_unreviewed_status_and_still_obey_audit(tmp_path: Path) -> None:
+def test_supplied_labels_keep_unreviewed_status_and_still_obey_audit(
+    tmp_path: Path,
+) -> None:
     """Development ingestion must not claim approval or bypass conflict checks."""
     rows = examples()[:3]
     for row in rows:
@@ -85,7 +95,9 @@ def test_supplied_labels_keep_unreviewed_status_and_still_obey_audit(tmp_path: P
     assert audit["review_reasons"]["conflicting_annotation"] == 2
 
 
-def test_near_comparison_limit_is_explicit_and_never_skips_pairs(tmp_path: Path) -> None:
+def test_near_comparison_limit_is_explicit_and_never_skips_pairs(
+    tmp_path: Path,
+) -> None:
     """Increasing the budget permits work; exhausting it still fails closed."""
     label = next(iter(Taxonomy.load(TAXONOMY).labels))
     path = write_input(tmp_path / "similar.csv", [
