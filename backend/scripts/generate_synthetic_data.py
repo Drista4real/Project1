@@ -256,7 +256,8 @@ def generate_balances(
     if not isinstance(start_date, date):
         raise ValueError("start_date must be a date")
     # Validate the complete date range before creating or overwriting files.
-    start_date + timedelta(days=balance_days - 1)
+    if balance_days - 1 > (date.max - start_date).days:
+        raise OverflowError("Balance date range exceeds the supported maximum")
     output_dir.mkdir(parents=True, exist_ok=True)
     fixed_path = output_dir / "balance_fixed.csv"
     flexible_path = output_dir / "balance_flexible.csv"

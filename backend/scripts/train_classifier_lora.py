@@ -97,6 +97,7 @@ def make_loader(rows, tokenizer, labels, options, *, shuffle=False):
         features,
         batch_size=options.batch_size,
         shuffle=shuffle,
+        num_workers=0,
         collate_fn=DataCollatorWithPadding(tokenizer, pad_to_multiple_of=8),
         generator=torch.Generator().manual_seed(options.seed),
     )

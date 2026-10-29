@@ -14,9 +14,25 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT))
 
-from app.domain.interfaces.classifier_interface import ClassificationResult  # noqa: E402
+from app.domain.interfaces.classifier_interface import (  # noqa: E402
+    ClassificationResult,
+)
 from app.infrastructure.ai.cloud_vlm._common import CloudVLMError  # noqa: E402
 from frontend import demo_pipeline as pipeline  # noqa: E402
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("cơm 40000 đồng và nước 5000 đồng", 2),
+        ("abc400 đồng +20 đồng -10 đồng ٢٣ đồng", 1),
+        ("10 đồng_x 20 đồng!", 1),
+        ("9" * 100_000 + " không phải tiền", 0),
+    ],
+    ids=["two", "boundaries", "suffix", "long-input"],
+)
+def test_normalized_amount_count(text: str, expected: int) -> None:
+    assert pipeline.count_normalized_amounts(text) == expected
 
 
 def wav_bytes(seconds: int = 1) -> bytes:
