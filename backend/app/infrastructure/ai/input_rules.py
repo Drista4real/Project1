@@ -95,7 +95,9 @@ def split_transactions(text: str) -> list[str]:
     """
     explicit = [
         s.strip()
-        for s in re.split(r"[;\n]+|,(?!\d)|\s+(?:và|rồi)\s+", text, flags=re.I)
+        for s in re.split(
+            r"[;\n]+|,(?!\d)|(?<!\s)\s+(?:và|rồi)\s+", text, flags=re.I
+        )
         if s.strip()
     ]
     result: list[str] = []

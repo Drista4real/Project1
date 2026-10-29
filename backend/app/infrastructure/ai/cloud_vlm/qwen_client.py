@@ -76,11 +76,11 @@ def parse_receipt_content(content: object) -> ReceiptExtractionResult:
     if not isinstance(content, str):
         raise ReceiptOutputError(("response: không có nội dung JSON dạng văn bản",))
     text = content.strip()
-    fenced = re.fullmatch(
-        r"```(?:json)?\s*\n?(.*?)\n?```", text, flags=re.DOTALL | re.IGNORECASE
-    )
-    if fenced is not None:
-        text = fenced.group(1).strip()
+    if text.startswith("```") and text.endswith("```") and len(text) >= 6:
+        text = text[3:-3]
+        if text[:4].lower() == "json":
+            text = text[4:]
+        text = text.strip()
     try:
         values = json.loads(text)
     except json.JSONDecodeError:
