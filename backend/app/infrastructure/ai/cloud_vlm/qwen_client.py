@@ -138,6 +138,7 @@ class QwenVLMReceiptExtractor(IReceiptExtractor):
         model_name: str | None = None,
         test_mode: bool | None = None,
         timeout_seconds: float = 15.0,
+        http_client: httpx.AsyncClient | None = None,
     ) -> None:
         """Configure OpenRouter, DashScope or FPT; tests stay offline."""
         if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
@@ -198,8 +199,15 @@ class QwenVLMReceiptExtractor(IReceiptExtractor):
             key = key.get_secret_value()
         self._api_key = SecretStr((key or "").strip())
         self.is_mock = testing or not bool(self._api_key.get_secret_value())
+        self._owns_client = http_client is None
         self._client = (
-            None if self.is_mock else httpx.AsyncClient(timeout=timeout_seconds)
+            None
+            if self.is_mock
+            else (
+                http_client
+                if http_client is not None
+                else httpx.AsyncClient(timeout=timeout_seconds)
+            )
         )
 
     async def extract_receipt(
@@ -348,5 +356,5 @@ class QwenVLMReceiptExtractor(IReceiptExtractor):
 
     async def aclose(self) -> None:
         """Release owned async HTTP resources."""
-        if self._client is not None:
+        if self._client is not None and self._owns_client:
             await self._client.aclose()

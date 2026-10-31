@@ -16,6 +16,50 @@ The preparation CLI only needs the Python standard library; it does not train
 models or modify the source CSV. Use `--dataset-dir` in `scripts/train_classifier.py`
 for verified fixed splits instead of the legacy random 80/20 mode.
 
+## Model runtime and latency
+
+[Sơ đồ trước–sau cho Model 1, 3 và 4](../docs/_shared/d2-architect/model-runtime-changes.svg)
+([PNG](../docs/_shared/d2-architect/model-runtime-changes.png),
+[nguồn D2](../docs/_shared/d2-architect/model-runtime-changes.d2)).
+
+Models 1 and 3 share one text/voice ingestion capability while retaining separate
+ASR and classifier adapters. Model 4 remains independent. See
+[ADR 0008](../docs/adr/0008-shared-ingestion-model-runtime.md) for lifecycle and scope.
+
+The API warms its local classifier before serving by default. Inspect
+`GET /ready/ai` for startup warm-up status and timings; `/health` remains liveness.
+Missing optional model dependencies keep CRUD running and report AI readiness 503.
+The current Docker image does not bundle ML dependencies/checkpoints: local model
+serving needs the corresponding classifier requirements and prepared local weights.
+Warm-up does not download them or call Gemini/Qwen.
+
+```dotenv
+CLASSIFIER_WARMUP=true
+CLASSIFIER_LORA_MERGE=false
+# Optional; benchmark on the actual host before choosing:
+# CLASSIFIER_CPU_THREADS=2
+```
+
+Merge is opt-in and affects only the in-memory LoRA serving model. Set it true
+and restart to compare. Each API worker has its own model; measure RAM
+and throughput before adding workers. Inference within a worker is serialized;
+`asyncio.to_thread` keeps the event loop free but does not add CPU capacity.
+
+From the repository root, using the environment with your ML dependencies:
+
+```powershell
+.\.venv\Scripts\python.exe backend/scripts/benchmark_inference.py --runs 30
+.\.venv\Scripts\python.exe backend/scripts/benchmark_inference.py --merge --runs 30
+.\.venv\Scripts\python.exe backend/scripts/benchmark_inference.py --threads 2 --concurrency 4
+# Optional real recording:
+.\.venv\Scripts\python.exe backend/scripts/benchmark_inference.py --audio D:/samples/voice.wav
+```
+
+Use a fresh process for each comparison. The benchmark never calls cloud APIs,
+changes checkpoints or writes financial data. Warm p50/p95 includes inference-lock
+waiting but excludes executor backlog and HTTP/network/upload time. Concurrent
+throughput is a local smoke measurement, not a production capacity estimate.
+
 ## Requirements
 
 - Python 3.12 or newer
