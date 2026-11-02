@@ -1,8 +1,10 @@
 import 'package:go_router/go_router.dart';
 import 'package:project_one/app/app_routes.dart';
 import 'package:project_one/features/ledger/screens/ledger_screen.dart';
+import 'package:project_one/features/chat/screens/chat_home_screen.dart';
 import 'package:project_one/features/reports/screens/reports_screen.dart';
 import 'package:project_one/features/budget/screens/budget_screen.dart';
+import 'package:project_one/features/plan/screens/plan_screen.dart';
 import 'package:project_one/features/settings/screens/settings_screen.dart';
 import 'package:project_one/features/transactions/screens/quick_add_transaction_screen.dart';
 import 'package:project_one/features/ai/screens/ai_quick_input_screen.dart';
@@ -10,8 +12,12 @@ import 'package:project_one/features/forecast/screens/cashflow_forecast_screen.d
 
 /// Each signed-in account owns a fresh navigation tree and screen state.
 GoRouter createAppRouter() => GoRouter(
-  initialLocation: AppRoutes.ledger,
+  initialLocation: AppRoutes.home,
   routes: [
+    GoRoute(
+      path: AppRoutes.home,
+      builder: (context, state) => const ChatHomeScreen(),
+    ),
     GoRoute(
       path: AppRoutes.ledger,
       builder: (context, state) => const LedgerScreen(),
@@ -25,6 +31,10 @@ GoRouter createAppRouter() => GoRouter(
       builder: (context, state) => const BudgetScreen(),
     ),
     GoRoute(
+      path: AppRoutes.plan,
+      builder: (context, state) => const PlanScreen(),
+    ),
+    GoRoute(
       path: AppRoutes.settings,
       builder: (context, state) => const SettingsScreen(),
     ),
@@ -34,7 +44,8 @@ GoRouter createAppRouter() => GoRouter(
     ),
     GoRoute(
       path: AppRoutes.aiQuickInput,
-      builder: (context, state) => const AiQuickInputScreen(),
+      builder: (context, state) =>
+          AiQuickInputScreen(initialPrompt: state.extra as String?),
     ),
     GoRoute(
       path: AppRoutes.forecast,

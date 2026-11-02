@@ -89,6 +89,39 @@ before the existing balance trigger executes. These scripts are not applied
 automatically. Existing users need an account in `public.accounts`; the base
 schema creates a cash account when a new user signs up.
 
+### Apply the migrations
+
+Migrations are not applied automatically. Two of them are needed for the
+budget engine and the chat agent:
+
+- `supabase/migrations/202611010001_budget_plan_engine.sql` — the plan tables,
+  the RLS policies and the `rebalance_plan` RPC (ADR 0009).
+- `supabase/migrations/202611010002_chat_agent_slots.sql` — the server-side
+  slots and the tool-call trace (ADR 0010).
+
+Paste them into the Supabase SQL editor and run them in order, or apply them
+from the repository with a direct PostgreSQL connection. Put the connection
+string in `backend/.env` (Supabase Dashboard → Settings → Database →
+Connection string, session pooler):
+
+```dotenv
+DATABASE_URL=postgresql://postgres.your-project-ref:your-password@aws-0-region.pooler.supabase.com:6543/postgres
+```
+
+URL-encode the special characters of the password (`!` becomes `%21`, for
+example). The script refuses to run while the template password is still in
+place, so a half-filled value fails fast instead of at the first query.
+
+```powershell
+pip install "psycopg[binary]"
+python -m scripts.apply_migrations --check   # report what is missing
+python -m scripts.apply_migrations           # apply every migration in order
+python -m scripts.apply_migrations --only 202611010002_chat_agent_slots.sql
+```
+
+Without the migrations the chat still answers, but the collected slots and
+the tool trace are dropped, and `/api/v1/budget-plans` answers 503.
+
 ### API AI (Model 4)
 
 Khi pull code mới, bổ sung các biến còn thiếu từ `.env.example` vào `.env`;

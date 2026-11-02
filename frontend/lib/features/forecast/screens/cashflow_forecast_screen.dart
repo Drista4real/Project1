@@ -42,7 +42,7 @@ class _ForecastPageState extends State<ForecastPage> {
     appBar: const AppScreenHeader(subtitle: 'Dự Báo'),
     body: CashflowForecastScreen(controller: _controller),
     bottomNavigationBar: AppScreenNavigation(
-      selectedIndex: 1,
+      selectedIndex: 2,
       onTransactionAdded: _controller.refresh,
     ),
   );

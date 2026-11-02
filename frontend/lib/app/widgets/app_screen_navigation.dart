@@ -50,33 +50,47 @@ class AppScreenNavigation extends StatelessWidget {
     if (saved == true) await onTransactionAdded?.call();
   }
 
+  /// The navigable destinations, in the order they appear in the bar.
+  static const List<NavDestination> destinations = <NavDestination>[
+    NavDestination(
+      route: AppRoutes.home,
+      outline: Icons.home_outlined,
+      filled: Icons.home,
+      label: 'Trang chủ',
+      identifier: 'nav-home',
+    ),
+    NavDestination(
+      route: AppRoutes.ledger,
+      outline: Icons.menu_book_outlined,
+      filled: Icons.menu_book,
+      label: 'Sổ thu chi',
+      identifier: 'nav-ledger',
+    ),
+    NavDestination(
+      route: AppRoutes.reports,
+      outline: Icons.pie_chart_outline,
+      filled: Icons.pie_chart,
+      label: 'Báo cáo',
+      identifier: 'nav-reports',
+    ),
+    NavDestination(
+      route: AppRoutes.budget,
+      outline: Icons.account_balance_wallet_outlined,
+      filled: Icons.account_balance_wallet,
+      label: 'Ngân sách',
+      identifier: 'nav-budget',
+    ),
+    NavDestination(
+      route: AppRoutes.settings,
+      outline: Icons.tune_outlined,
+      filled: Icons.tune,
+      label: 'Cài đặt',
+      identifier: 'nav-settings',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    const routes = [
-      AppRoutes.ledger,
-      AppRoutes.reports,
-      '',
-      AppRoutes.budget,
-      AppRoutes.settings,
-    ];
-    const items = [
-      (Icons.menu_book_outlined, Icons.menu_book, 'Sổ thu chi'),
-      (Icons.pie_chart_outline, Icons.pie_chart, 'Báo cáo'),
-      (Icons.add, Icons.add, ''),
-      (
-        Icons.account_balance_wallet_outlined,
-        Icons.account_balance_wallet,
-        'Ngân sách',
-      ),
-      (Icons.tune_outlined, Icons.tune, 'Cài đặt'),
-    ];
-    const identifiers = [
-      'nav-ledger',
-      'nav-reports',
-      'nav-add',
-      'nav-budget',
-      'nav-settings',
-    ];
     return BottomAppBar(
       color: Theme.of(context).colorScheme.surface,
       elevation: 0,
@@ -85,81 +99,93 @@ class AppScreenNavigation extends StatelessWidget {
         height: 68,
         child: Row(
           children: [
-            for (var i = 0; i < items.length; i++)
-              Expanded(
-                child: Semantics(
-                  container: true,
-                  identifier: identifiers[i],
-                  child: i == 2
-                      ? Align(
-                          alignment: Alignment.topCenter,
-                          child: Transform.translate(
-                            offset: const Offset(0, -12),
-                            child: SizedBox(
-                              width: 54,
-                              height: 54,
-                              child: FloatingActionButton(
-                                heroTag: 'quick-add-navigation',
-                                onPressed: () => _addTransaction(context),
-                                backgroundColor: AppTheme.primaryForestGreen,
-                                elevation: 3,
-                                shape: const CircleBorder(),
-                                child: const Icon(
-                                  Icons.add,
-                                  color: Colors.white,
-                                  size: 29,
-                                ),
-                              ),
-                            ),
-                          ),
-                        )
-                      : InkWell(
-                          onTap: () {
-                            final routeIndex = i < 2 ? i : i - 1;
-                            if (routeIndex != selectedIndex) {
-                              context.go(routes[i]);
-                            } else {
-                              onSelectedTab?.call();
-                            }
-                          },
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                selectedIndex == (i < 2 ? i : i - 1)
-                                    ? items[i].$2
-                                    : items[i].$1,
-                                color: selectedIndex == (i < 2 ? i : i - 1)
-                                    ? Theme.of(context).colorScheme.primary
-                                    : Theme.of(
-                                        context,
-                                      ).colorScheme.onSurfaceVariant,
-                                size: 21,
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                items[i].$3,
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight:
-                                      selectedIndex == (i < 2 ? i : i - 1)
-                                      ? FontWeight.w700
-                                      : FontWeight.normal,
-                                  color: selectedIndex == (i < 2 ? i : i - 1)
-                                      ? Theme.of(context).colorScheme.primary
-                                      : Theme.of(
-                                          context,
-                                        ).colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                ),
-              ),
+            Expanded(child: _buildItem(context, 0)),
+            Expanded(child: _buildItem(context, 1)),
+            Expanded(child: _buildAddButton(context)),
+            Expanded(child: _buildItem(context, 2)),
+            Expanded(child: _buildItem(context, 3)),
+            Expanded(child: _buildItem(context, 4)),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildItem(BuildContext context, int index) {
+    final destination = destinations[index];
+    final isSelected = selectedIndex == index;
+    return Semantics(
+      container: true,
+      identifier: destination.identifier,
+      child: InkWell(
+        onTap: () {
+          if (!isSelected) {
+            context.go(destination.route);
+          } else {
+            onSelectedTab?.call();
+          }
+        },
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isSelected ? destination.filled : destination.outline,
+              color: isSelected
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
+              size: 21,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              destination.label,
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.normal,
+                color: isSelected
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddButton(BuildContext context) {
+    return Align(
+      alignment: Alignment.topCenter,
+      child: Transform.translate(
+        offset: const Offset(0, -12),
+        child: SizedBox(
+          width: 54,
+          height: 54,
+          child: FloatingActionButton(
+            heroTag: 'quick-add-navigation',
+            onPressed: () => _addTransaction(context),
+            backgroundColor: AppTheme.primaryForestGreen,
+            elevation: 3,
+            shape: const CircleBorder(),
+            child: const Icon(Icons.add, color: Colors.white, size: 29),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class NavDestination {
+  const NavDestination({
+    required this.route,
+    required this.outline,
+    required this.filled,
+    required this.label,
+    required this.identifier,
+  });
+
+  final String route;
+  final IconData outline;
+  final IconData filled;
+  final String label;
+  final String identifier;
 }

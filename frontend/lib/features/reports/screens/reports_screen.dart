@@ -58,7 +58,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             builder: (context, data, refresh) => _history(data),
           ),
     bottomNavigationBar: AppScreenNavigation(
-      selectedIndex: 1,
+      selectedIndex: 2,
       onTransactionAdded: _dataController.refresh,
     ),
   );
