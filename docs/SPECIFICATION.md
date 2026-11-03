@@ -250,3 +250,29 @@ Kết quả cần lưu dấu nguồn phiên âm/trích xuất/phân loại riên
 - **Cần nghiệm thu riêng:** SQLCipher/kho nháp offline, vòng đời media và quyền tải audio, kiểm định schema phía provider, GPU/vLLM tự quản, hiệu năng/WER/F1 và retry/chống trùng xuyên suốt. App lock trong ADR 0001 không thay thế mã hóa dữ liệu.
 
 Thiết kế này mở rộng quy tắc cũ “Qwen đọc ảnh, Gemini chỉ text/advisor” bằng hai nhánh media dự phòng có kiểm soát. Tài liệu setup adapter mô tả hành vi code hiện tại; [ADR 0004](adr/0004-three-tier-ai-and-modality-fallback.md) ghi nhận quyết định đích. Thay đổi tài liệu không tự bật tải audio hoặc gọi thêm cloud.
+
+### 5.7. Mở rộng: ngân sách động và cố vấn trước khi mua
+
+Phần mở rộng này được đặc tả riêng trong [DYNAMIC_BUDGET_SPEC.md](DYNAMIC_BUDGET_SPEC.md): hội thoại thu thập slot, Budget Engine chia tiền theo ngày, mô phỏng giao dịch trước khi mua và chia lại các ngày còn lại.
+
+Bốn ràng buộc rút ra từ đặc tả gốc và được giữ nguyên:
+
+1. **LLM không tính toán tài chính.** Mọi phép chia ngân sách, kiểm tra số học, ngưỡng cảnh báo và ghi dữ liệu là deterministic code ở Tầng 2; Gemini chỉ giao tiếp, trích xuất slot và phát sinh lời gọi tool có validate.
+2. **Ngân sách động là bản chiếu của mô hình envelope sẵn có**, không phải nguồn sự thật thứ hai. Việc chia lại hạn mức tuân theo quy tắc chặn của [ADR 0005](adr/0005-envelope-capacity-and-wallet-totals.md) và ghi bằng một transaction.
+3. **Mô phỏng giao dịch dùng lại kết quả Model 2**, không tính lại runway, để ứng dụng chỉ hiển thị một con số số dư còn lại có thẩm quyền.
+4. **Cố vấn trước khi mua phụ thuộc các route nhập liệu media** (`/api/v1/ingestion/audio`, `/api/v1/ingestion/receipt`) mà mục 5.6 xếp vào giai đoạn sau. Đó là điều kiện tiên quyết, không phải tuỳ chọn.
+
+Tài liệu mở rộng không tự bật tính năng nào và không thay đổi trách nhiệm của Model 1–4 như đặc tả ở mục 5.2.
+
+### 5.8. Trang chủ hội thoại (Conversational Canvas)
+
+Trang chủ (`/`) là canvas hội thoại: lời chào, danh sách gợi ý câu hỏi nhanh, khung chat và ô soạn thảo. Sổ thu chi giữ nguyên chức năng và chuyển sang route riêng (`/ledger`) với một mục điều hướng riêng.
+
+Ràng buộc giữ nguyên từ [ADR 0010](adr/0010-conversational-home-canvas.md):
+
+1. **LLM chỉ giao tiếp, trích xuất slot và đề xuất tool.** Mọi phép tính tiền, kiểm tra hạn mức và ghi dữ liệu vẫn do Tầng 2 và các RPC của PostgreSQL thực hiện.
+2. **Slot lưu server-side.** `ai_chat_sessions.budget_slots` giữ `total_income`, `duration_days`, `savings_target`, `fixed_expenses`, nên ngữ cảnh không mất khi đổi lượt hoặc tắt app.
+3. **Trace tool được ghi lại.** `ai_chat_messages.tool_name`, `tool_args`, `tool_result` lưu lại đúng những gì đã thực thi, phục vụ kiểm toán.
+4. **Tối đa một lời gọi tool mỗi lượt**, tham số validate bằng Pydantic trước khi service chạy; nội dung người dùng không bao giờ nằm trong system prompt.
+
+Endpoint phía server: `GET /api/v1/chat/tools`, `POST /api/v1/chat/sessions`, `GET /api/v1/chat/sessions/{id}`, `GET /api/v1/chat/sessions/{id}/messages`, `POST /api/v1/chat/turn`.

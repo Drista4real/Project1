@@ -62,3 +62,66 @@
 - **Filtered report**: an XLSX or PDF containing every transaction matching the
   selected date range, search query and tags. A wallet transfer is not income or
   spending when calculating report totals.
+
+- **Budget plan**: a deterministic projection of a spending plan over a number of
+  days, built from total income, fixed expenses, a savings target and a duration.
+  It holds a spendable budget, a daily allowance, a survival floor and a daily
+  allocation per planning group. It projects `public.budgets`; it never replaces
+  the configured envelope limits, which stay the source of truth.
+- **Survival floor**: the minimum daily allowance a plan may fall to before a
+  purchase is classified as critical. It is derived from the fixed expenses per
+  day and can be overridden by the user.
+- **Planning group**: one of `food`, `transport` or `lifestyle`. Every group maps
+  to exactly one envelope pillar: `food` and `transport` to `needs`, `lifestyle`
+  to `wants`, and `other` to `unexpected`.
+- **Rebalance**: a confirmed change of the remaining daily allocation after a
+  purchase. It reduces cuttable pillars in a fixed order (`wants`, `culture`,
+  `unexpected`) and never drops a funded pillar below its existing category
+  limits. The allocation, the purchase, the actual spend and the plan version
+  are written in one database transaction.
+- **Purchase impact**: the deterministic verdict for a proposed purchase:
+  `SAFE`, `WARNING_REBALANCE_NEEDED`, `CRITICAL_DANGER` or `INSUFFICIENT_DATA`.
+  The engine never estimates when the balance history is too short.
+- **Plan screen**: the screen that shows a budget plan: the daily allowance, the
+  survival floor, the split across the four pillars and the planning groups, and
+  the day-by-day projection. It renders the engine's figures and computes none
+  of them.
+- **Remaining plan budget**: the spendable budget of a plan minus the confirmed
+  spending recorded inside the plan window. It is read from real rows, not
+  projected; a plan without a projection has no known remaining budget.
+
+- **Conversational canvas**: the home screen of the app. It hosts the assistant
+  conversation, the quick question suggestions and the composer. It is a view of
+  the conversational assistant, not the ledger.
+- **Ledger**: the transaction ledger screen. It keeps its own navigation entry
+  next to the conversational canvas; renaming the home screen does not merge or
+  remove it.
+- **Chat session**: one conversation between the user and the assistant. It owns
+  the collected slots, the messages and the tool trace.
+- **Budget slots**: the plan inputs the assistant collects across turns
+  (`total_income`, `duration_days`, `savings_target`, `fixed_expenses`). They are
+  stored on the chat session, so the context survives a turn change or an app
+  restart.
+- **Tool trace**: the record of one tool invocation on a message
+  (`tool_name`, `tool_args`, `tool_result`). It is written for auditing only; the
+  ledger never stores the trace as finance data.
+- **Deterministic guard**: the rule that the language model may only propose a
+  tool call. The validation, the money arithmetic and the database write are
+  owned by the backend service and the database function.
+- **Tool declaration dialect**: the narrower JSON-schema subset the Gemini
+  function-calling API accepts. It has no `exclusiveMinimum`,
+  `exclusiveMaximum`, `pattern` or `anyOf`. The registry converts a Pydantic
+  schema into this dialect before the request leaves the process; the
+  argument validation stays strict.
+- **Provider availability**: the state of the conversational provider, reported
+  as a 503 with an actionable message. It is distinct from a schema problem:
+  a missing migration never reports the assistant as unavailable.
+- **Migration state**: whether the database has the columns and tables a
+  feature needs. Until migration `202611010002` is applied the chat keeps
+  working and only the collected slots and the tool trace are dropped.
+- **Money amount on the wire**: an amount is a `Decimal` on the server and
+  travels as a JSON string, so the precision of the cent survives the round
+  trip. A client must accept a string and a number for the same field.
+- **Supabase project alignment**: the backend and the app must use the same
+  Supabase project. The backend validates a token against its own
+  `SUPABASE_URL`; a token signed by another project is refused with a 401.

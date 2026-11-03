@@ -13,6 +13,15 @@ String financeApiErrorMessage(int status, String path, Object? detail) {
       detail.length <= 2000) {
     return detail;
   }
+  // The chat API answers with an actionable Vietnamese message, so the
+  // detail is more useful than the generic status text.
+  if (path.startsWith('/chat') &&
+      {400, 404, 422, 503}.contains(status) &&
+      detail is String &&
+      detail.trim().isNotEmpty &&
+      detail.length <= 2000) {
+    return detail;
+  }
   return switch (status) {
     401 => 'Phiên đã hết hạn. Vui lòng đăng nhập lại.',
     403 => 'Bạn không có quyền thực hiện thao tác này.',

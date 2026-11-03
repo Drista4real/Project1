@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.api.v1.router import api_router
+from app.domain.chat import ChatError
 from app.domain.transactions import TransactionError
 from app.infrastructure.ai.classifier.runtime import warmup_classifier
 from app.infrastructure.ai.cloud_vlm.qwen_client import QwenVLMReceiptExtractor
@@ -52,4 +53,9 @@ def index():
 
 @app.exception_handler(TransactionError)
 async def transaction_error_handler(request, error: TransactionError):
+    return JSONResponse(status_code=error.status, content={"detail": error.message})
+
+
+@app.exception_handler(ChatError)
+async def chat_error_handler(request, error: ChatError):
     return JSONResponse(status_code=error.status, content={"detail": error.message})
