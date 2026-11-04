@@ -941,9 +941,11 @@ flowchart LR
 - `POST /api/v1/ingestion/text` đã có kèm test (`backend/tests/api/test_ingestion.py`).
 
 **Phần còn nợ (đã tách):**
-- Đăng ký `forecast.router` vào `api_router` (`backend/app/api/v1/router.py` hiện
-  **chưa** include); `get_cashflow_forecaster` trả 503 thay vì `raise`
-  (`backend/app/api/v1/forecast.py:22`).
+- ~~Đăng ký `forecast.router` vào `api_router`~~ — **xong (#91)**. Route đã được
+  include; `get_cashflow_forecaster` trả `None` và route trả **503** kèm message
+  tiếng Việt thay vì `raise`. Lý do thật của lỗi ban đầu là route **404** (chưa
+  đăng ký), không phải 500: FastAPI đã tự chuyển `HTTPException` trong dependency
+  thành response 503 đúng cách.
 - Tải + bundle model ASR (thiếu `encoder.int8.onnx` và `decoder.int8.onnx`).
 - Nối nút "Hóa đơn" (`frontend/lib/features/ai/widgets/natural_input_card.dart:110`
   đang `onPressed: null`) và xóa `ai_input_box_card.dart` — **dead code**, không
@@ -1089,13 +1091,13 @@ writes chat sessions that ADR 0001 currently exposes as read-only.
 | Hạng mục | Trạng thái | Vị trí |
 |---|---|---|
 | Model 1 (PhoBERT + LightGBM) | ✅ **Đang chạy** — `/ready/ai` trả 200 | `backend/app/infrastructure/ai/classifier/runtime.py` |
-| Model 2 (LightGBM / EWMA) | ✅ Code đủ, ⚠️ chưa có route thật | `backend/app/infrastructure/ai/forecaster/` |
+| Model 2 (LightGBM / EWMA) | ✅ Code đủ, ⚠️ route đã đăng ký nhưng chưa có forecaster → 503 | `backend/app/infrastructure/ai/forecaster/` |
 | Model 3 (PhoWhisper offline) | ⚠️ Code đủ, ❌ thiếu file ONNX (102 MB) + `sherpa_onnx`/`av` | `backend/app/infrastructure/ai/edge_asr/recognizer.py`, `frontend/lib/features/ai/services/voice_input_native.dart` |
 | Model 4 (Qwen VLM) | ⚠️ Adapter có, ❌ chưa có route HTTP, ❌ chưa nối nút Camera | `backend/app/infrastructure/ai/cloud_vlm/qwen_client.py` |
 | `/api/v1/ingestion/text` | ✅ Đang chạy | `backend/app/api/v1/ingestion.py:60` |
 | `/api/v1/ingestion/audio` | ❌ Chưa có route | `execute_audio()` tồn tại, không route |
 | `/api/v1/ingestion/receipt` | ❌ Chưa có route | `ingest_receipt()` là hook |
-| `/api/v1/forecast` | ❌ Chưa include vào `api_router` | `backend/app/api/v1/router.py` |
+| `/api/v1/forecast` | ⚠️ Đã include vào `api_router`, trả 503 (chưa cấu hình forecaster) | `backend/app/api/v1/router.py` |
 | `/api/v1/budget-plans` | ✅ Đang chạy — 6 endpoint | `backend/app/api/v1/endpoints/budget_plans.py` |
 | `/api/v1/chat` | ✅ Đang chạy — 5 endpoint | `backend/app/api/v1/endpoints/chat.py` |
 | `budgets` / 4 trụ cột | ✅ Đang chạy | `frontend/supabase/schema.sql:127` |

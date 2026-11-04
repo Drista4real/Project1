@@ -8,6 +8,7 @@ from app.api.v1.endpoints import (
     management,
     transactions,
 )
+from app.api.v1.forecast import router as forecast_router
 from app.api.v1.ingestion import router as ingestion_router
 
 api_router = APIRouter()
@@ -18,3 +19,4 @@ api_router.include_router(management.router)
 api_router.include_router(ingestion_router)
 api_router.include_router(budget_plans.router)
 api_router.include_router(chat.router)
+api_router.include_router(forecast_router)
