@@ -916,15 +916,46 @@ flowchart LR
 
 > **Nên làm trước** — là nền cho cả pre-purchase advisor lẫn rebalance, và **không phụ thuộc Gemini**.
 
-### Ticket B — Nền API cho media (chặn pre-purchase advisor)
+### Ticket B — Nền media cho pre-purchase advisor — đã tách nhỏ (2026-11-04)
 
-**Nội dung:**
-- `POST /api/v1/ingestion/audio` — multipart, giới hạn size, chuẩn hóa 16 kHz mono, dùng `SherpaOnnxRecognizer`
-- `POST /api/v1/ingestion/receipt` — multipart, `UploadFile`, giới hạn 4 MiB, kiểm MIME signature
-- Sửa prefix lặp `/api/v1`; đăng ký `forecast.router` vào `api_router` (`backend/app/api/v1/router.py` hiện **chưa** include); `get_cashflow_forecaster` trả 503 thay vì `raise`
-- Flutter: thêm `image_picker` + nối nút "Hóa đơn" (hiện chỉ hiện SnackBar tại `frontend/lib/features/ai/widgets/ai_input_box_card.dart:125`)
-- Flutter: nối transcript → `/ingestion/text`
-- Backend: tải model ASR (`backend/scripts/download_asr_model.py`) + `frontend/scripts/prepare_voice_assets.py`
+> Ticket gốc gộp nhiều việc độc lập nên dễ lỗi. Đã tách thành các issue con.
+> Xem issue cha [#90](https://github.com/Drista4real/Project1/issues/90) và các
+> issue con #91 (router), #92 (artifacts ASR), #93 (nút Hóa đơn), #94 (test
+> transcript).
+
+**Quyết định kiến trúc đã chốt** (theo ADR 0004 và ADR 0008):
+
+- **ASR chạy on-device trên Flutter.** Nút "Nói nhanh" phiên âm bằng
+  sherpa-onnx/PhoWhisper INT8 trên máy. **Không** mở `POST /api/v1/ingestion/audio`
+  ở backend Python — server-side offline ASR không đáp ứng yêu cầu on-device.
+- **Không mở route upload hóa đơn.** ADR 0008: *"No receipt upload HTTP route is
+  added."* Hook `get_receipt_ingestor` (`backend/app/api/v1/ingestion.py:52`) giữ
+  nguyên, không gắn route. Nút "Hóa đơn" phải giải thích trạng thái thay vì im lặng.
+- `POST /ingestion/audio` và `POST /ingestion/receipt` **hoãn sang milestone 4**
+  (`docs/APP_COMPLETION_CHECKLIST.md`).
+
+**Phần đã xong, không làm lại:**
+- `backend/scripts/download_asr_model.py` và `frontend/scripts/prepare_voice_assets.py`.
+- Luồng transcript → `/ingestion/text` đã nối tại
+  `frontend/lib/features/ai/screens/ai_quick_input_screen.dart:269`.
+- `POST /api/v1/ingestion/text` đã có kèm test (`backend/tests/api/test_ingestion.py`).
+
+**Phần còn nợ (đã tách):**
+- Đăng ký `forecast.router` vào `api_router` (`backend/app/api/v1/router.py` hiện
+  **chưa** include); `get_cashflow_forecaster` trả 503 thay vì `raise`
+  (`backend/app/api/v1/forecast.py:22`).
+- Tải + bundle model ASR (thiếu `encoder.int8.onnx` và `decoder.int8.onnx`).
+- Nối nút "Hóa đơn" (`frontend/lib/features/ai/widgets/natural_input_card.dart:110`
+  đang `onPressed: null`) và xóa `ai_input_box_card.dart` — **dead code**, không
+  nơi nào import.
+- Test hồi quy transcript → `/ingestion/text`.
+
+**Đã lỗi thời trong bản Ticket B gốc:**
+- "Sửa prefix lặp `/api/v1`" — **không còn lỗi**. Mọi router tự mang prefix đầy
+  đủ và `api_router` không có prefix, nên OpenAPI ra đúng `/api/v1/*`. Giữ nguyên
+  quy ước này cho mọi router mới.
+- `frontend/lib/features/ai/widgets/ai_input_box_card.dart:125` mà spec trỏ tới là
+  dead code; widget đang chạy thật là `natural_input_card.dart`.
 
 **Điều kiện nghiệm thu:** nhập 1 câu thật trong Flutter → tạo đúng bản nháp → user xác nhận → số dư cập nhật đúng (B01–B08 của `docs/APP_COMPLETION_CHECKLIST.md`).
 
