@@ -105,6 +105,11 @@
 - **Tool trace**: the record of one tool invocation on a message
   (`tool_name`, `tool_args`, `tool_result`). It is written for auditing only; the
   ledger never stores the trace as finance data.
+- **Question options**: the choices the assistant offers with a question, at
+  most four. They reach the user as tappable chips labelled A, B, C, D plus a
+  "Khác" chip that opens a text field. The user answers by tapping one, so the
+  question never has to be typed by hand. They are stored in the tool trace of
+  the question message and restored from there.
 - **Deterministic guard**: the rule that the language model may only propose a
   tool call. The validation, the money arithmetic and the database write are
   owned by the backend service and the database function.

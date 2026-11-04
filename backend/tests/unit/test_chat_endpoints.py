@@ -89,6 +89,7 @@ def client(monkeypatch):
 
     from app.application.chat import ChatService
     from app.application.chat_tools import (
+        AskUserQuestionArgs,
         ConfirmRebalanceArgs,
         CreateBudgetPlanArgs,
         SearchNearbySimilarPlacesArgs,
@@ -136,6 +137,15 @@ def client(monkeypatch):
                     description="Confirm a purchase",
                     writes=True,
                     input_model=ConfirmRebalanceArgs,
+                ),
+                handler=noop,
+            ),
+            ToolHandler(
+                spec=ToolSpec(
+                    name="ask_user_question",
+                    description="Ask a multiple-choice question",
+                    writes=False,
+                    input_model=AskUserQuestionArgs,
                 ),
                 handler=noop,
             ),

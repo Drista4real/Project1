@@ -34,6 +34,7 @@ ToolName = Literal[
     "simulate_purchase_impact",
     "search_nearby_similar_places",
     "confirm_and_rebalance_budget",
+    "ask_user_question",
 ]
 
 Sender = Literal["user", "assistant", "system"]
@@ -138,6 +139,13 @@ class ChatSession(BaseModel):
     updated_at: str | None = None
 
 
+#: How many options one question may offer.
+MAX_QUESTION_OPTIONS = 4
+
+#: The tool the assistant uses to ask a multiple-choice question.
+QUESTION_TOOL = "ask_user_question"
+
+
 class ChatMessage(BaseModel):
     """One message in a conversation."""
 
@@ -151,6 +159,7 @@ class ChatMessage(BaseModel):
     tool_args: dict | None = None
     tool_result: dict | None = None
     created_at: str | None = None
+    options: tuple[str, ...] = ()
 
 
 class ToolCall(BaseModel):
@@ -202,6 +211,7 @@ class ChatTurn(BaseModel):
     tool_calls: tuple[ToolOutcome, ...] = ()
     slots: BudgetSlots = Field(default_factory=BudgetSlots)
     created_at: str | None = None
+    options: tuple[str, ...] = ()
 
 
 class ChatRepository(Protocol):

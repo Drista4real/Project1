@@ -11,6 +11,7 @@ from decimal import Decimal
 
 from app.application.chat import ChatService
 from app.application.chat_tools import (
+    AskUserQuestionArgs,
     ConfirmRebalanceArgs,
     CreateBudgetPlanArgs,
     SearchNearbySimilarPlacesArgs,
@@ -55,6 +56,12 @@ _PLACES_DESCRIPTION = (
 _REBALANCE_DESCRIPTION = (
     "Ghi nhận khoản mua đã được người dùng xác nhận và chia lại hạn mức của "
     "những ngày còn lại. Chỉ gọi khi người dùng xác nhận dự định mua."
+)
+
+_ASK_DESCRIPTION = (
+    "Hỏi người dùng một câu hỏi có lựa chọn. Dùng khi cần người dùng chọn "
+    "một trong vài hướng đi tiếp, thay vì hỏi họ phải tự diễn đạt. Tối đa 4 lựa "
+    "chọn, mỗi lựa chọn ngắn gọn và dễ đọc."
 )
 
 
@@ -211,6 +218,23 @@ def _search_places_handler(places: PlacesSearch):
     return handler
 
 
+def _ask_user_question_handler():
+    """Bind the question tool to the echo of its own arguments.
+
+    The question is not a computation: the tool only carries the question and
+    its options back so the client can render them as tappable chips. The
+    user picks one and the answer arrives as the next message.
+    """
+
+    async def handler(arguments: AskUserQuestionArgs) -> dict:
+        return {
+            "question": arguments.question,
+            "options": list(arguments.options),
+        }
+
+    return handler
+
+
 def build_tool_registry(
     *, client, user_id: str, places: PlacesSearch
 ) -> ToolRegistry:
@@ -251,6 +275,15 @@ def build_tool_registry(
                 input_model=ConfirmRebalanceArgs,
             ),
             handler=_confirm_rebalance_handler(client, user_id),
+        ),
+        ToolHandler(
+            spec=ToolSpec(
+                name="ask_user_question",
+                description=_ASK_DESCRIPTION,
+                writes=False,
+                input_model=AskUserQuestionArgs,
+            ),
+            handler=_ask_user_question_handler(),
         ),
     )
     return ToolRegistry(handlers)

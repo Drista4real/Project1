@@ -50,6 +50,7 @@ class ChatMessage {
     required this.sender,
     required this.content,
     this.toolName,
+    this.options = const [],
   });
 
   final int id;
@@ -57,13 +58,21 @@ class ChatMessage {
   final String content;
   final String? toolName;
 
+  /// The choices the assistant offered, shown as tappable chips.
+  final List<String> options;
+
   bool get isUser => sender == 'user';
+  bool get hasOptions => options.isNotEmpty;
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
     id: (json['id'] as num?)?.toInt() ?? 0,
     sender: json['sender'] as String? ?? 'assistant',
     content: json['content'] as String? ?? '',
     toolName: json['tool_name'] as String?,
+    options: ((json['options'] as List?) ?? const [])
+        .map((item) => item.toString())
+        .where((item) => item.trim().isNotEmpty)
+        .toList(),
   );
 }
 
@@ -95,12 +104,16 @@ class ChatTurn {
     required this.reply,
     required this.slots,
     this.toolName,
+    this.options = const [],
   });
 
   final int sessionId;
   final String reply;
   final BudgetSlots slots;
   final String? toolName;
+
+  /// The choices the assistant offered, shown as tappable chips.
+  final List<String> options;
 
   factory ChatTurn.fromJson(Map<String, dynamic> json) {
     final calls = (json['tool_calls'] as List?) ?? const [];
@@ -114,6 +127,10 @@ class ChatTurn {
         (json['slots'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),
       toolName: toolName,
+      options: ((json['options'] as List?) ?? const [])
+          .map((item) => item.toString())
+          .where((item) => item.trim().isNotEmpty)
+          .toList(),
     );
   }
 }

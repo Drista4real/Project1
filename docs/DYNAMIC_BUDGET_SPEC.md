@@ -184,7 +184,8 @@ POST /api/v1/chat   { session_id, message }
   ├─2. Nạp slot server-side từ ai_chat_sessions.budget_slots
   ├─3. Xây context: system prompt (versioned) + USER_INPUT + slot hiện có
   ├─4. Gọi Gemini với tools = [create_budget_plan, simulate_purchase_impact,
-  │                              search_nearby_similar_places, confirm_and_rebalance_budget]
+  │                              search_nearby_similar_places, confirm_and_rebalance_budget,
+  │                              ask_user_question]
   │
   ├─5a. Gemini trả TEXT → trả về user, lưu message, kết thúc lượt
   │
@@ -744,6 +745,11 @@ Cần thêm cột `tool_name`, `tool_args` (jsonb), `tool_result` (jsonb) để 
 | `simulate_purchase_impact` | `plan_id`, `current_day ∈ [1,N]`, `amount > 0`, `group`, `category` | `level`, `daily_allowance_now`, `daily_allowance_after`, `survival_floor` | **Không** (read-only) |
 | `search_nearby_similar_places` | `query`, `lat`, `lng`, `radius_m`, `max_price_level`, `min_rating` | danh sách place | **Không** |
 | `confirm_and_rebalance_budget` | `plan_id`, `expected_version`, `allocations`, `idempotency_key` | `plan_version` mới, before/after, `transaction_id` | UPDATE + INSERT (1 RPC) |
+| `ask_user_question` | `question` (≤500 ký tự), `options` (2–4 lựa chọn) | `question`, `options` | **Không** (chỉ mang lựa chọn về client) |
+
+> `ask_user_question` không tính tiền và không ghi DB: nó mang câu hỏi và các
+> lựa chọn về client để người dùng bấm chọn thay vì tự gõ. Tối đa 4 lựa chọn,
+> luôn kèm một lựa chọn "Khác" để người dùng tự nhập.
 
 > Endpoint HTTP hiện có (Ticket A):
 > `POST /api/v1/budget-plans`, `GET /api/v1/budget-plans`,
