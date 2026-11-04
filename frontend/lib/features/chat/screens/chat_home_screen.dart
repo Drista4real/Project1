@@ -8,6 +8,7 @@ import 'package:project_one/core/theme/app_theme.dart';
 import 'package:project_one/features/chat/cubit/chat_cubit.dart';
 import 'package:project_one/features/chat/data/chat_repository.dart';
 import 'package:project_one/features/chat/widgets/chat_greeting.dart';
+import 'package:project_one/features/chat/widgets/chat_message_block.dart';
 import 'package:project_one/features/chat/widgets/chat_message_bubble.dart';
 
 /// The conversational home canvas.
@@ -186,10 +187,12 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
             label: const Text('Xem kế hoạch chi tiêu'),
           ),
         ] else ...[
-          for (final message in state.messages)
-            ChatMessageBubble(
-              message: message.content,
-              isUser: message.isUser,
+          for (var index = 0; index < state.messages.length; index++)
+            ChatMessageBlock(
+              message: state.messages[index],
+              isLast: index == state.messages.length - 1,
+              busy: state.sending,
+              onSend: _send,
             ),
           if (state.sending)
             const ChatMessageBubble(message: '', isUser: false, pending: true),

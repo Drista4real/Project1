@@ -42,6 +42,14 @@ class FakeChatRepository implements ChatRepository {
   @override
   Future<ChatTurn> send({required int sessionId, required String message}) async {
     sent.add(message);
+    if (message == 'Bắt đầu') {
+      return ChatTurn(
+        sessionId: sessionId,
+        reply: 'Bạn muốn kế hoạch kéo dài bao lâu?',
+        slots: const BudgetSlots(totalIncome: 20000000),
+        options: const ['1 tháng', '3 tháng', '6 tháng'],
+      );
+    }
     return ChatTurn(
       sessionId: sessionId,
       reply: 'Đã ghi nhận: $message',
@@ -94,6 +102,58 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.sent, ['Thu nhập 20 triệu']);
+  });
+
+  testWidgets('a question offers tappable options', (tester) async {
+    final repository = FakeChatRepository();
+    await tester.pumpWidget(
+      MaterialApp(home: ChatHomeScreen(repository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('chatMessageField')),
+      'Bắt đầu',
+    );
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bạn muốn kế hoạch kéo dài bao lâu?'), findsOneWidget);
+    expect(find.text('1 tháng'), findsOneWidget);
+    expect(find.text('3 tháng'), findsOneWidget);
+    expect(find.text('Khác'), findsOneWidget);
+
+    await tester.tap(find.text('3 tháng'));
+    await tester.pumpAndSettle();
+
+    expect(repository.sent, ['Bắt đầu', '3 tháng']);
+  });
+
+  testWidgets('the custom option lets the user type an answer', (tester) async {
+    final repository = FakeChatRepository();
+    await tester.pumpWidget(
+      MaterialApp(home: ChatHomeScreen(repository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('chatMessageField')),
+      'Bắt đầu',
+    );
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Khác'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('chatCustomOptionField')),
+      '12 tháng',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pumpAndSettle();
+
+    expect(repository.sent, ['Bắt đầu', '12 tháng']);
   });
 
   testWidgets('a failing history still leaves the composer usable', (

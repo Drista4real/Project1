@@ -1,6 +1,6 @@
 """Tool contract for the conversational assistant.
 
-Four tools are exposed to the language model. They are described to the model
+Five tools are exposed to the language model. They are described to the model
 as function declarations, and each one has a Pydantic argument model that is
 validated before any service runs. A tool never computes money: it delegates
 to the deterministic budget services (ADR 0009).
@@ -20,21 +20,29 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from app.domain.budget_plan import (
     GroupKey,
     PlanAllocation,
     RebalanceRequest,
 )
-from app.domain.chat import ToolCall, ToolOutcome
+from app.domain.chat import MAX_QUESTION_OPTIONS, ToolCall, ToolOutcome
 
-#: The four tools the assistant may call.
+#: The five tools the assistant may call.
 TOOL_NAMES: tuple[str, ...] = (
     "create_budget_plan",
     "simulate_purchase_impact",
     "search_nearby_similar_places",
     "confirm_and_rebalance_budget",
+    "ask_user_question",
 )
 
 #: Tools that write to the database. Only these need an idempotency key.
@@ -101,6 +109,37 @@ class ConfirmRebalanceArgs(BaseModel):
     group_key: GroupKey = "lifestyle"
     description: str | None = Field(default=None, max_length=2000)
     idempotency_key: str = Field(min_length=36, max_length=36)
+
+
+class AskUserQuestionArgs(BaseModel):
+    """Arguments for `ask_user_question`.
+
+    The assistant asks a multiple-choice question. The options are what the
+    user sees as tappable chips, so they are short and mutually exclusive.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    question: str = Field(min_length=1, max_length=500)
+    options: list[str] = Field(min_length=2, max_length=MAX_QUESTION_OPTIONS)
+
+    @field_validator("options")
+    @classmethod
+    def clean_options(cls, values: list[str]) -> list[str]:
+        """Trim the options and drop the empty ones.
+
+        An option the user cannot read is worse than one option fewer, so a
+        blank entry is removed instead of being rendered as an empty chip.
+        """
+        cleaned = [value.strip()[:200] for value in values]
+        return [value for value in cleaned if value]
+
+    @model_validator(mode="after")
+    def validate_options(self):
+        """Refuse a question that would render without a single choice."""
+        if len(self.options) < 2:
+            raise ValueError("A question needs at least two options")
+        return self
 
 
 class ToolSpec(BaseModel):

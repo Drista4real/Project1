@@ -10,6 +10,7 @@ from app.application.chat import (
     looks_like_injection,
 )
 from app.application.chat_tools import (
+    AskUserQuestionArgs,
     ConfirmRebalanceArgs,
     CreateBudgetPlanArgs,
     SearchNearbySimilarPlacesArgs,
@@ -150,6 +151,13 @@ def _registry(handler_calls: list[dict]) -> ToolRegistry:
         )
         return {"plan_id": 42, "plan_version": 2}
 
+    async def question_handler(arguments):
+        handler_calls.append({"name": "ask_user_question", "args": arguments})
+        return {
+            "question": arguments.question,
+            "options": list(arguments.options),
+        }
+
     return ToolRegistry(
         (
             ToolHandler(
@@ -187,6 +195,15 @@ def _registry(handler_calls: list[dict]) -> ToolRegistry:
                     input_model=ConfirmRebalanceArgs,
                 ),
                 handler=rebalance_handler,
+            ),
+            ToolHandler(
+                spec=ToolSpec(
+                    name="ask_user_question",
+                    description="Ask a multiple-choice question",
+                    writes=False,
+                    input_model=AskUserQuestionArgs,
+                ),
+                handler=question_handler,
             ),
         )
     )
@@ -276,7 +293,7 @@ class TestToolRegistry:
         assert not outcome.ok
         assert outcome.error_code == "unknown_tool"
 
-    def test_declarations_cover_the_four_tools(self):
+    def test_declarations_cover_the_five_tools(self):
         registry = _registry([])
         names = {item["name"] for item in registry.declarations()}
         assert names == {
@@ -284,6 +301,7 @@ class TestToolRegistry:
             "simulate_purchase_impact",
             "search_nearby_similar_places",
             "confirm_and_rebalance_budget",
+            "ask_user_question",
         }
 
     def test_declarations_do_not_leak_schema_noise(self):
@@ -384,6 +402,63 @@ class TestChatService:
         assert turn.tool_calls[0].ok
         assert turn.reply == "Ke hoach 30 ngay da san sang."
         assert repository.stored_messages[-1].tool_name == "create_budget_plan"
+
+    @pytest.mark.asyncio
+    async def test_a_question_returns_the_options_to_the_user(self):
+        calls: list[dict] = []
+        repository = FakeRepository()
+        model = FakeModel(
+            [
+                (
+                    "",
+                    (
+                        ToolCall(
+                            name="ask_user_question",
+                            arguments={
+                                "question": "Ban muon ke hoach keo dai bao lau?",
+                                "options": ["1 thang", "3 thang", "6 thang"],
+                            },
+                        ),
+                    ),
+                ),
+            ]
+        )
+        service = ChatService(
+            repository=repository,
+            registry=_registry(calls),
+            model=model,
+            system_prompt="system",
+        )
+        turn = await service.run_turn(session_id=1, user_input="Lap ke hoach")
+        assert turn.options == ("1 thang", "3 thang", "6 thang")
+        assert turn.reply == "Ban muon ke hoach keo dai bao lau?"
+
+    @pytest.mark.asyncio
+    async def test_a_question_with_too_few_options_is_refused(self):
+        calls: list[dict] = []
+        repository = FakeRepository()
+        model = FakeModel(
+            [
+                (
+                    "",
+                    (
+                        ToolCall(
+                            name="ask_user_question",
+                            arguments={"question": "Chon di", "options": ["Mot"]},
+                        ),
+                    ),
+                ),
+            ]
+        )
+        service = ChatService(
+            repository=repository,
+            registry=_registry(calls),
+            model=model,
+            system_prompt="system",
+        )
+        turn = await service.run_turn(session_id=1, user_input="Lap ke hoach")
+        assert turn.options == ()
+        assert not turn.tool_calls[0].ok
 
     @pytest.mark.asyncio
     async def test_the_tool_trace_records_the_validated_arguments(self):

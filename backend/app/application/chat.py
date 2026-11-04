@@ -103,6 +103,25 @@ def looks_like_injection(text: str) -> bool:
     return any(pattern in lowered for pattern in INJECTION_PATTERNS)
 
 
+#: The tool the assistant uses to ask a multiple-choice question.
+QUESTION_TOOL = "ask_user_question"
+
+
+def _question_options(outcomes: tuple[ToolOutcome, ...]) -> tuple[str, ...]:
+    """Read the offered choices out of the question tool's result.
+
+    Only a successful question carries options: a failed call is an error the
+    user must be told about, not a set of choices to tap.
+    """
+    for outcome in outcomes:
+        if outcome.name != QUESTION_TOOL or not outcome.ok:
+            continue
+        data = outcome.data or {}
+        options = data.get("options") or []
+        return tuple(str(option) for option in options)
+    return ()
+
+
 class ChatService:
     """Run one conversation turn and persist the result."""
 
@@ -163,6 +182,7 @@ class ChatService:
         )
 
         slots = slots.merge(collected)
+        options = _question_options(outcomes)
         self.repository.save_slots(session_id, slots)
         self.repository.append_message(
             session_id,
@@ -177,6 +197,7 @@ class ChatService:
             reply=reply,
             tool_calls=tuple(outcomes),
             slots=slots,
+            options=options,
         )
 
     async def _converse(
@@ -207,9 +228,19 @@ class ChatService:
         collected = await self._collect_slots(call, outcome)
         if not outcome.ok:
             return collected, self._explain_failure(outcome), (outcome,)
+        if call.name == QUESTION_TOOL:
+            # The question itself is the answer. Asking the model to narrate
+            # it would only add words around the choices the user must tap.
+            return collected, self._question_text(outcome), (outcome,)
 
         explanation = await self._explain_result(outcome)
         return collected, explanation, (outcome,)
+
+    def _question_text(self, outcome: ToolOutcome) -> str:
+        """Return the question the assistant asked."""
+        data = outcome.data or {}
+        question = str(data.get("question") or "").strip()
+        return question or "Bạn muốn mình giúp gì tiếp theo?"
 
     async def _explain_result(self, outcome: ToolOutcome) -> str:
         """Let the model describe the real tool result to the user."""

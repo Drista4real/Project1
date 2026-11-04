@@ -13,6 +13,7 @@ from postgrest.exceptions import APIError
 from supabase import Client
 
 from app.domain.chat import (
+    QUESTION_TOOL,
     BudgetSlots,
     ChatError,
     ChatMessage,
@@ -52,6 +53,21 @@ def _slots_from_record(record: dict[str, Any]) -> BudgetSlots:
         return BudgetSlots.model_validate(raw)
     except Exception:  # noqa: BLE001 - a broken payload must not break the chat
         return BudgetSlots()
+
+
+def _message_options(row: dict[str, Any]) -> tuple[str, ...]:
+    """Read the offered choices out of a stored question message.
+
+    The options live in the tool result of the question tool, so they are
+    restored from there instead of being stored a second time.
+    """
+    if row.get("tool_name") != QUESTION_TOOL:
+        return ()
+    result = row.get("tool_result")
+    if not isinstance(result, dict):
+        return ()
+    options = result.get("options") or []
+    return tuple(str(option) for option in options)
 
 
 class SupabaseChatRepository:
@@ -182,6 +198,7 @@ class SupabaseChatRepository:
                 tool_args=row.get("tool_args"),
                 tool_result=row.get("tool_result"),
                 created_at=row.get("created_at"),
+                options=_message_options(row),
             )
             for row in rows
         ]
@@ -237,6 +254,7 @@ class SupabaseChatRepository:
             tool_args=row.get("tool_args"),
             tool_result=row.get("tool_result"),
             created_at=row.get("created_at"),
+            options=_message_options(row),
         )
 
     def save_slots(self, session_id: int, slots: BudgetSlots) -> None:
