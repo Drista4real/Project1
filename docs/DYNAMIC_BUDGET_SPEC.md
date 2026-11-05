@@ -959,7 +959,12 @@ flowchart LR
   hóa đơn bằng ảnh chưa được bật và đường dẫn hiện tại là nhập văn bản hoặc nói.
   Nút bị disable đúng khi đang phân tích/ghi âm/lưu. `ai_input_box_card.dart` đã
   xóa (dead code, không nơi nào import).
-- Test hồi quy transcript → `/ingestion/text`.
+- ~~Test hồi quy transcript → `/ingestion/text`~~ — **xong (#94)**. Ba test widget
+  trong `frontend/test/features/ai/ai_quick_input_screen_test.dart` chứng minh
+  transcript đi vào ô nhập rồi gửi nguyên văn tới `/ingestion/text`, transcript
+  rỗng báo lỗi mà **không** gọi API, và transcript dài hơn 2000 ký tự bị cắt đúng
+  giới hạn endpoint. Phần backend (`test_spoken_money_without_punctuation`) đã có
+  sẵn. Test dùng `VoiceInput` giả lập nên chạy được trên CI không cần model.
 
 **Đã lỗi thời trong bản Ticket B gốc:**
 - "Sửa prefix lặp `/api/v1`" — **không còn lỗi**. Mọi router tự mang prefix đầy
@@ -1104,7 +1109,7 @@ writes chat sessions that ADR 0001 currently exposes as read-only.
 | Model 2 (LightGBM / EWMA) | ✅ Code đủ, ⚠️ route đã đăng ký nhưng chưa có forecaster → 503 | `backend/app/infrastructure/ai/forecaster/` |
 | Model 3 (PhoWhisper offline) | ⚠️ Code đủ, ❌ thiếu file ONNX (102 MB) + `sherpa_onnx`/`av` | `backend/app/infrastructure/ai/edge_asr/recognizer.py`, `frontend/lib/features/ai/services/voice_input_native.dart` |
 | Model 4 (Qwen VLM) | ⚠️ Adapter có, ❌ chưa có route HTTP, ❌ chưa nối nút Camera | `backend/app/infrastructure/ai/cloud_vlm/qwen_client.py` |
-| `/api/v1/ingestion/text` | ✅ Đang chạy | `backend/app/api/v1/ingestion.py:60` |
+| `/api/v1/ingestion/text` | ✅ Đang chạy, có test hồi quy transcript (#94) | `backend/app/api/v1/ingestion.py:60` |
 | `/api/v1/ingestion/audio` | ❌ Chưa có route | `execute_audio()` tồn tại, không route |
 | `/api/v1/ingestion/receipt` | ❌ Chưa có route (ADR 0008 — cố ý) | `ingest_receipt()` là hook; nút "Hóa đơn" giải thích trạng thái (#93) |
 | `/api/v1/forecast` | ⚠️ Đã include vào `api_router`, trả 503 (chưa cấu hình forecaster) | `backend/app/api/v1/router.py` |

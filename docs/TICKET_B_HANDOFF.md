@@ -13,9 +13,15 @@ pre-purchase advisor".
 | [#91](https://github.com/Drista4real/Project1/issues/91) | Đăng ký `forecast.router` + trả 503 | — | ✅ Đóng — `18fe061` |
 | [#92](https://github.com/Drista4real/Project1/issues/92) | Tải + bundle model ASR PhoWhisper INT8 | — | ⏳ Mở — chưa làm |
 | [#93](https://github.com/Drista4real/Project1/issues/93) | Nút "Hóa đơn" báo đúng trạng thái | #91 | ✅ Đóng — `f0a12d7` |
-| [#94](https://github.com/Drista4real/Project1/issues/94) | Test hồi quy transcript → `/ingestion/text` | #92 | ⏳ Mở — blocked |
+| [#94](https://github.com/Drista4real/Project1/issues/94) | Test hồi quy transcript → `/ingestion/text` | #92 | ✅ Đóng — phần test tự động không cần model |
 
-Cả hai commit đã push lên `origin/home_feat`.
+Cả ba commit đã push lên `origin/home_feat`.
+
+> **Lưu ý về #94:** issue ghi *"blocked by #92"* vì cần model thật để kiểm chứng thủ
+> công trên Android. Phần test tự động thì **không** cần model — nó dùng
+> `VoiceInput` giả lập qua tham số `voiceInput` của `AiQuickInputScreen`, nên chạy
+> được trên CI Ubuntu không có Android, không có model. Vì vậy #94 đã làm được và
+> đóng trước #92. Phần còn lại của #92 là kiểm chứng thủ công trên thiết bị.
 
 ## Quyết định kiến trúc đã chốt
 
@@ -85,14 +91,22 @@ tiền đề cho #94.
 
 ### #94 — Test hồi quy transcript → `/ingestion/text`
 
-Blocked bởi #92 vì test cần model thật để chạy phiên âm. Hướng làm:
+Đã xong. Ba test widget trong
+`frontend/test/features/ai/ai_quick_input_screen_test.dart`:
 
-- Test widget ở `frontend/test/features/ai/ai_quick_input_screen_test.dart`: mô phỏng
-  `VoiceInput` trả transcript → kiểm tra transcript vào ô nhập → bấm "Phân tích" →
-  request gửi đúng `POST /api/v1/ingestion/text` với nội dung transcript.
-- Luồng transcript → `/ingestion/text` **đã nối** tại
-  `frontend/lib/features/ai/screens/ai_quick_input_screen.dart` (nhánh `_finishVoice`),
-  nên ticket này chỉ bổ sung test, không sửa source trừ khi test lộ ra lỗi thật.
+- Transcript đi vào ô nhập rồi gửi **nguyên văn** tới `/ingestion/text`.
+- Transcript rỗng → hiện lỗi tiếng Việt và **không** gọi API.
+- Transcript dài hơn 2000 ký tự bị cắt đúng giới hạn endpoint.
+
+Phần backend đã có sẵn: `test_spoken_money_without_punctuation` tại
+`backend/tests/api/test_ingestion.py:259`.
+
+Test dùng `VoiceInput` giả lập (`FakeVoice`) nên chạy được trên CI Ubuntu không
+có Android, không có model. `FakeVoice` được thêm field `transcript` để test điều
+khiển được nội dung phiên âm.
+
+Phần còn lại của #92 là kiểm chứng thủ công trên Android — phần test tự động của
+#94 không phụ thuộc model.
 
 ## Bài học cần nhớ cho các phiên sau
 
@@ -123,7 +137,7 @@ Blocked bởi #92 vì test cần model thật để chạy phiên âm. Hướng 
 |---|---|
 | `pytest tests` (backend) | 748 passed |
 | `ruff check app tests` | All checks passed |
-| `flutter test` (frontend) | 177 passed |
+| `flutter test` (frontend) | 180 passed |
 | `flutter analyze lib test` | No issues found |
 
 ## Tài liệu liên quan
