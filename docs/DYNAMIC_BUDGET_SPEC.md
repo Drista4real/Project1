@@ -922,6 +922,9 @@ flowchart LR
 > Xem issue cha [#90](https://github.com/Drista4real/Project1/issues/90) và các
 > issue con #91 (router), #92 (artifacts ASR), #93 (nút Hóa đơn), #94 (test
 > transcript).
+>
+> **Bàn giao:** xem `docs/TICKET_B_HANDOFF.md` để biết trạng thái chi tiết, phần còn
+> lại và các bài học cần nhớ cho phiên làm việc sau.
 
 **Quyết định kiến trúc đã chốt** (theo ADR 0004 và ADR 0008):
 

@@ -1,0 +1,135 @@
+# Bàn giao Ticket B — Nền API cho media
+
+Tài liệu này ghi lại trạng thái Ticket B sau khi hoàn tất #91 và #93, để có thể
+bổ sung và kiểm thử về sau. Ticket cha: [#90](https://github.com/Drista4real/Project1/issues/90).
+
+Spec gốc: `docs/DYNAMIC_BUDGET_SPEC.md`, mục 13 — "Ticket B — Nền media cho
+pre-purchase advisor".
+
+## Trạng thái hiện tại
+
+| Ticket | Nội dung | Phụ thuộc | Trạng thái |
+|---|---|---|---|
+| [#91](https://github.com/Drista4real/Project1/issues/91) | Đăng ký `forecast.router` + trả 503 | — | ✅ Đóng — `18fe061` |
+| [#92](https://github.com/Drista4real/Project1/issues/92) | Tải + bundle model ASR PhoWhisper INT8 | — | ⏳ Mở — chưa làm |
+| [#93](https://github.com/Drista4real/Project1/issues/93) | Nút "Hóa đơn" báo đúng trạng thái | #91 | ✅ Đóng — `f0a12d7` |
+| [#94](https://github.com/Drista4real/Project1/issues/94) | Test hồi quy transcript → `/ingestion/text` | #92 | ⏳ Mở — blocked |
+
+Cả hai commit đã push lên `origin/home_feat`.
+
+## Quyết định kiến trúc đã chốt
+
+Theo ADR 0004 (ASR on-device) và ADR 0008 (không mở route upload receipt):
+
+- **ASR chạy on-device trên Flutter.** Nút "Nói nhanh" phiên âm bằng
+  sherpa-onnx/PhoWhisper INT8 trên máy. **Không** mở `POST /api/v1/ingestion/audio`
+  ở backend Python.
+- **Không mở route upload hóa đơn.** Hook `get_receipt_ingestor`
+  (`backend/app/api/v1/ingestion.py:52`) giữ nguyên, không gắn route. Mở route này
+  sau này phải là ticket riêng kèm cập nhật ADR 0008.
+- `POST /ingestion/audio` và `POST /ingestion/receipt` **hoãn sang milestone 4**
+  (`docs/APP_COMPLETION_CHECKLIST.md`).
+
+## Đã xong
+
+### #91 — Forecast router (`18fe061`)
+
+- `backend/app/api/v1/router.py` include `forecast.router`.
+- `backend/app/api/v1/forecast.py`: `get_cashflow_forecaster()` trả `None` thay vì
+  `raise HTTPException`; route trả **503** với message tiếng Việt
+  *"Dự báo dòng tiền chưa sẵn sàng. Vui lòng thử lại sau."*
+- Body 503 chỉ có `detail` — không bao giờ trả dự báo giả.
+- `ValueError` từ Model 2 map thành **422**.
+- Test: `backend/tests/api/test_forecast.py` — 12 test.
+
+### #93 — Nút "Hóa đơn" (`f0a12d7`)
+
+- `frontend/lib/features/ai/widgets/natural_input_card.dart`: thêm callback bắt buộc
+  `onReceipt` và hằng `receiptUnavailableMessage`. Nút dùng
+  `key: ValueKey('aiReceiptButton')`.
+- Nút disable theo `disabled`, `isAnalyzing`, `recording`, `voiceBusy` — cùng điều
+  kiện với nút "Dán nội dung" và "Phân tích" trong cùng `Wrap`.
+- `frontend/lib/features/ai/screens/ai_quick_input_screen.dart`:
+  `_showReceiptUnavailable()` hiện SnackBar giải thích rõ tại sao chưa dùng được.
+- **Xóa dead code** `frontend/lib/features/ai/widgets/ai_input_box_card.dart`
+  (216 dòng, không nơi nào import).
+- Test: 2 test widget trong
+  `frontend/test/features/ai/ai_quick_input_screen_test.dart`.
+- Tài liệu: `docs/DYNAMIC_BUDGET_SPEC.md` (mục Ticket B + bảng tra nhanh) và
+  `GLOSSARY.md` (thêm thuật ngữ *Receipt scan*).
+
+## Còn lại
+
+### #92 — Model ASR cho thiết bị
+
+Đây là **setup, không phải code**. Chi tiết đầy đủ trong issue #92. Tóm tắt:
+
+```powershell
+python backend/scripts/download_asr_model.py    # ~104 MB, verify SHA256 theo manifest
+python frontend/scripts/prepare_voice_assets.py # chép vào frontend/assets/models/
+python -m pip install -r backend/requirements-asr.txt
+```
+
+Ràng buộc quan trọng:
+
+- **Không commit binary model vào Git.** `.gitignore` đã ignore
+  `weights/onnx/phowhisper-tiny/*.onnx` và
+  `frontend/assets/models/phowhisper-tiny/*.onnx`. Giữ nguyên — phân phối qua
+  GitHub Release `model3-phowhisper-tiny-int8-v1`.
+- **Không đổi model.** Chỉ dùng bản INT8 đã ghim trong manifest.
+- Không sửa `voice_input_native.dart` trong ticket này — code phiên âm đã có test.
+- CI (`flutter build apk --debug`) build **không kèm** model nên vẫn phải xanh.
+
+Sau khi có model, bấm "Nói nhanh" trên Android phải ra transcript đúng; đó là
+tiền đề cho #94.
+
+### #94 — Test hồi quy transcript → `/ingestion/text`
+
+Blocked bởi #92 vì test cần model thật để chạy phiên âm. Hướng làm:
+
+- Test widget ở `frontend/test/features/ai/ai_quick_input_screen_test.dart`: mô phỏng
+  `VoiceInput` trả transcript → kiểm tra transcript vào ô nhập → bấm "Phân tích" →
+  request gửi đúng `POST /api/v1/ingestion/text` với nội dung transcript.
+- Luồng transcript → `/ingestion/text` **đã nối** tại
+  `frontend/lib/features/ai/screens/ai_quick_input_screen.dart` (nhánh `_finishVoice`),
+  nên ticket này chỉ bổ sung test, không sửa source trừ khi test lộ ra lỗi thật.
+
+## Bài học cần nhớ cho các phiên sau
+
+1. **Lỗi gốc của #91 là 404, không phải 500.** FastAPI đã tự chuyển
+   `HTTPException` trong dependency thành response 503 đúng cách. Lỗi thật là route
+   chưa được include vào `api_router`. Đừng vội sửa dependency thành `raise` trước khi
+   route đã được đăng ký.
+
+2. **Có thể có revert chưa commit trong working tree.** Trước khi bắt đầu ticket mới,
+   luôn chạy `git status` và `git diff HEAD` để phát hiện thay đổi lạ. Trong phiên này
+   `router.py` bị gỡ `include_router(forecast_router)` khiến 9 test fail với 404.
+
+3. **Prefix router đã chuẩn hoá — không sửa lại.** Mỗi router tự mang prefix đầy đủ
+   (`/api/v1/...`), `api_router` không có prefix. OpenAPI ra đúng `/api/v1/*`, không
+   lặp. Yêu cầu "sửa prefix lặp `/api/v1`" trong Ticket B gốc là **đã lỗi thời**.
+
+4. **Lockfile phải giữ nguyên khi commit.** CI build Flutter 3.41.3 còn local là
+   3.47.7. Không commit thay đổi `frontend/pubspec.lock`, dùng `--enforce-lockfile`.
+
+5. **`flutter analyze` mất ~2 phút.** Chạy nền và chờ, đừng để timeout.
+
+6. **File nhị phân lớn không vào git.** Model ONNX ~102 MB phân phối qua GitHub
+   Release, không phải commit.
+
+## Kiểm thử đã chạy
+
+| Bộ test | Kết quả |
+|---|---|
+| `pytest tests` (backend) | 748 passed |
+| `ruff check app tests` | All checks passed |
+| `flutter test` (frontend) | 177 passed |
+| `flutter analyze lib test` | No issues found |
+
+## Tài liệu liên quan
+
+- `docs/DYNAMIC_BUDGET_SPEC.md` — mục 13 (Ticket B) và Phụ lục B (bảng tra nhanh)
+- `docs/MODEL3_SETUP.md` — hướng dẫn tải và đóng gói model ASR
+- `docs/adr/0004-three-tier-ai-and-modality-fallback.md` — quyết định ASR on-device
+- `docs/adr/0008-shared-ingestion-model-runtime.md` — quyết định không mở route upload receipt
+- `GLOSSARY.md` — thuật ngữ *Receipt scan*
