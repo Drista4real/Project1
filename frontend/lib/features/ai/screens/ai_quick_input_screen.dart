@@ -304,6 +304,17 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
     }
   }
 
+  /// Explains that receipt scanning is not available in this release.
+  ///
+  /// ADR 0008 keeps the receipt adapter behind a backend hook and adds no
+  /// upload route, so the button reports the situation instead of failing
+  /// silently.
+  void _showReceiptUnavailable() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text(receiptUnavailableMessage)),
+    );
+  }
+
   Future<void> _edit(ReviewTransaction item) async {
     if (item.type == 'transfer') {
       await showDialog<void>(
@@ -594,6 +605,7 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
                 isAnalyzing: _analyzing,
                 onAnalyze: _analyze,
                 onVoice: _toggleVoice,
+                onReceipt: _showReceiptUnavailable,
                 recording: _recording,
                 voiceBusy: _voiceBusy,
                 transcribing: _transcribing,

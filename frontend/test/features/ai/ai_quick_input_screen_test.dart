@@ -7,6 +7,7 @@ import 'package:project_one/features/ai/models/transaction_draft.dart';
 import 'package:project_one/features/ai/screens/ai_quick_input_screen.dart';
 import 'package:project_one/features/ai/services/input_preferences.dart';
 import 'package:project_one/features/ai/services/voice_input.dart';
+import 'package:project_one/features/ai/widgets/natural_input_card.dart';
 import 'package:project_one/features/finance/domain/usecases/finance_insights.dart';
 import '../../helpers/envelope_memory_repository.dart';
 import '../../helpers/fake_finance_repository.dart';
@@ -304,6 +305,31 @@ void main() {
       expect(find.text('ăn trưa sáu mươi lăm nghìn'), findsOneWidget);
     },
   );
+
+  testWidgets('the receipt button explains why it is unavailable', (
+    tester,
+  ) async {
+    await open(tester, SavingRepository());
+    await tester.tap(find.byKey(const ValueKey('aiReceiptButton')));
+    await tester.pumpAndSettle();
+    expect(find.text(receiptUnavailableMessage), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the receipt button is disabled while the screen is busy', (
+    tester,
+  ) async {
+    final voice = FakeVoice()..permission = Completer<void>();
+    await open(tester, SavingRepository(), voice: voice);
+    await tester.tap(find.text('Nói nhanh'));
+    await tester.pump();
+    final button = tester.widget<OutlinedButton>(
+      find.byKey(const ValueKey('aiReceiptButton')),
+    );
+    expect(button.onPressed, isNull);
+    voice.permission!.complete();
+    await tester.pumpAndSettle();
+  });
 
   testWidgets('reference layout fits a narrow phone', (tester) async {
     tester.view.physicalSize = const Size(360, 800);

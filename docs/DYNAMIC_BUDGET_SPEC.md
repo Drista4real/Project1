@@ -930,7 +930,11 @@ flowchart LR
   ở backend Python — server-side offline ASR không đáp ứng yêu cầu on-device.
 - **Không mở route upload hóa đơn.** ADR 0008: *"No receipt upload HTTP route is
   added."* Hook `get_receipt_ingestor` (`backend/app/api/v1/ingestion.py:52`) giữ
-  nguyên, không gắn route. Nút "Hóa đơn" phải giải thích trạng thái thay vì im lặng.
+  nguyên, không gắn route. Nút "Hóa đơn" phải giải thích trạng thái thay vì im lặng
+  — **đã nối xong (#93)**: bấm sẽ hiện thông báo tiếng Việt nói rõ quét hóa đơn
+  bằng ảnh chưa được bật ở bản này và đường dẫn hiện tại là nhập văn bản hoặc
+  nói. Route upload hóa đơn **không** được mở ở đợt này; nếu sau này cần thì phải
+  là ticket riêng kèm quyết định kiến trúc cập nhật ADR 0008.
 - `POST /ingestion/audio` và `POST /ingestion/receipt` **hoãn sang milestone 4**
   (`docs/APP_COMPLETION_CHECKLIST.md`).
 
@@ -947,9 +951,11 @@ flowchart LR
   đăng ký), không phải 500: FastAPI đã tự chuyển `HTTPException` trong dependency
   thành response 503 đúng cách.
 - Tải + bundle model ASR (thiếu `encoder.int8.onnx` và `decoder.int8.onnx`).
-- Nối nút "Hóa đơn" (`frontend/lib/features/ai/widgets/natural_input_card.dart:110`
-  đang `onPressed: null`) và xóa `ai_input_box_card.dart` — **dead code**, không
-  nơi nào import.
+- ~~Nối nút "Hóa đơn" và xóa `ai_input_box_card.dart`~~ — **xong (#93)**. Nút
+  "Hóa đơn" đã có callback thật, bấm sẽ hiện thông báo tiếng Việt giải thích quét
+  hóa đơn bằng ảnh chưa được bật và đường dẫn hiện tại là nhập văn bản hoặc nói.
+  Nút bị disable đúng khi đang phân tích/ghi âm/lưu. `ai_input_box_card.dart` đã
+  xóa (dead code, không nơi nào import).
 - Test hồi quy transcript → `/ingestion/text`.
 
 **Đã lỗi thời trong bản Ticket B gốc:**
@@ -957,7 +963,8 @@ flowchart LR
   đủ và `api_router` không có prefix, nên OpenAPI ra đúng `/api/v1/*`. Giữ nguyên
   quy ước này cho mọi router mới.
 - `frontend/lib/features/ai/widgets/ai_input_box_card.dart:125` mà spec trỏ tới là
-  dead code; widget đang chạy thật là `natural_input_card.dart`.
+  dead code; widget đang chạy thật là `natural_input_card.dart`. **Đã xóa file
+  dead code (#93).**
 
 **Điều kiện nghiệm thu:** nhập 1 câu thật trong Flutter → tạo đúng bản nháp → user xác nhận → số dư cập nhật đúng (B01–B08 của `docs/APP_COMPLETION_CHECKLIST.md`).
 
@@ -1096,7 +1103,7 @@ writes chat sessions that ADR 0001 currently exposes as read-only.
 | Model 4 (Qwen VLM) | ⚠️ Adapter có, ❌ chưa có route HTTP, ❌ chưa nối nút Camera | `backend/app/infrastructure/ai/cloud_vlm/qwen_client.py` |
 | `/api/v1/ingestion/text` | ✅ Đang chạy | `backend/app/api/v1/ingestion.py:60` |
 | `/api/v1/ingestion/audio` | ❌ Chưa có route | `execute_audio()` tồn tại, không route |
-| `/api/v1/ingestion/receipt` | ❌ Chưa có route | `ingest_receipt()` là hook |
+| `/api/v1/ingestion/receipt` | ❌ Chưa có route (ADR 0008 — cố ý) | `ingest_receipt()` là hook; nút "Hóa đơn" giải thích trạng thái (#93) |
 | `/api/v1/forecast` | ⚠️ Đã include vào `api_router`, trả 503 (chưa cấu hình forecaster) | `backend/app/api/v1/router.py` |
 | `/api/v1/budget-plans` | ✅ Đang chạy — 6 endpoint | `backend/app/api/v1/endpoints/budget_plans.py` |
 | `/api/v1/chat` | ✅ Đang chạy — 5 endpoint | `backend/app/api/v1/endpoints/chat.py` |

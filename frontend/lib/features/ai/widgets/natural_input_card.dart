@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+/// Shown when the receipt button is pressed.
+///
+/// ADR 0008 keeps receipt extraction behind a backend hook and adds no upload
+/// route, so image-based receipt scanning is unavailable in this release.
+const receiptUnavailableMessage =
+    'Quét hóa đơn bằng ảnh chưa được bật ở bản này. '
+    'Hãy nhập nội dung bằng văn bản hoặc dùng nút "Nói nhanh".';
+
 class NaturalInputCard extends StatelessWidget {
   const NaturalInputCard({
     required this.controller,
     required this.isAnalyzing,
     required this.onAnalyze,
     required this.onVoice,
+    required this.onReceipt,
     this.recording = false,
     this.voiceBusy = false,
     this.transcribing = false,
@@ -21,6 +30,9 @@ class NaturalInputCard extends StatelessWidget {
   final bool transcribing, heardSpeech;
   final double voiceLevel;
   final VoidCallback onAnalyze, onVoice;
+
+  /// Explains why receipt scanning is unavailable instead of failing silently.
+  final VoidCallback onReceipt;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -108,7 +120,11 @@ class NaturalInputCard extends StatelessWidget {
               ),
             ),
             OutlinedButton.icon(
-              onPressed: null,
+              key: const ValueKey('aiReceiptButton'),
+              onPressed:
+                  disabled || isAnalyzing || recording || voiceBusy
+                  ? null
+                  : onReceipt,
               icon: const Icon(Icons.camera_alt_outlined, size: 19),
               label: const Text('Hóa đơn'),
               style: OutlinedButton.styleFrom(
