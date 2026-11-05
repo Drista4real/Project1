@@ -48,6 +48,13 @@ owned by its caller. Streamlit continues request-local cloud clients because it
 creates a new asyncio loop per action; caching those clients across loops would
 be invalid. Model 4's existing request timeouts and validation remain unchanged.
 
+Confirmed 2026-11-04 while splitting Ticket B of `docs/DYNAMIC_BUDGET_SPEC.md`
+(issue [#90](https://github.com/Drista4real/Project1/issues/90)): this decision
+stands. No `POST /api/v1/ingestion/audio` route is added either — ASR stays
+on-device in Flutter per ADR 0004, so the server-side offline path would only
+duplicate the device runtime. The receipt upload route returns only as a separate
+ticket that also updates this ADR.
+
 Streamlit adds an explicit local preparation button and per-stage timings.
 An offline benchmark measures cold acquisition, warm classification and bounded
 concurrent requests; these timings are not production HTTP load or quality tests.

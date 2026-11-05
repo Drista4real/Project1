@@ -916,15 +916,63 @@ flowchart LR
 
 > **Nên làm trước** — là nền cho cả pre-purchase advisor lẫn rebalance, và **không phụ thuộc Gemini**.
 
-### Ticket B — Nền API cho media (chặn pre-purchase advisor)
+### Ticket B — Nền media cho pre-purchase advisor — đã tách nhỏ (2026-11-04)
 
-**Nội dung:**
-- `POST /api/v1/ingestion/audio` — multipart, giới hạn size, chuẩn hóa 16 kHz mono, dùng `SherpaOnnxRecognizer`
-- `POST /api/v1/ingestion/receipt` — multipart, `UploadFile`, giới hạn 4 MiB, kiểm MIME signature
-- Sửa prefix lặp `/api/v1`; đăng ký `forecast.router` vào `api_router` (`backend/app/api/v1/router.py` hiện **chưa** include); `get_cashflow_forecaster` trả 503 thay vì `raise`
-- Flutter: thêm `image_picker` + nối nút "Hóa đơn" (hiện chỉ hiện SnackBar tại `frontend/lib/features/ai/widgets/ai_input_box_card.dart:125`)
-- Flutter: nối transcript → `/ingestion/text`
-- Backend: tải model ASR (`backend/scripts/download_asr_model.py`) + `frontend/scripts/prepare_voice_assets.py`
+> Ticket gốc gộp nhiều việc độc lập nên dễ lỗi. Đã tách thành các issue con.
+> Xem issue cha [#90](https://github.com/Drista4real/Project1/issues/90) và các
+> issue con #91 (router), #92 (artifacts ASR), #93 (nút Hóa đơn), #94 (test
+> transcript).
+>
+> **Bàn giao:** xem `docs/TICKET_B_HANDOFF.md` để biết trạng thái chi tiết, phần còn
+> lại và các bài học cần nhớ cho phiên làm việc sau.
+
+**Quyết định kiến trúc đã chốt** (theo ADR 0004 và ADR 0008):
+
+- **ASR chạy on-device trên Flutter.** Nút "Nói nhanh" phiên âm bằng
+  sherpa-onnx/PhoWhisper INT8 trên máy. **Không** mở `POST /api/v1/ingestion/audio`
+  ở backend Python — server-side offline ASR không đáp ứng yêu cầu on-device.
+- **Không mở route upload hóa đơn.** ADR 0008: *"No receipt upload HTTP route is
+  added."* Hook `get_receipt_ingestor` (`backend/app/api/v1/ingestion.py:52`) giữ
+  nguyên, không gắn route. Nút "Hóa đơn" phải giải thích trạng thái thay vì im lặng
+  — **đã nối xong (#93)**: bấm sẽ hiện thông báo tiếng Việt nói rõ quét hóa đơn
+  bằng ảnh chưa được bật ở bản này và đường dẫn hiện tại là nhập văn bản hoặc
+  nói. Route upload hóa đơn **không** được mở ở đợt này; nếu sau này cần thì phải
+  là ticket riêng kèm quyết định kiến trúc cập nhật ADR 0008.
+- `POST /ingestion/audio` và `POST /ingestion/receipt` **hoãn sang milestone 4**
+  (`docs/APP_COMPLETION_CHECKLIST.md`).
+
+**Phần đã xong, không làm lại:**
+- `backend/scripts/download_asr_model.py` và `frontend/scripts/prepare_voice_assets.py`.
+- Luồng transcript → `/ingestion/text` đã nối tại
+  `frontend/lib/features/ai/screens/ai_quick_input_screen.dart:269`.
+- `POST /api/v1/ingestion/text` đã có kèm test (`backend/tests/api/test_ingestion.py`).
+
+**Phần còn nợ (đã tách):**
+- ~~Đăng ký `forecast.router` vào `api_router`~~ — **xong (#91)**. Route đã được
+  include; `get_cashflow_forecaster` trả `None` và route trả **503** kèm message
+  tiếng Việt thay vì `raise`. Lý do thật của lỗi ban đầu là route **404** (chưa
+  đăng ký), không phải 500: FastAPI đã tự chuyển `HTTPException` trong dependency
+  thành response 503 đúng cách.
+- Tải + bundle model ASR (thiếu `encoder.int8.onnx` và `decoder.int8.onnx`).
+- ~~Nối nút "Hóa đơn" và xóa `ai_input_box_card.dart`~~ — **xong (#93)**. Nút
+  "Hóa đơn" đã có callback thật, bấm sẽ hiện thông báo tiếng Việt giải thích quét
+  hóa đơn bằng ảnh chưa được bật và đường dẫn hiện tại là nhập văn bản hoặc nói.
+  Nút bị disable đúng khi đang phân tích/ghi âm/lưu. `ai_input_box_card.dart` đã
+  xóa (dead code, không nơi nào import).
+- ~~Test hồi quy transcript → `/ingestion/text`~~ — **xong (#94)**. Ba test widget
+  trong `frontend/test/features/ai/ai_quick_input_screen_test.dart` chứng minh
+  transcript đi vào ô nhập rồi gửi nguyên văn tới `/ingestion/text`, transcript
+  rỗng báo lỗi mà **không** gọi API, và transcript dài hơn 2000 ký tự bị cắt đúng
+  giới hạn endpoint. Phần backend (`test_spoken_money_without_punctuation`) đã có
+  sẵn. Test dùng `VoiceInput` giả lập nên chạy được trên CI không cần model.
+
+**Đã lỗi thời trong bản Ticket B gốc:**
+- "Sửa prefix lặp `/api/v1`" — **không còn lỗi**. Mọi router tự mang prefix đầy
+  đủ và `api_router` không có prefix, nên OpenAPI ra đúng `/api/v1/*`. Giữ nguyên
+  quy ước này cho mọi router mới.
+- `frontend/lib/features/ai/widgets/ai_input_box_card.dart:125` mà spec trỏ tới là
+  dead code; widget đang chạy thật là `natural_input_card.dart`. **Đã xóa file
+  dead code (#93).**
 
 **Điều kiện nghiệm thu:** nhập 1 câu thật trong Flutter → tạo đúng bản nháp → user xác nhận → số dư cập nhật đúng (B01–B08 của `docs/APP_COMPLETION_CHECKLIST.md`).
 
@@ -1058,13 +1106,13 @@ writes chat sessions that ADR 0001 currently exposes as read-only.
 | Hạng mục | Trạng thái | Vị trí |
 |---|---|---|
 | Model 1 (PhoBERT + LightGBM) | ✅ **Đang chạy** — `/ready/ai` trả 200 | `backend/app/infrastructure/ai/classifier/runtime.py` |
-| Model 2 (LightGBM / EWMA) | ✅ Code đủ, ⚠️ chưa có route thật | `backend/app/infrastructure/ai/forecaster/` |
+| Model 2 (LightGBM / EWMA) | ✅ Code đủ, ⚠️ route đã đăng ký nhưng chưa có forecaster → 503 | `backend/app/infrastructure/ai/forecaster/` |
 | Model 3 (PhoWhisper offline) | ⚠️ Code đủ, ❌ thiếu file ONNX (102 MB) + `sherpa_onnx`/`av` | `backend/app/infrastructure/ai/edge_asr/recognizer.py`, `frontend/lib/features/ai/services/voice_input_native.dart` |
 | Model 4 (Qwen VLM) | ⚠️ Adapter có, ❌ chưa có route HTTP, ❌ chưa nối nút Camera | `backend/app/infrastructure/ai/cloud_vlm/qwen_client.py` |
-| `/api/v1/ingestion/text` | ✅ Đang chạy | `backend/app/api/v1/ingestion.py:60` |
+| `/api/v1/ingestion/text` | ✅ Đang chạy, có test hồi quy transcript (#94) | `backend/app/api/v1/ingestion.py:60` |
 | `/api/v1/ingestion/audio` | ❌ Chưa có route | `execute_audio()` tồn tại, không route |
-| `/api/v1/ingestion/receipt` | ❌ Chưa có route | `ingest_receipt()` là hook |
-| `/api/v1/forecast` | ❌ Chưa include vào `api_router` | `backend/app/api/v1/router.py` |
+| `/api/v1/ingestion/receipt` | ❌ Chưa có route (ADR 0008 — cố ý) | `ingest_receipt()` là hook; nút "Hóa đơn" giải thích trạng thái (#93) |
+| `/api/v1/forecast` | ⚠️ Đã include vào `api_router`, trả 503 (chưa cấu hình forecaster) | `backend/app/api/v1/router.py` |
 | `/api/v1/budget-plans` | ✅ Đang chạy — 6 endpoint | `backend/app/api/v1/endpoints/budget_plans.py` |
 | `/api/v1/chat` | ✅ Đang chạy — 5 endpoint | `backend/app/api/v1/endpoints/chat.py` |
 | `budgets` / 4 trụ cột | ✅ Đang chạy | `frontend/supabase/schema.sql:127` |
