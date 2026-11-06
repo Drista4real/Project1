@@ -50,10 +50,11 @@ action; the agent only appends to the conversation it is answering in.
 
 The language model performs conversation, slot extraction and tool invocation
 only. It never computes money. Every number a user sees comes from a
-deterministic tool result, exactly as ADR 0009 requires. The four tools are
+deterministic tool result, exactly as ADR 0009 requires. The tools are
 `create_budget_plan`, `simulate_purchase_impact`,
-`search_nearby_similar_places` and `confirm_and_rebalance_budget`; they are
-invoked through one registry that validates arguments with Pydantic before any
+`search_nearby_similar_places`, `confirm_and_rebalance_budget` and
+`ask_user_question`; they are invoked through one registry that validates
+arguments with Pydantic before any
 service runs, checks plan ownership from the server-side user id, and refuses
 to call a writing tool more than once per turn.
 
@@ -135,3 +136,37 @@ to the names the API uses (`INTEGER`, `NUMBER`, `STRING`, `OBJECT`, …). The
 argument validation is unchanged: the model still receives the strict
 Pydantic model, so the schema the model sees may be wider than the schema
 the registry enforces.
+
+## Amendment: the choices are a tool, not a rendering
+
+A user answering "one month, three months or six months?" has to type the
+answer. The canvas can offer the choices as tappable chips instead, but only
+if the assistant actually proposes them.
+
+The choices are therefore a fifth tool, `ask_user_question`. It carries a
+question and two to four short options and writes nothing: it exists so the
+client can render the options as chips labelled `A.`, `B.`, `C.`, `D.`, plus a
+`Khác` chip that lets the user type an answer of their own. The server reads
+the options out of the tool result and returns them with the turn; the client
+never invents an option.
+
+The tool is only useful if the model calls it. A prompt that merely names the
+tool leaves the model free to answer in prose, and the user then sees no
+options at all without any error. The system prompt therefore states the rule
+plainly: a question whose answer is two to four discrete choices must go
+through the tool, and the choices must not be listed in prose. A question that
+needs a free-form number the user has to type — income, fixed expenses — is
+still asked in text, because there is nothing to tap.
+
+## Amendment: a spent allowance is not an outage
+
+The provider refuses a request whose daily allowance is used up with HTTP 429
+and the status `RESOURCE_EXHAUSTED`. That is not a transient outage: the
+allowance for the day is spent, and an immediate retry fails the same way.
+
+The provider failure is therefore not one status. A quota refusal answers
+**429** with its own message, so the user learns that waiting is the fix
+instead of being told to retry a service that is not busy. Every other
+provider failure stays a **503**, because the assistant is genuinely
+unavailable and a later retry may succeed. The client passes the chat
+message through for both, so the Vietnamese text reaches the screen unchanged.

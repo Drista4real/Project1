@@ -29,6 +29,20 @@ from app.domain.chat import (
 from app.domain.transactions import TransactionError
 
 
+def _api_error(code: int, status: str):
+    """Build the provider error the SDK raises for a refused request."""
+    from google.genai import errors
+
+    return errors.APIError(
+        code=code,
+        response_json={
+            "code": code,
+            "status": status,
+            "message": "Quota exceeded",
+        },
+    )
+
+
 class FakeRepository:
     """An in-memory conversation store."""
 
@@ -657,6 +671,96 @@ class TestUnavailableProvider:
         with pytest.raises(ChatError) as failure:
             await service.run_turn(session_id=1, user_input="Xin chao")
         assert failure.value.status == 503
+
+
+class TestQuotaExhaustion:
+    """A spent daily allowance is not a transient outage.
+
+    The provider refuses the request with HTTP 429. The user must be told
+    that waiting is the fix, so the failure carries its own status, code and
+    message instead of the generic "temporarily unavailable" one.
+    """
+
+    def test_a_quota_refusal_is_recognised(self):
+        from app.infrastructure.ai.chat.gemini_chat import (
+            QUOTA_EXHAUSTED_MESSAGE,
+            _quota_error,
+        )
+
+        error = _api_error(429, "RESOURCE_EXHAUSTED")
+        assert _quota_error(error) == QUOTA_EXHAUSTED_MESSAGE
+
+    def test_another_provider_error_is_not_a_quota_error(self):
+        from app.infrastructure.ai.chat.gemini_chat import _quota_error
+
+        assert _quota_error(_api_error(500, "INTERNAL")) is None
+
+    def test_an_unrelated_exception_is_not_a_quota_error(self):
+        from app.infrastructure.ai.chat.gemini_chat import _quota_error
+
+        assert _quota_error(RuntimeError("boom")) is None
+
+    @pytest.mark.asyncio
+    async def test_the_turn_reports_the_quota_with_its_own_status(self):
+        from app.domain.chat import ChatUnavailable
+        from app.infrastructure.ai.chat.gemini_chat import (
+            QUOTA_EXHAUSTED_MESSAGE,
+            GeminiChatModel,
+        )
+
+        class QuotaClient:
+            """A client whose provider refuses the request."""
+
+            def __init__(self) -> None:
+                self.aio = self
+                self.models = self
+
+            async def generate_content(self, **kwargs):
+                raise _api_error(429, "RESOURCE_EXHAUSTED")
+
+        model = GeminiChatModel()
+        model._client = QuotaClient()  # type: ignore[assignment]
+
+        service = ChatService(
+            repository=FakeRepository(),
+            registry=_registry([]),
+            model=model,
+            system_prompt="system",
+        )
+        with pytest.raises(ChatUnavailable) as failure:
+            await service.run_turn(session_id=1, user_input="Xin chao")
+        assert failure.value.status == 429
+        assert failure.value.code == "quota"
+        assert failure.value.message == QUOTA_EXHAUSTED_MESSAGE
+
+    @pytest.mark.asyncio
+    async def test_another_provider_failure_stays_a_transient_503(self):
+        from app.domain.chat import ChatUnavailable
+        from app.infrastructure.ai.chat.gemini_chat import GeminiChatModel
+
+        class BrokenClient:
+            """A client whose provider fails for another reason."""
+
+            def __init__(self) -> None:
+                self.aio = self
+                self.models = self
+
+            async def generate_content(self, **kwargs):
+                raise _api_error(500, "INTERNAL")
+
+        model = GeminiChatModel()
+        model._client = BrokenClient()  # type: ignore[assignment]
+
+        service = ChatService(
+            repository=FakeRepository(),
+            registry=_registry([]),
+            model=model,
+            system_prompt="system",
+        )
+        with pytest.raises(ChatUnavailable) as failure:
+            await service.run_turn(session_id=1, user_input="Xin chao")
+        assert failure.value.status == 503
+        assert failure.value.code == "unavailable"
 
 
 class TestPromptSeparation:

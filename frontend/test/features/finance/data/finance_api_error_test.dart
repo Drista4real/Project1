@@ -38,4 +38,22 @@ void main() {
       contains('biểu mẫu'),
     );
   });
+
+  test('the chat quota message reaches the user', () {
+    expect(
+      financeApiErrorMessage(
+        429,
+        '/chat/turn',
+        'Trợ lý hội thoại đã hết hạn mức gọi hôm nay.',
+      ),
+      'Trợ lý hội thoại đã hết hạn mức gọi hôm nay.',
+    );
+  });
+
+  test('a quota refusal without a detail keeps a generic message', () {
+    expect(
+      financeApiErrorMessage(429, '/chat/turn', null),
+      contains('quá nhiều lần'),
+    );
+  });
 }
