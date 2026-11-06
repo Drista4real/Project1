@@ -11,7 +11,7 @@ pre-purchase advisor".
 | Ticket | Nội dung | Phụ thuộc | Trạng thái |
 |---|---|---|---|
 | [#91](https://github.com/Drista4real/Project1/issues/91) | Đăng ký `forecast.router` + trả 503 | — | ✅ Đóng — `18fe061` |
-| [#92](https://github.com/Drista4real/Project1/issues/92) | Tải + bundle model ASR PhoWhisper INT8 | — | ⏳ Mở — chưa làm |
+| [#92](https://github.com/Drista4real/Project1/issues/92) | Tải + bundle model ASR PhoWhisper INT8 | — | ✅ Đóng — setup, không sửa code |
 | [#93](https://github.com/Drista4real/Project1/issues/93) | Nút "Hóa đơn" báo đúng trạng thái | #91 | ✅ Đóng — `f0a12d7` |
 | [#94](https://github.com/Drista4real/Project1/issues/94) | Test hồi quy transcript → `/ingestion/text` | #92 | ✅ Đóng — phần test tự động không cần model |
 
@@ -68,13 +68,23 @@ Theo ADR 0004 (ASR on-device) và ADR 0008 (không mở route upload receipt):
 
 ### #92 — Model ASR cho thiết bị
 
-Đây là **setup, không phải code**. Chi tiết đầy đủ trong issue #92. Tóm tắt:
+Đây là **setup, không phải code** — không có thay đổi source nào được commit.
+Chi tiết đầy đủ trong issue #92. Đã chạy thành công:
 
 ```powershell
-python backend/scripts/download_asr_model.py    # ~104 MB, verify SHA256 theo manifest
-python frontend/scripts/prepare_voice_assets.py # chép vào frontend/assets/models/
-python -m pip install -r backend/requirements-asr.txt
+python backend/scripts/download_asr_model.py --github-cli   # ~104 MB, verify SHA256 theo manifest
+python frontend/scripts/prepare_voice_assets.py              # chép vào frontend/assets/models/
+python -m pip install -r backend/requirements-asr.txt        # sherpa-onnx 1.13.8, av 16.1.0
 ```
+
+Kết quả kiểm chứng:
+
+- `weights/onnx/phowhisper-tiny/` có đủ 3 artifact, SHA256 khớp `manifest.json`.
+- `frontend/assets/models/phowhisper-tiny/` có đủ 3 file, SHA256 khớp (verify cả 6
+  file ở cả hai vị trí).
+- `SherpaOnnxRecognizer(allow_mock=False)` → `is_mock: False`, recognizer load
+  thành công → model thật chạy được, không phải mock.
+- `import sherpa_onnx` (1.13.8) và `import av` (16.1.0) OK.
 
 Ràng buộc quan trọng:
 
@@ -86,8 +96,15 @@ Ràng buộc quan trọng:
 - Không sửa `voice_input_native.dart` trong ticket này — code phiên âm đã có test.
 - CI (`flutter build apk --debug`) build **không kèm** model nên vẫn phải xanh.
 
-Sau khi có model, bấm "Nói nhanh" trên Android phải ra transcript đúng; đó là
-tiền đề cho #94.
+**Việc còn lại của #92 là kiểm chứng thủ công trên Android** (không làm được
+trong môi trường CI): build APK, cài lên máy, bấm "Nói nhanh" và nói
+*"ăn trưa bún bò 65k"* → transcript đúng → bấm "Phân tích" → draft `65.000`.
+
+> **Lưu ý về lockfile:** `flutter pub deps` (hay `flutter pub get` không khoá) có
+> thể nâng các package transitive (`matcher`, `meta`, `test_api`, `vector_math`).
+> CI chạy `flutter pub get --enforce-lockfile` với Flutter 3.41.3 còn local là
+> 3.47.7, nên **không được commit thay đổi `frontend/pubspec.lock`**. Nếu lỡ
+> sửa, dùng `git checkout -- frontend/pubspec.lock`.
 
 ### #94 — Test hồi quy transcript → `/ingestion/text`
 
@@ -139,6 +156,23 @@ Phần còn lại của #92 là kiểm chứng thủ công trên Android — ph�
 | `ruff check app tests` | All checks passed |
 | `flutter test` (frontend) | 180 passed |
 | `flutter analyze lib test` | No issues found |
+
+## Trạng thái Ticket B
+
+| Ticket | Nội dung | Phụ thuộc | Trạng thái |
+|---|---|---|---|
+| [#91](https://github.com/Drista4real/Project1/issues/91) | Đăng ký `forecast.router` + trả 503 | — | ✅ Đóng — `18fe061` |
+| [#92](https://github.com/Drista4real/Project1/issues/92) | Tải + bundle model ASR PhoWhisper INT8 | — | ✅ Đóng — setup, không sửa code |
+| [#93](https://github.com/Drista4real/Project1/issues/93) | Nút "Hóa đơn" báo đúng trạng thái | #91 | ✅ Đóng — `f0a12d7` |
+| [#94](https://github.com/Drista4real/Project1/issues/94) | Test hồi quy transcript → `/ingestion/text` | #92 | ✅ Đóng — phần test tự động không cần model |
+
+Cả ba commit đã push lên `origin/home_feat`.
+
+> **Lưu ý về #94:** issue ghi *"blocked by #92"* vì cần model thật để kiểm chứng thủ
+> công trên Android. Phần test tự động thì **không** cần model — nó dùng
+> `VoiceInput` giả lập qua tham số `voiceInput` của `AiQuickInputScreen`, nên chạy
+> được trên CI Ubuntu không có Android, không có model. Vì vậy #94 đã làm được và
+> đóng trước #92. Phần còn lại của #92 là kiểm chứng thủ công trên thiết bị.
 
 ## Tài liệu liên quan
 

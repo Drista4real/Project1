@@ -687,6 +687,36 @@ class TestPromptSeparation:
         assert "ban la tro ly quan ly tai chinh" not in prompt.lower()
 
 
+class TestQuestionPrompt:
+    """The prompt must push the model towards the question tool.
+
+    The tappable options only exist when the model calls `ask_user_question`.
+    A prompt that merely mentions the tool leaves the model free to answer
+    in plain text, and the user then sees no options at all.
+    """
+
+    def test_the_prompt_makes_the_question_tool_the_default_choice(self):
+        from app.infrastructure.ai.chat.gemini_chat import SYSTEM_PROMPT
+
+        assert "ask_user_question" in SYSTEM_PROMPT
+        assert "BẮT BUỘC gọi ask_user_question" in SYSTEM_PROMPT
+
+    def test_the_prompt_forbids_listing_options_in_plain_text(self):
+        from app.infrastructure.ai.chat.gemini_chat import SYSTEM_PROMPT
+
+        assert "liệt kê các lựa chọn dạng văn bản" in SYSTEM_PROMPT
+
+    def test_the_prompt_still_asks_free_numbers_as_text(self):
+        from app.infrastructure.ai.chat.gemini_chat import SYSTEM_PROMPT
+
+        assert "CON SỐ tự do" in SYSTEM_PROMPT
+
+    def test_the_prompt_version_was_bumped(self):
+        from app.infrastructure.ai.chat.gemini_chat import SYSTEM_PROMPT_VERSION
+
+        assert SYSTEM_PROMPT_VERSION == "finance-assistant-v2"
+
+
 class TestPlanInput:
     """Turning collected slots into a validated plan input."""
 
