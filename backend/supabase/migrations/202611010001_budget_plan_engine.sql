@@ -169,6 +169,10 @@ DECLARE
   -- meaning of every raise in one place.
   c_err_unauthenticated constant text := '42501';
   c_err_input          constant text := '22023';
+  -- The allocation payload names the engine and the tables share.
+  c_group_key          constant text := 'group_key';
+  -- The status a plan carries after a rebalance.
+  c_status_rebalanced  constant text := 'REBALANCED';
   v_owner uuid := auth.uid();
   v_plan  public.budget_plans%ROWTYPE;
   v_event public.budget_plan_events%ROWTYPE;
@@ -240,7 +244,7 @@ BEGIN
   END LOOP;
 
   FOR v_item IN SELECT * FROM pg_catalog.jsonb_array_elements(p_allocations) LOOP
-    v_group := v_item ->> 'group_key';
+    v_group := v_item ->> c_group_key;
     v_pillar := v_item ->> 'pillar';
     v_amount := (v_item ->> 'daily_amount')::numeric;
     IF v_group IS NULL OR v_pillar IS NULL OR v_amount IS NULL THEN
@@ -280,7 +284,7 @@ BEGIN
     UPDATE public.daily_allocations a
        SET amount = (v_item ->> 'daily_amount')::numeric
      WHERE a.plan_id = p_plan_id
-       AND a.group_key = v_item ->> 'group_key'
+       AND a.group_key = v_item ->> c_group_key
        AND a.alloc_date >= CURRENT_DATE;
   END LOOP;
 
@@ -290,7 +294,7 @@ BEGIN
     v_account_id := (p_purchase ->> 'account_id')::bigint;
     v_category_id := (p_purchase ->> 'category_id')::bigint;
     v_description := p_purchase ->> 'description';
-    v_purchase_group := p_purchase ->> 'group_key';
+    v_purchase_group := p_purchase ->> c_group_key;
     IF v_account_id IS NULL THEN
       RAISE EXCEPTION 'Cần chọn ví để ghi giao dịch.' USING ERRCODE = c_err_input;
     END IF;
@@ -313,7 +317,7 @@ BEGIN
   UPDATE public.budget_plans
      SET plan_version = plan_version + 1,
          daily_allowance = v_total_after,
-         status = 'REBALANCED',
+         status = c_status_rebalanced,
          updated_at = pg_catalog.now()
    WHERE id = p_plan_id;
 
@@ -322,7 +326,8 @@ BEGIN
     before_state, after_state, result, idempotency_key
   ) VALUES (
     p_plan_id, v_owner,
-    CASE WHEN v_purchase_amount > 0 THEN 'PURCHASE_CONFIRMED' ELSE 'REBALANCED' END,
+    CASE WHEN v_purchase_amount > 0
+         THEN 'PURCHASE_CONFIRMED' ELSE c_status_rebalanced END,
     p_allocations, p_allocations,
     v_before, v_after,
     pg_catalog.jsonb_build_object(
