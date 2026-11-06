@@ -7,6 +7,7 @@ import 'package:project_one/features/ai/models/transaction_draft.dart';
 import 'package:project_one/features/ai/screens/ai_quick_input_screen.dart';
 import 'package:project_one/features/ai/services/input_preferences.dart';
 import 'package:project_one/features/ai/services/voice_input.dart';
+import 'package:project_one/features/ai/widgets/natural_input_card.dart';
 import 'package:project_one/features/finance/domain/usecases/finance_insights.dart';
 import '../../helpers/envelope_memory_repository.dart';
 import '../../helpers/fake_finance_repository.dart';
@@ -54,6 +55,10 @@ class MemoryPreferences implements InputPreferences {
 class FakeVoice implements VoiceInput {
   bool started = false, cancelled = false, disposed = false;
   Completer<void>? permission;
+
+  /// The transcript the fake recogniser returns when recording stops.
+  String transcript = 'ăn trưa sáu mươi lăm nghìn';
+
   @override
   bool get supported => true;
   @override
@@ -63,7 +68,7 @@ class FakeVoice implements VoiceInput {
   }
 
   @override
-  Future<String> stop() async => 'ăn trưa sáu mươi lăm nghìn';
+  Future<String> stop() async => transcript;
   @override
   Future<void> cancel() async => cancelled = true;
   @override
@@ -153,6 +158,14 @@ Future<void> analyze(WidgetTester tester) async {
     'bún bò 65k, trà sữa 35k',
   );
   await tester.tap(find.text('Phân tích'));
+  await tester.pumpAndSettle();
+}
+
+/// Record and stop, so the fake recogniser returns its transcript.
+Future<void> speak(WidgetTester tester) async {
+  await tester.tap(find.text('Nói nhanh'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Dừng ghi âm'));
   await tester.pumpAndSettle();
 }
 
@@ -304,6 +317,74 @@ void main() {
       expect(find.text('ăn trưa sáu mươi lăm nghìn'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'the spoken transcript reaches the ingestion request unchanged',
+    (tester) async {
+      final finance = SavingRepository();
+      final api = FakeInput();
+      final voice = FakeVoice()
+        ..transcript = 'cơm ba mươi nghìn tiền mặt';
+      await open(tester, finance, api: api, voice: voice);
+      await speak(tester);
+      expect(find.text('cơm ba mươi nghìn tiền mặt'), findsOneWidget);
+      await tester.tap(find.text('Phân tích'));
+      await tester.pumpAndSettle();
+      expect(api.received, 'cơm ba mươi nghìn tiền mặt');
+      expect(finance.saved, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('an empty transcript reports the problem and sends nothing', (
+    tester,
+  ) async {
+    final api = FakeInput();
+    final voice = FakeVoice()..transcript = '';
+    await open(tester, SavingRepository(), api: api, voice: voice);
+    await speak(tester);
+    expect(find.textContaining('Chưa nhận được lời nói'), findsOneWidget);
+    expect(api.received, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a transcript longer than the endpoint limit is truncated', (
+    tester,
+  ) async {
+    final api = FakeInput();
+    final voice = FakeVoice()..transcript = 'a' * 2500;
+    await open(tester, SavingRepository(), api: api, voice: voice);
+    await speak(tester);
+    await tester.tap(find.text('Phân tích'));
+    await tester.pumpAndSettle();
+    expect(api.received?.length, 2000);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the receipt button explains why it is unavailable', (
+    tester,
+  ) async {
+    await open(tester, SavingRepository());
+    await tester.tap(find.byKey(const ValueKey('aiReceiptButton')));
+    await tester.pumpAndSettle();
+    expect(find.text(receiptUnavailableMessage), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the receipt button is disabled while the screen is busy', (
+    tester,
+  ) async {
+    final voice = FakeVoice()..permission = Completer<void>();
+    await open(tester, SavingRepository(), voice: voice);
+    await tester.tap(find.text('Nói nhanh'));
+    await tester.pump();
+    final button = tester.widget<OutlinedButton>(
+      find.byKey(const ValueKey('aiReceiptButton')),
+    );
+    expect(button.onPressed, isNull);
+    voice.permission!.complete();
+    await tester.pumpAndSettle();
+  });
 
   testWidgets('reference layout fits a narrow phone', (tester) async {
     tester.view.physicalSize = const Size(360, 800);

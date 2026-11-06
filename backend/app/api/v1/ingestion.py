@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.api.dependencies import UserDependency
@@ -47,9 +47,14 @@ def get_transaction_ingestor(request: TextIngestionRequest) -> ParseTransaction:
     )
 
 
-def get_receipt_ingestor() -> IngestReceipt:
-    """Override in the composition root after configuring the VLM adapter."""
-    raise HTTPException(status_code=503, detail="Receipt extractor is not configured")
+def get_receipt_ingestor(request: Request) -> IngestReceipt:
+    """Reuse the application-owned adapter and HTTP pool, never a mock receipt."""
+    extractor = getattr(request.app.state, "receipt_extractor", None)
+    if extractor is None or extractor.is_mock:
+        raise HTTPException(
+            status_code=503, detail="Receipt extractor is not configured"
+        )
+    return IngestReceipt(extractor)
 
 
 @router.post("/text")

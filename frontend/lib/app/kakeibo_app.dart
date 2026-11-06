@@ -52,7 +52,7 @@ class _AccountAppState extends State<_AccountApp> {
 
   @override
   Widget build(BuildContext context) => MaterialApp.router(
-    title: 'Kakeibo Zen - Sổ Thu Chi & Dự Báo Dòng Tiền AI',
+    title: 'Kakeibo Zen - Quản lý Tài chính & Ngân sách động AI',
     debugShowCheckedModeBanner: false,
     theme: AppTheme.kakeiboTheme,
     darkTheme: AppTheme.kakeiboDarkTheme,

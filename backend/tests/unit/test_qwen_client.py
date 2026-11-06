@@ -45,6 +45,45 @@ class TestReceiptOutputError:
         assert str(error) == "Receipt output failed validation"
 
 
+@pytest.mark.asyncio
+async def test_borrowed_http_client_is_reused_and_not_closed() -> None:
+    """Multiple extracts can share an application-owned connection pool."""
+    calls = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        receipt = {
+            "merchant_name": "Shop",
+            "transaction_date": None,
+            "items": [{"name": "Item", "quantity": 1, "price": 35000}],
+            "total_amount": 35000,
+            "category": "Ăn uống",
+            "confidence_score": 0.0,
+            "is_arithmetic_valid": False,
+        }
+        return httpx.Response(
+            200, json={"choices": [{"message": {"content": json.dumps(receipt)}}]}
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as transport:
+        extractor = QwenVLMReceiptExtractor(
+            api_key="test-key", test_mode=False, http_client=transport
+        )
+        await extractor.extract_receipt(b"image")
+        await extractor.aclose()
+        assert not transport.is_closed
+        await extractor.extract_receipt(b"image")
+        assert len(calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_owned_http_client_closes() -> None:
+    """Standalone extractors release the pool they create themselves."""
+    extractor = QwenVLMReceiptExtractor(api_key="test-key", test_mode=False)
+    await extractor.aclose()
+    assert extractor._client.is_closed
+
+
 class TestSchemaErrors:
     """Tests for _schema_errors function."""
 

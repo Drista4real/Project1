@@ -6,6 +6,27 @@ phần đấu nối với app được thực hiện sau.
 
 ## Khởi động
 
+### Đo cold start và chạy sau khi nạp sẵn
+
+Trong **Ghi chép & phân loại**, mở **Chuẩn bị model & đo thời gian** rồi bấm
+**Nạp sẵn model 1 + 3**. Bước này chỉ nạp/chạy mẫu classifier cục bộ và nạp ASR;
+không gửi audio, ảnh hoặc câu mẫu lên cloud. ASR báo rõ mock nếu thiếu trọng số;
+việc nạp ASR chưa đo thời gian giải mã một bản ghi thật.
+
+Sau đó phân tích nhiều câu khác nhau. Mở **Thời gian từng bước** dưới kết quả để
+xem thời gian lấy classifier, suy luận, chuẩn hóa và fallback (nếu có). Giọng nói
+có thêm thời gian lấy recognizer và phiên âm; hóa đơn có thời gian Qwen/Gemini.
+Khởi động lại tiến trình Streamlit để đo lại cold start. Xóa kết quả trên màn hình
+không giải phóng model trong RAM.
+
+Demo dùng chung bộ nạp classifier của backend. Bật `CLASSIFIER_LORA_MERGE=true`
+trong cấu hình rồi khởi động lại để thử merge LoRA trong RAM; mặc định chưa bật
+vì phép đo ngắn chưa cho thấy lợi ích tốc độ rõ ràng. Checkpoint không bị ghi đè.
+Các tùy chọn và benchmark CLI được mô tả trong
+[backend README](../backend/README.md#model-runtime-and-latency).
+
+### Chạy demo
+
 Chạy từ thư mục gốc repository, trong môi trường Python của dự án:
 
 ```powershell

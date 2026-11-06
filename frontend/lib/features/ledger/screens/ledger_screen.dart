@@ -93,7 +93,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
       appBar: _buildKakeiboAppBar(),
       body: _buildLedgerContent(),
       bottomNavigationBar: AppScreenNavigation(
-        selectedIndex: 0,
+        selectedIndex: 1,
         onTransactionAdded: _loadAllData,
       ),
     );
@@ -128,7 +128,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
                   ),
                 ),
                 Text(
-                  'Sổ Thu Chi Thông Minh',
+                  'Trang Chủ',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

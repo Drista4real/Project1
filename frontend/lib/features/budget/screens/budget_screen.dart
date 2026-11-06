@@ -1,8 +1,10 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:project_one/features/budget/cubit/budget_month_cubit.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:project_one/app/app_dependencies.dart';
+import 'package:project_one/app/app_routes.dart';
 import 'package:project_one/app/widgets/app_screen_navigation.dart';
+import 'package:project_one/features/budget/cubit/budget_month_cubit.dart';
 import 'package:project_one/features/finance/domain/usecases/finance_insights.dart';
 import 'package:project_one/features/management/open_finance_module.dart';
 import 'package:project_one/features/management/screens/resource_list_screen.dart';
@@ -56,6 +58,11 @@ class _BudgetScreenState extends State<BudgetScreen> {
       repository: _insights.repository,
     );
     if (mounted) await _dataController.refresh();
+  }
+
+  /// Open the plan projection of the envelope.
+  Future<void> _openPlan() async {
+    await context.push(AppRoutes.plan);
   }
 
   Future<void> _sheet(Widget sheet) async {
@@ -164,6 +171,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
                 overview: overview,
                 onMonth: (delta) => _cubit.move(delta),
                 onManage: _manage,
+                onPlan: _openPlan,
                 onRebalance: () => _rebalance(overview),
                 onSavingGoals: _savingGoals,
                 onEdit: (record) => _edit(overview, record),
@@ -174,8 +182,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
         },
       ),
       bottomNavigationBar: AppScreenNavigation(
-        selectedIndex: 2,
-        onTransactionAdded: _dataController.refresh,
+      selectedIndex: 3,
+      onTransactionAdded: _dataController.refresh,
       ),
     ),
   );

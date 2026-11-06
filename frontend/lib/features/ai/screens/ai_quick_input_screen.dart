@@ -31,12 +31,16 @@ class AiQuickInputScreen extends StatefulWidget {
     this.insights,
     this.voiceInput,
     this.preferences,
+    this.initialPrompt,
   });
   final AiInputRepository? inputRepository;
   final FinanceRepository? financeRepository;
   final FinanceInsights? insights;
   final VoiceInput? voiceInput;
   final InputPreferences? preferences;
+
+  /// A hint shown when the screen is opened from the conversational canvas.
+  final String? initialPrompt;
 
   @override
   State<AiQuickInputScreen> createState() => _AiQuickInputScreenState();
@@ -76,6 +80,8 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _text.addListener(_inputChanged);
+    final prompt = widget.initialPrompt;
+    if (prompt != null && prompt.isNotEmpty) _text.text = prompt;
     _loadReferences();
     _loadBudget();
     final voice = _voice;
@@ -298,6 +304,17 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
     }
   }
 
+  /// Explains that receipt scanning is not available in this release.
+  ///
+  /// ADR 0008 keeps the receipt adapter behind a backend hook and adds no
+  /// upload route, so the button reports the situation instead of failing
+  /// silently.
+  void _showReceiptUnavailable() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text(receiptUnavailableMessage)),
+    );
+  }
+
   Future<void> _edit(ReviewTransaction item) async {
     if (item.type == 'transfer') {
       await showDialog<void>(
@@ -389,7 +406,7 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
           _uncertainSave = true;
           _error =
               'Đã xác nhận lưu $_savedCount giao dịch. Yêu cầu vừa gửi chưa xác nhận được kết quả. '
-              'Hãy kiểm tra Sổ Thu Chi trước khi nhập lại để tránh lưu trùng.';
+              'Hãy kiểm tra Trang Chủ trước khi nhập lại để tránh lưu trùng.';
         });
       }
     } finally {
@@ -401,7 +418,7 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop(_savedCount > 0);
     } else {
-      context.go(AppRoutes.ledger);
+      context.go(AppRoutes.home);
     }
   }
 
@@ -503,7 +520,7 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
                     style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
                   ),
                   Text(
-                    'Sổ Thu Chi',
+                    'Trang Chủ',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400),
@@ -588,6 +605,7 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
                 isAnalyzing: _analyzing,
                 onAnalyze: _analyze,
                 onVoice: _toggleVoice,
+                onReceipt: _showReceiptUnavailable,
                 recording: _recording,
                 voiceBusy: _voiceBusy,
                 transcribing: _transcribing,
@@ -621,7 +639,7 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
                       if (_uncertainSave)
                         TextButton(
                           onPressed: _close,
-                          child: const Text('Về Sổ Thu Chi'),
+                          child: const Text('Về Trang Chủ'),
                         ),
                     ],
                   ),
@@ -738,7 +756,7 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
                         )
                       : const Icon(Icons.check_circle_outline),
                   label: Text(
-                    _saving ? 'Đang lưu…' : 'Xác nhận & Lưu vào Sổ Thu Chi',
+                    _saving ? 'Đang lưu…' : 'Xác nhận & Lưu vào Trang Chủ',
                   ),
                   style: FilledButton.styleFrom(
                     textStyle: const TextStyle(
