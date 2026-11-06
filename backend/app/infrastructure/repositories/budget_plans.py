@@ -101,7 +101,7 @@ class SupabaseBudgetPlanRepository:
         ]
         if rows:
             self.client.table("daily_allocations").insert(rows).execute()
-        return self._to_plan(record, plan.groups)
+        return _to_plan(record, plan.groups)
 
     def get(self, plan_id: int) -> BudgetPlan:
         """Return one plan owned by the authenticated user."""
@@ -115,7 +115,7 @@ class SupabaseBudgetPlanRepository:
         if not result.data:
             raise TransactionError(404, "Budget plan not found")
         record = result.data[0]
-        return self._to_plan(record, self._groups_from_allocations(plan_id))
+        return _to_plan(record, self._groups_from_allocations(plan_id))
 
     def list_plans(self, active_only: bool, limit: int, offset: int) -> dict:
         """List plans owned by the authenticated user."""
@@ -128,7 +128,7 @@ class SupabaseBudgetPlanRepository:
             .range(offset, offset + limit - 1)
             .execute()
         )
-        items = [self._to_plan(record, ()) for record in result.data]
+        items = [_to_plan(record, ()) for record in result.data]
         return {
             "items": items,
             "total": result.count or 0,
@@ -255,7 +255,7 @@ class SupabaseBudgetPlanRepository:
         if request.description:
             purchase["description"] = request.description
         try:
-            data = (
+            data: dict[str, Any] | None = (
                 self.client.rpc(
                     "rebalance_plan",
                     {
@@ -306,7 +306,7 @@ class SupabaseBudgetPlanRepository:
         if not result.data:
             return None
         record = result.data[0]
-        return self._to_plan(record, self._groups_from_allocations(record["id"]))
+        return _to_plan(record, self._groups_from_allocations(record["id"]))
 
     def _groups_from_allocations(self, plan_id: int) -> tuple[PlanGroup, ...]:
         allocations = self.allocations(plan_id)
@@ -322,31 +322,36 @@ class SupabaseBudgetPlanRepository:
             )
         return tuple(seen.values())
 
-    @staticmethod
-    def _to_plan(record: dict, groups: tuple[PlanGroup, ...]) -> BudgetPlan:
-        return BudgetPlan(
-            id=int(record["id"]),
-            title=record["title"],
-            status=record["status"],
-            total_income=_decimal(record["total_income"]),
-            duration_days=int(record["duration_days"]),
-            savings_target=_decimal(record["savings_target"]),
-            fixed_expenses=_decimal(record["fixed_expenses"]),
-            start_date=date.fromisoformat(record["start_date"]),
-            spendable_budget=_decimal(record["spendable_budget"]),
-            daily_allowance=_decimal(record["daily_allowance"]),
-            survival_floor=_decimal(record.get("survival_floor")),
-            plan_version=int(record["plan_version"]),
-            config_version=record["config_version"],
-            groups=groups,
-            idempotency_key=(
-                UUID(record["idempotency_key"])
-                if record.get("idempotency_key")
-                else None
-            ),
-            created_at=record.get("created_at"),
-            updated_at=record.get("updated_at"),
-        )
+
+def _to_plan(record: dict[str, Any], groups: tuple[PlanGroup, ...]) -> BudgetPlan:
+    """Build a plan from a stored row.
+
+    The row is read through a mapping, so a missing optional column reads
+    as absent instead of raising.
+    """
+    return BudgetPlan(
+        id=int(record["id"]),
+        title=record["title"],
+        status=record["status"],
+        total_income=_decimal(record["total_income"]),
+        duration_days=int(record["duration_days"]),
+        savings_target=_decimal(record["savings_target"]),
+        fixed_expenses=_decimal(record["fixed_expenses"]),
+        start_date=date.fromisoformat(record["start_date"]),
+        spendable_budget=_decimal(record["spendable_budget"]),
+        daily_allowance=_decimal(record["daily_allowance"]),
+        survival_floor=_decimal(record.get("survival_floor")),
+        plan_version=int(record["plan_version"]),
+        config_version=record["config_version"],
+        groups=groups,
+        idempotency_key=(
+            UUID(record["idempotency_key"])
+            if record.get("idempotency_key")
+            else None
+        ),
+        created_at=record.get("created_at"),
+        updated_at=record.get("updated_at"),
+    )
 
 
 def _rpc_error(error: APIError) -> TransactionError:

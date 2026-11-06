@@ -357,13 +357,15 @@ class TestRebalancePayloadValidation:
         assert caught.value.status == 422
 
     def test_a_version_below_one_is_refused(self):
+        payload = _rebalance_payload(expected_version=0)
         with pytest.raises(TransactionError) as caught:
-            validate_rebalance_payload(_rebalance_payload(expected_version=0))
+            validate_rebalance_payload(payload)
         assert caught.value.status == 422
 
     def test_an_empty_allocation_list_is_refused(self):
+        payload = _rebalance_payload(allocations=[])
         with pytest.raises(TransactionError) as caught:
-            validate_rebalance_payload(_rebalance_payload(allocations=[]))
+            validate_rebalance_payload(payload)
         assert caught.value.status == 422
 
     def test_a_negative_daily_amount_is_refused(self):

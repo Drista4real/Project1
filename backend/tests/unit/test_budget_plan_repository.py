@@ -243,9 +243,10 @@ class TestRebalanceVersionConflict:
         )
         client = _Client(rpc=rpc)
         repository = SupabaseBudgetPlanRepository(client, USER)
+        request = self._request()
 
         with pytest.raises(TransactionError) as caught:
-            repository.rebalance(self._request())
+            repository.rebalance(request)
 
         assert caught.value.status == 409
         assert caught.value.message == "Kế hoạch đã thay đổi, hãy tải lại."
@@ -283,9 +284,10 @@ class TestRebalanceVersionConflict:
         rpc = _RpcQuery(result=_result(None))
         client = _Client(rpc=rpc)
         repository = SupabaseBudgetPlanRepository(client, USER)
+        request = self._request()
 
         with pytest.raises(TransactionError) as caught:
-            repository.rebalance(self._request())
+            repository.rebalance(request)
 
         assert caught.value.status == 409
 
