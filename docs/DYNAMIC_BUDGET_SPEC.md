@@ -978,6 +978,30 @@ flowchart LR
   dead code; widget đang chạy thật là `natural_input_card.dart`. **Đã xóa file
   dead code (#93).**
 
+### Lựa chọn A/B/C/D trong khung hội thoại (2026-11-06)
+
+Chips `A. B. C. D.` (kèm chip `Khác`) chỉ hiện khi model gọi tool
+`ask_user_question`. Server đọc `options` từ kết quả tool rồi trả về cùng lượt
+chat; client không tự sinh lựa chọn.
+
+`SYSTEM_PROMPT` (`finance-assistant-v2`) đã siết: câu hỏi có 2–4 đáp án rời rạc
+**phải** gọi tool, không được liệt kê lựa chọn bằng văn bản. Câu hỏi cần con số
+tự do (thu nhập, chi phí cố định) vẫn hỏi bằng văn bản vì không có gì để bấm.
+
+> **Bài học:** tính năng dựa trên tool call phải kiểm bằng provider thật. Unit test
+> với model giả luôn pass và không bắt được prompt chưa đủ mạnh.
+
+### Hạn mức provider (2026-11-06)
+
+Provider từ chối request khi hết hạn mức với **HTTP 429**
+(`RESOURCE_EXHAUSTED`). Đây không phải sự cố tạm thời — hạn mức trong ngày đã hết,
+thử lại ngay vẫn lỗi. Backend trả **429** kèm message riêng
+(*"Trợ lý hội thoại đã hết hạn mức gọi hôm nay…"*); các lỗi provider khác vẫn là
+**503**. Chi tiết trong `docs/adr/0010-conversational-home-canvas.md`.
+
+> **Lưu ý vận hành:** key Gemini free tier giới hạn 20 request/ngày cho
+> `gemini-2.5-flash`. Cần key có billing khi triển khai thật.
+
 **Điều kiện nghiệm thu:** nhập 1 câu thật trong Flutter → tạo đúng bản nháp → user xác nhận → số dư cập nhật đúng (B01–B08 của `docs/APP_COMPLETION_CHECKLIST.md`).
 
 ### Ticket C — Chat agent + slot filling + tool calling

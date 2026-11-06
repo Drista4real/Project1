@@ -14,9 +14,10 @@ String financeApiErrorMessage(int status, String path, Object? detail) {
     return detail;
   }
   // The chat API answers with an actionable Vietnamese message, so the
-  // detail is more useful than the generic status text.
+  // detail is more useful than the generic status text. A 429 is the
+  // provider's daily allowance, which the user must be told about.
   if (path.startsWith('/chat') &&
-      {400, 404, 422, 503}.contains(status) &&
+      {400, 404, 422, 429, 503}.contains(status) &&
       detail is String &&
       detail.trim().isNotEmpty &&
       detail.length <= 2000) {
@@ -29,6 +30,8 @@ String financeApiErrorMessage(int status, String path, Object? detail) {
     409 =>
       'Dữ liệu đang được sử dụng, bị trùng hoặc đã thay đổi. Vui lòng kiểm tra lại.',
     422 => 'Kiểm tra giá trị và dữ liệu liên quan trong biểu mẫu.',
+    429 =>
+      'Bạn đã gọi quá nhiều lần. Vui lòng chờ một lúc rồi thử lại.',
     503 => 'Máy chủ chưa sẵn sàng. Vui lòng thử lại sau.',
     _ => 'Không thể xử lý yêu cầu. Vui lòng thử lại.',
   };

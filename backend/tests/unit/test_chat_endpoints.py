@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.api.dependencies import UserContext, get_user_context
 from app.api.v1.endpoints.chat import get_chat_service
+from app.application.chat import ChatService
 from app.domain.chat import BudgetSlots, ChatSession
 from app.main import app
 
@@ -205,3 +206,36 @@ class TestChatEndpoints:
             "/api/v1/chat/turn", json={"session_id": 1, "message": "   "}
         )
         assert response.status_code == 422
+
+
+class TestQuotaEndpoint:
+    """A spent daily allowance reaches the client as a 429."""
+
+    def test_the_quota_failure_is_reported_with_its_own_status(self, client):
+        from app.domain.chat import ChatUnavailable
+
+        class QuotaModel:
+            is_mock = False
+
+            async def complete(self, **kwargs):
+                raise ChatUnavailable(
+                    "Trợ lý hội thoại đã hết hạn mức gọi hôm nay. "
+                    "Vui lòng thử lại sau hoặc dùng gói có hạn mức cao hơn.",
+                    code="quota",
+                    status=429,
+                )
+
+        original = app.dependency_overrides[get_chat_service]()
+        quota_service = ChatService(
+            repository=original.repository,
+            registry=original.registry,
+            model=QuotaModel(),
+            system_prompt="system",
+        )
+        app.dependency_overrides[get_chat_service] = lambda: quota_service
+
+        response = client.post(
+            "/api/v1/chat/turn", json={"session_id": 1, "message": "Xin chào"}
+        )
+        assert response.status_code == 429
+        assert "hết hạn mức" in response.json()["detail"]

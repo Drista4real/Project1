@@ -132,6 +132,35 @@ def _region(label: str, content: str) -> str:
     return f"<{label}>\n{content}\n</{label}>"
 
 
+#: The message shown when the provider's daily allowance is used up.
+QUOTA_EXHAUSTED_MESSAGE = (
+    "Trợ lý hội thoại đã hết hạn mức gọi hôm nay. "
+    "Vui lòng thử lại sau hoặc dùng gói có hạn mức cao hơn."
+)
+
+
+def _quota_error(error: Exception) -> str | None:
+    """Return the quota message when the provider refused the request.
+
+    A quota refusal is not a transient outage: the allowance for the day is
+    spent, so retrying immediately fails the same way. The user needs to know
+    that waiting is the fix, not that the service is merely busy.
+
+    The SDK reports this as HTTP 429 with the `RESOURCE_EXHAUSTED` status, but
+    the quota can also be reported per minute. Both mean the same thing here.
+    """
+    try:
+        from google.genai import errors
+    except ImportError:  # pragma: no cover - the SDK is a runtime dependency
+        return None
+
+    if not isinstance(error, errors.APIError):
+        return None
+    if error.code != 429 and str(error.status or "").upper() != "RESOURCE_EXHAUSTED":
+        return None
+    return QUOTA_EXHAUSTED_MESSAGE
+
+
 def build_prompt(
     *,
     user_input: str,
@@ -216,6 +245,13 @@ class GeminiChatModel:
                 code="timeout",
             ) from exc
         except Exception as error:  # noqa: BLE001 - provider errors are reported
+            quota = _quota_error(error)
+            if quota is not None:
+                raise ChatUnavailable(
+                    quota,
+                    code="quota",
+                    status=429,
+                ) from error
             logger.warning("Gemini chat turn failed: %s", type(error).__name__)
             raise ChatUnavailable(
                 "Trợ lý hội thoại tạm thời không phản hồi. Vui lòng thử lại.",
