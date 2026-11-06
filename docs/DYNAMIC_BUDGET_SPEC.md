@@ -953,7 +953,11 @@ flowchart LR
   tiếng Việt thay vì `raise`. Lý do thật của lỗi ban đầu là route **404** (chưa
   đăng ký), không phải 500: FastAPI đã tự chuyển `HTTPException` trong dependency
   thành response 503 đúng cách.
-- Tải + bundle model ASR (thiếu `encoder.int8.onnx` và `decoder.int8.onnx`).
+- Tải + bundle model ASR (thiếu `encoder.int8.onnx` và `decoder.int8.onnx`) —
+  **xong (#92)**. Đã tải từ Release `model3-phowhisper-tiny-int8-v1`, verify SHA256
+  theo manifest, chép vào `frontend/assets/models/phowhisper-tiny/`, và cài
+  `sherpa-onnx` + `av`. Model thật load được (`is_mock: False`). Còn lại: kiểm
+  chứng thủ công trên Android.
 - ~~Nối nút "Hóa đơn" và xóa `ai_input_box_card.dart`~~ — **xong (#93)**. Nút
   "Hóa đơn" đã có callback thật, bấm sẽ hiện thông báo tiếng Việt giải thích quét
   hóa đơn bằng ảnh chưa được bật và đường dẫn hiện tại là nhập văn bản hoặc nói.
@@ -1107,7 +1111,7 @@ writes chat sessions that ADR 0001 currently exposes as read-only.
 |---|---|---|
 | Model 1 (PhoBERT + LightGBM) | ✅ **Đang chạy** — `/ready/ai` trả 200 | `backend/app/infrastructure/ai/classifier/runtime.py` |
 | Model 2 (LightGBM / EWMA) | ✅ Code đủ, ⚠️ route đã đăng ký nhưng chưa có forecaster → 503 | `backend/app/infrastructure/ai/forecaster/` |
-| Model 3 (PhoWhisper offline) | ⚠️ Code đủ, ❌ thiếu file ONNX (102 MB) + `sherpa_onnx`/`av` | `backend/app/infrastructure/ai/edge_asr/recognizer.py`, `frontend/lib/features/ai/services/voice_input_native.dart` |
+| Model 3 (PhoWhisper offline) | ✅ Artifact đã tải + bundle, `sherpa_onnx`/`av` đã cài — ⚠️ còn kiểm chứng thủ công trên Android | `backend/app/infrastructure/ai/edge_asr/recognizer.py`, `frontend/lib/features/ai/services/voice_input_native.dart` |
 | Model 4 (Qwen VLM) | ⚠️ Adapter có, ❌ chưa có route HTTP, ❌ chưa nối nút Camera | `backend/app/infrastructure/ai/cloud_vlm/qwen_client.py` |
 | `/api/v1/ingestion/text` | ✅ Đang chạy, có test hồi quy transcript (#94) | `backend/app/api/v1/ingestion.py:60` |
 | `/api/v1/ingestion/audio` | ❌ Chưa có route | `execute_audio()` tồn tại, không route |
