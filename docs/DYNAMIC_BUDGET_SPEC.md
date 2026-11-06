@@ -513,7 +513,8 @@ end $$;
 > **Vì sao `PT409` chứ không phải `40001`:** `40001` là `serialization_failure` — PostgREST
 > coi đây là lỗi transient và **retry transaction vô hạn**, request treo tới 504 rồi ra 503.
 > `PT409` là mã lỗi custom của PostgREST (`PT<status_code>`): trả thẳng HTTP 409, không retry.
-> Xem `backend/supabase/migrations/202611010003_budget_plan_rebalance_conflict.sql`.
+> Xem `backend/supabase/migrations/202611010001_budget_plan_engine.sql` (hằng `PT409` được
+> khai báo ngay trong RPC) và `202611010003_budget_plan_event_arrays.sql`.
 
 ### 6.5 Ghi giao dịch
 
@@ -926,7 +927,8 @@ flowchart LR
 | Thành phần | Vị trí |
 |---|---|
 | Idempotency khi tạo kế hoạch | `backend/app/domain/budget_plan.py`, `backend/app/application/budget_plan.py`, `backend/app/infrastructure/repositories/budget_plans.py` |
-| RPC version conflict dùng `PT409` | `backend/supabase/migrations/202611010003_budget_plan_rebalance_conflict.sql` |
+| RPC version conflict dùng `PT409` | `backend/supabase/migrations/202611010001_budget_plan_engine.sql` |
+| Constraint mảng cho audit trail | `backend/supabase/migrations/202611010003_budget_plan_event_arrays.sql` |
 | Unit test repository | `backend/tests/unit/test_budget_plan_repository.py` |
 | Unit test endpoint rebalance | `backend/tests/unit/test_budget_plan_endpoints.py` |
 | E2E Java trên Postgres thật | `tests/backend-e2e/src/test/java/vn/kakeibo/e2e/BudgetPlanIT.java` |
@@ -938,8 +940,9 @@ flowchart LR
   Key là tuỳ chọn; server tự suy ra key từ `turn_key` (id message) cho tool chat,
   nên LLM không bao giờ phải tự bịa UUID.
 - **Version conflict**: `rebalance_plan` raise `PT409` (không phải `40001`) — xem mục 6.4.
-- **Kết quả kiểm chứng**: pytest `785 passed`, Ruff sạch. E2E Java trên PostgreSQL 17
-  thật: `68/68` test pass (`BudgetPlanIT` 11/11).
+- **Kết quả kiểm chứng**: pytest `791 passed`, Ruff sạch. E2E Java trên PostgreSQL 17
+  thật: `68/68` test pass (`BudgetPlanIT` 11/11). SonarCloud quality gate: **OK**
+  (security 1, duplication 0.28%).
 
 ### Ticket B — Nền media cho pre-purchase advisor — đã tách nhỏ (2026-11-04)
 

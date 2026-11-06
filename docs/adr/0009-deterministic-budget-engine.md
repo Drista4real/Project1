@@ -46,6 +46,12 @@ second plan and a second set of daily allocations. The key is optional in the
 API and is derived on the server when a caller does not supply one, so a chat
 model is never asked to produce a UUID.
 
+The database function names the values it repeats. The SQL states it raises,
+the allocation key and the rebalance status are declared once and used by
+name, so a meaning cannot drift between two occurrences of a literal. A
+repeated literal is a smell here for the same reason it is one in Python: it
+is a place where the two occurrences can disagree.
+
 The engine validates the envelope capacity inside the database through
 `validate_envelope_capacity`, reusing the ADR 0005 rule instead of restating
 it. Checking it in the database is what makes the check hold between two
@@ -87,11 +93,18 @@ the plan version, wrote exactly one purchase, returned the stored result for a
 repeated idempotency key without writing twice, and rejected a stale
 `expected_version`.
 
-Validation on 2026-11-06 (Ticket A closed): the Python suite passed with 785
+Validation on 2026-11-06 (Ticket A closed): the Python suite passed with 791
 tests and Ruff clean. The Java end-to-end suite ran against a real PostgreSQL
 17 with the Supabase migrations applied and passed 68 of 68 tests, of which
 `BudgetPlanIT` covers 11 scenarios: plan creation, a stale version returning
 409, an accepted rebalance bumping the version, an idempotency key replaying
 the stored result, a missing key being rejected with 422, a purchase without
 an account being rejected with 422, and cross-user reads being blocked by row
-level security.
+level security. The SonarCloud quality gate for the pull request passed with
+a security rating of 1 and a duplicated line density of 0.28%.
+
+The benchmark reads a recording the operator selects on the command line. The
+path is untrusted input: the file is located by walking the real directory
+entries of the path, so a name that only traverses somewhere else never
+reaches the read, and the recording must be a regular file with a known audio
+extension and a size a benchmark could use.
