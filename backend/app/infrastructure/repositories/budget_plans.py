@@ -3,6 +3,7 @@
 from datetime import date
 from decimal import Decimal
 from typing import Any
+from uuid import UUID
 
 from postgrest.exceptions import APIError
 from supabase import Client
@@ -45,7 +46,16 @@ class SupabaseBudgetPlanRepository:
     def create(
         self, plan: BudgetPlan, allocations: list[DailyAllocation]
     ) -> BudgetPlan:
-        """Persist a plan with its daily projection in one round trip."""
+        """Persist a plan with its daily projection in one round trip.
+
+        The plan carries an optional idempotency key. A repeated request with
+        the same key returns the plan that was already stored instead of
+        writing a second one, so a retried call never duplicates a plan.
+        """
+        if plan.idempotency_key is not None:
+            existing = self._find_by_idempotency_key(plan.idempotency_key)
+            if existing is not None:
+                return existing
         payload = {
             "user_id": self.user_id,
             "title": plan.title,
@@ -60,8 +70,20 @@ class SupabaseBudgetPlanRepository:
             "survival_floor": str(plan.survival_floor),
             "plan_version": plan.plan_version,
             "config_version": plan.config_version,
+            "idempotency_key": (
+                str(plan.idempotency_key)
+                if plan.idempotency_key is not None
+                else None
+            ),
         }
-        result = self.client.table("budget_plans").insert(payload).execute()
+        try:
+            result = self.client.table("budget_plans").insert(payload).execute()
+        except APIError as error:
+            if error.code == "23505" and plan.idempotency_key is not None:
+                existing = self._find_by_idempotency_key(plan.idempotency_key)
+                if existing is not None:
+                    return existing
+            raise _rpc_error(error) from error
         if not result.data:
             raise TransactionError(409, "Unable to create budget plan")
         record = result.data[0]
@@ -272,6 +294,20 @@ class SupabaseBudgetPlanRepository:
 
     # -- helpers -------------------------------------------------------------
 
+    def _find_by_idempotency_key(self, key: UUID) -> BudgetPlan | None:
+        """Return the plan already stored under an idempotency key."""
+        result = (
+            self.client.table("budget_plans")
+            .select("*")
+            .eq("user_id", self.user_id)
+            .eq("idempotency_key", str(key))
+            .execute()
+        )
+        if not result.data:
+            return None
+        record = result.data[0]
+        return self._to_plan(record, self._groups_from_allocations(record["id"]))
+
     def _groups_from_allocations(self, plan_id: int) -> tuple[PlanGroup, ...]:
         allocations = self.allocations(plan_id)
         seen: dict[str, PlanGroup] = {}
@@ -303,19 +339,32 @@ class SupabaseBudgetPlanRepository:
             plan_version=int(record["plan_version"]),
             config_version=record["config_version"],
             groups=groups,
+            idempotency_key=(
+                UUID(record["idempotency_key"])
+                if record.get("idempotency_key")
+                else None
+            ),
             created_at=record.get("created_at"),
             updated_at=record.get("updated_at"),
         )
 
 
 def _rpc_error(error: APIError) -> TransactionError:
-    """Translate a database error into an actionable API error."""
+    """Translate a database error into an actionable API error.
+
+    The rebalance function raises the PostgREST code `PT409` for a stale
+    plan version. A plain `40001` would not work: PostgREST treats a
+    serialization failure as transient and retries it forever, so the request
+    would hang instead of answering with a conflict.
+    """
     code = error.code
-    if code == "40001":
+    if code in {"PT409", "40001"}:
         return TransactionError(409, "Kế hoạch đã thay đổi, hãy tải lại.")
-    if code == "42501":
+    if code in {"PT403", "42501"}:
         return TransactionError(403, "Kế hoạch không khả dụng.")
-    if code in {"23514", "22023"}:
+    if code == "23505":
+        return TransactionError(409, "Kế hoạch đã tồn tại.")
+    if code in {"PT422", "23514", "22023"}:
         return TransactionError(422, error.message)
     return TransactionError(503, "Data service unavailable")
 

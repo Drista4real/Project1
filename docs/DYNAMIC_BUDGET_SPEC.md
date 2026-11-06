@@ -491,7 +491,7 @@ begin
 
   -- 3. Optimistic lock
   if v_plan.plan_version <> p_expected_version then
-    raise exception 'Kế hoạch đã thay đổi, hãy tải lại.' using errcode = '40001';
+    raise exception 'Kế hoạch đã thay đổi, hãy tải lại.' using errcode = 'PT409';
   end if;
 
   -- 4. Validate envelope capacity theo ADR 0005
@@ -508,7 +508,12 @@ end $$;
 
 > `validate_envelope_capacity` là hàm **tái sử dụng** rule của ADR 0005, không viết lại logic riêng. Phải nằm trong DB để chống race condition giữa 2 client.
 
-> **Mã lỗi → HTTP:** `40001` → 409 (version conflict) · `42501` → 403 (không sở hữu) · `23514`/`22023` → 422 (vi phạm envelope / input sai) · lỗi khác → 503.
+> **Mã lỗi → HTTP:** `PT409` → 409 (version conflict) · `42501` → 403 (không sở hữu) · `23514`/`22023` → 422 (vi phạm envelope / input sai) · lỗi khác → 503.
+>
+> **Vì sao `PT409` chứ không phải `40001`:** `40001` là `serialization_failure` — PostgREST
+> coi đây là lỗi transient và **retry transaction vô hạn**, request treo tới 504 rồi ra 503.
+> `PT409` là mã lỗi custom của PostgREST (`PT<status_code>`): trả thẳng HTTP 409, không retry.
+> Xem `backend/supabase/migrations/202611010003_budget_plan_rebalance_conflict.sql`.
 
 ### 6.5 Ghi giao dịch
 
@@ -741,7 +746,7 @@ Cần thêm cột `tool_name`, `tool_args` (jsonb), `tool_result` (jsonb) để 
 
 | Tool | Input (Pydantic) | Output | Ghi DB |
 |---|---|---|---|
-| `create_budget_plan` | `total_income ≥ 0`, `duration_days ∈ [1,365]`, `savings_target ≥ 0`, `fixed_expenses ≥ 0`, `group_ratios` tổng = 100 | `plan_id`, `daily_allowance`, `survival_floor`, `groups`, `plan_version` | INSERT plan + allocations |
+| `create_budget_plan` | `total_income ≥ 0`, `duration_days ∈ [1,365]`, `savings_target ≥ 0`, `fixed_expenses ≥ 0`, `group_ratios` tổng = 100, `idempotency_key` (tuỳ chọn) | `plan_id`, `daily_allowance`, `survival_floor`, `groups`, `plan_version` | INSERT plan + allocations |
 | `simulate_purchase_impact` | `plan_id`, `current_day ∈ [1,N]`, `amount > 0`, `group`, `category` | `level`, `daily_allowance_now`, `daily_allowance_after`, `survival_floor` | **Không** (read-only) |
 | `search_nearby_similar_places` | `query`, `lat`, `lng`, `radius_m`, `max_price_level`, `min_rating` | danh sách place | **Không** |
 | `confirm_and_rebalance_budget` | `plan_id`, `expected_version`, `allocations`, `idempotency_key` | `plan_version` mới, before/after, `transaction_id` | UPDATE + INSERT (1 RPC) |
@@ -859,7 +864,7 @@ flowchart LR
     C --> E["Pre-purchase advisor<br/>chạy đầy đủ"]
 ```
 
-### Ticket A — Budget Engine deterministic ⭐ *độc lập AI, test được 100%* — ✅ **Đã xong 2026-11-01**
+### Ticket A — Budget Engine deterministic ⭐ *độc lập AI, test được 100%* — ✅ **Đã xong 2026-11-01, đóng 2026-11-06**
 
 **Nội dung:**
 - Migration `budget_plans` + `daily_allocations` + `budget_plan_events` + RLS + index
@@ -893,7 +898,7 @@ flowchart LR
 - Tổng 3 nhóm luôn bằng `B_spendable` (kể cả khi làm tròn) ✅
 - Sàn pillar: zero-out pillar có hạn mức danh mục → bị chặn ✅
 - 3 mức cảnh báo + `INSUFFICIENT_DATA` ✅
-- 409 version conflict ✅ (RPC trả `40001` → API 409)
+- 409 version conflict ✅ (RPC trả `PT409` → API 409)
 - Idempotency trùng → không ghi 2 lần ✅ (RPC trả kết quả đã lưu)
 - `B_spendable ≤ 0` → từ chối ✅
 
@@ -915,6 +920,26 @@ flowchart LR
   Truy cập từ màn Ngân sách (nút "Xem kế hoạch chi tiêu"), route `/plan`.
 
 > **Nên làm trước** — là nền cho cả pre-purchase advisor lẫn rebalance, và **không phụ thuộc Gemini**.
+
+**Bổ sung 2026-11-06 (vòng 3 — đóng Ticket A):**
+
+| Thành phần | Vị trí |
+|---|---|
+| Idempotency khi tạo kế hoạch | `backend/app/domain/budget_plan.py`, `backend/app/application/budget_plan.py`, `backend/app/infrastructure/repositories/budget_plans.py` |
+| RPC version conflict dùng `PT409` | `backend/supabase/migrations/202611010003_budget_plan_rebalance_conflict.sql` |
+| Unit test repository | `backend/tests/unit/test_budget_plan_repository.py` |
+| Unit test endpoint rebalance | `backend/tests/unit/test_budget_plan_endpoints.py` |
+| E2E Java trên Postgres thật | `tests/backend-e2e/src/test/java/vn/kakeibo/e2e/BudgetPlanIT.java` |
+
+- **Idempotency khi tạo kế hoạch**: `budget_plans.idempotency_key` đã có unique
+  `(user_id, idempotency_key)` nhưng `create()` bỏ sót field này khỏi payload insert.
+  Nay key được truyền xuyên domain → service → repository; khi trùng unique
+  (`23505`) repository trả lại plan đã có thay vì tạo thêm plan và thêm daily allocations.
+  Key là tuỳ chọn; server tự suy ra key từ `turn_key` (id message) cho tool chat,
+  nên LLM không bao giờ phải tự bịa UUID.
+- **Version conflict**: `rebalance_plan` raise `PT409` (không phải `40001`) — xem mục 6.4.
+- **Kết quả kiểm chứng**: pytest `785 passed`, Ruff sạch. E2E Java trên PostgreSQL 17
+  thật: `68/68` test pass (`BudgetPlanIT` 11/11).
 
 ### Ticket B — Nền media cho pre-purchase advisor — đã tách nhỏ (2026-11-04)
 

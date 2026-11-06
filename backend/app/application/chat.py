@@ -10,6 +10,7 @@ on the server so an interrupted session resumes without re-asking (ADR 0010).
 """
 
 import logging
+import uuid
 from collections.abc import Sequence
 from decimal import Decimal, InvalidOperation
 
@@ -175,10 +176,13 @@ class ChatService:
                 "Chat turn contained instruction-like text in the user data region"
             )
 
-        self.repository.append_message(session_id, "user", message)
+        user_message = self.repository.append_message(session_id, "user", message)
 
         collected, reply, outcomes = await self._converse(
-            slots=slots, history=history, message=message
+            slots=slots,
+            history=history,
+            message=message,
+            turn_key=str(user_message.id),
         )
 
         slots = slots.merge(collected)
@@ -206,6 +210,7 @@ class ChatService:
         slots: BudgetSlots,
         history: Sequence[ChatMessage],
         message: str,
+        turn_key: str,
     ) -> tuple[BudgetSlots, str, tuple[ToolOutcome, ...]]:
         """Ask the model, run at most one tool, and ask the model to explain."""
         declarations = self.registry.declarations()
@@ -224,6 +229,7 @@ class ChatService:
             logger.info(
                 "Model proposed %d tool calls; only the first one runs", len(calls)
             )
+        call = self._with_idempotency_key(call, turn_key)
         outcome = await self.registry.run(call)
         collected = await self._collect_slots(call, outcome)
         if not outcome.ok:
@@ -235,6 +241,27 @@ class ChatService:
 
         explanation = await self._explain_result(outcome)
         return collected, explanation, (outcome,)
+
+    def _with_idempotency_key(self, call: ToolCall, turn_key: str) -> ToolCall:
+        """Give a writing tool a stable idempotency key.
+
+        The model never invents a key: it cannot count retries, and a key it
+        repeats would silently replay an old write. The server derives one
+        from the turn instead, so the same turn always produces the same key
+        and a retry of that turn cannot write twice.
+        """
+        if not self.registry.writes(call.name):
+            return call
+        arguments = dict(call.arguments)
+        if arguments.get("idempotency_key"):
+            return call
+        arguments["idempotency_key"] = str(
+            uuid.uuid5(
+                uuid.NAMESPACE_URL,
+                f"kakeibo:chat:{call.name}:{turn_key}",
+            )
+        )
+        return ToolCall(name=call.name, arguments=arguments)
 
     def _question_text(self, outcome: ToolOutcome) -> str:
         """Return the question the assistant asked."""

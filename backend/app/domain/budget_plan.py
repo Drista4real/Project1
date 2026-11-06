@@ -150,6 +150,7 @@ class BudgetPlan(BaseModel):
     plan_version: int
     config_version: str
     groups: tuple[PlanGroup, ...]
+    idempotency_key: UUID | None = None
     created_at: str | None = None
     updated_at: str | None = None
 
@@ -185,8 +186,10 @@ class PlanEvent(BaseModel):
     id: int
     plan_id: int
     event_type: str
-    proposal: dict = Field(default_factory=dict)
-    accepted: dict = Field(default_factory=dict)
+    #: The proposed allocations and the accepted ones. The engine stores a
+    #: list of group allocations, so this is a list rather than a mapping.
+    proposal: list = Field(default_factory=list)
+    accepted: list = Field(default_factory=list)
     before_state: dict | None = None
     after_state: dict | None = None
     created_at: str | None = None

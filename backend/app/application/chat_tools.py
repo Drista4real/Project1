@@ -19,6 +19,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
+from uuid import UUID
 
 from pydantic import (
     BaseModel,
@@ -67,6 +68,7 @@ class CreateBudgetPlanArgs(BaseModel):
     survival_floor_override: Decimal | None = Field(
         default=None, ge=0, max_digits=15, decimal_places=2
     )
+    idempotency_key: str | None = Field(default=None, min_length=36, max_length=36)
 
 
 class SimulatePurchaseImpactArgs(BaseModel):
@@ -108,7 +110,7 @@ class ConfirmRebalanceArgs(BaseModel):
     )
     group_key: GroupKey = "lifestyle"
     description: str | None = Field(default=None, max_length=2000)
-    idempotency_key: str = Field(min_length=36, max_length=36)
+    idempotency_key: str | None = Field(default=None, min_length=36, max_length=36)
 
 
 class AskUserQuestionArgs(BaseModel):
@@ -372,17 +374,16 @@ def allocation_payload(allocations: Sequence[PlanAllocation]) -> list[dict]:
 def rebalance_request(
     arguments: ConfirmRebalanceArgs,
     allocations: Sequence[PlanAllocation],
+    idempotency_key: UUID,
 ) -> RebalanceRequest:
     """Build the rebalance request the service expects."""
-    from uuid import UUID
-
     return RebalanceRequest(
         plan_id=arguments.plan_id,
         expected_version=arguments.expected_version,
         current_day=arguments.current_day,
         purchase_amount=arguments.purchase_amount,
         allocations=tuple(allocations),
-        idempotency_key=UUID(arguments.idempotency_key),
+        idempotency_key=idempotency_key,
         description=arguments.description,
     )
 

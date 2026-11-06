@@ -96,6 +96,16 @@ smoke staging và rollback là bước tiếp theo. Path filter giảm chạy th
 check bị skip có thể chặn merge nếu đặt trực tiếp làm required check; cần thiết kế
 gate tổng hợp chạy mọi PR khi bật branch protection.
 
+## Kết quả kiểm tra tại máy ngày 06/11/2026 (đóng Ticket A)
+
+- Ruff backend: đạt (`All checks passed!`).
+- Pytest toàn backend (`pytest tests -q`): **785 passed** trong 31 giây.
+- Flutter analyze: đạt (`No issues found!`); Flutter unit/widget: **182 passed**.
+- Java E2E trên PostgreSQL 17 thật (migration Supabase đã apply): **68/68 passed**,
+  trong đó `BudgetPlanIT` 11/11 — tạo kế hoạch, version cũ → 409, rebalance tăng
+  `plan_version`, idempotency key trả lại kết quả đã lưu, thiếu key → 422, mua
+  không có ví → 422, RLS chặn đọc dữ liệu của user khác.
+
 ## Kết quả kiểm tra tại máy ngày 17/10/2026
 
 - Ruff backend: đạt; pytest API + unit: **66 passed**.

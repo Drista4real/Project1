@@ -8,6 +8,7 @@ into a service call and render the result as plain JSON (ADR 0009).
 import logging
 from collections.abc import Sequence
 from decimal import Decimal
+from uuid import UUID
 
 from app.application.chat import ChatService
 from app.application.chat_tools import (
@@ -27,6 +28,7 @@ from app.domain.budget_plan import (
     PlanAllocation,
 )
 from app.domain.chat import PlacesSearch
+from app.domain.transactions import TransactionError
 from app.infrastructure.ai.chat.gemini_chat import (
     SYSTEM_PROMPT,
     GeminiChatModel,
@@ -74,7 +76,30 @@ def _plan_input(arguments: CreateBudgetPlanArgs) -> BudgetPlanCreateInput:
         fixed_expenses=arguments.fixed_expenses,
         survival_floor_override=arguments.survival_floor_override,
         group_ratios=GroupRatios(),
+        idempotency_key=_optional_uuid(arguments.idempotency_key),
     )
+
+
+def _optional_uuid(value: str | None) -> UUID | None:
+    """Read an optional UUID sent by the model or the client."""
+    if not value:
+        return None
+    try:
+        return UUID(value)
+    except ValueError:
+        return None
+
+
+def _required_uuid(value: str | None) -> UUID:
+    """Read the UUID a writing tool must carry.
+
+    The server derives the key before the tool runs, so a missing key means
+    the call did not come through the chat turn and must not be guessed.
+    """
+    key = _optional_uuid(value)
+    if key is None:
+        raise TransactionError(422, "Thiếu idempotency key.")
+    return key
 
 
 def _create_budget_plan_handler(client, user_id: str):
@@ -170,7 +195,11 @@ def _confirm_rebalance_handler(client, user_id: str):
             )
             for item in proposal.allocations
         )
-        request = rebalance_request(arguments, allocations)
+        request = rebalance_request(
+            arguments,
+            allocations,
+            _required_uuid(arguments.idempotency_key),
+        )
         result = rebalance(repository, request)
         return result.model_dump(mode="json")
 

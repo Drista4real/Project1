@@ -31,6 +31,21 @@ repeated idempotency key returns the stored result, so a partial allocation
 cannot be left behind. This closes the gap recorded in ADR 0005, where
 rebalancing still used several API writes.
 
+The version conflict is raised with the PostgREST error code `PT409`, not with
+the SQLSTATE `40001`. `40001` means `serialization_failure`, which PostgREST
+treats as transient: it retries the transaction until the request times out, so
+the client sees a 504 and the API reports 503 instead of a version conflict.
+`PT409` is PostgREST's own `PT<status_code>` form and carries the HTTP status
+directly. The API maps both `PT409` and the legacy `40001` to a 409 response,
+so a database that was not migrated yet still reports the conflict correctly.
+
+Plan creation carries an idempotency key as well. The key is stored on
+`budget_plans` under a unique constraint on `(user_id, idempotency_key)`; a
+repeated key returns the plan that already exists instead of inserting a
+second plan and a second set of daily allocations. The key is optional in the
+API and is derived on the server when a caller does not supply one, so a chat
+model is never asked to produce a UUID.
+
 The engine validates the envelope capacity inside the database through
 `validate_envelope_capacity`, reusing the ADR 0005 rule instead of restating
 it. Checking it in the database is what makes the check hold between two
@@ -71,3 +86,12 @@ was exercised against real rows: the rebalance moved the allocation, bumped
 the plan version, wrote exactly one purchase, returned the stored result for a
 repeated idempotency key without writing twice, and rejected a stale
 `expected_version`.
+
+Validation on 2026-11-06 (Ticket A closed): the Python suite passed with 785
+tests and Ruff clean. The Java end-to-end suite ran against a real PostgreSQL
+17 with the Supabase migrations applied and passed 68 of 68 tests, of which
+`BudgetPlanIT` covers 11 scenarios: plan creation, a stale version returning
+409, an accepted rebalance bumping the version, an idempotency key replaying
+the stored result, a missing key being rejected with 422, a purchase without
+an account being rejected with 422, and cross-user reads being blocked by row
+level security.

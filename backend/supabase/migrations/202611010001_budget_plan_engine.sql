@@ -210,7 +210,11 @@ BEGIN
   END IF;
 
   IF v_plan.plan_version <> p_expected_version THEN
-    RAISE EXCEPTION 'Kế hoạch đã thay đổi, hãy tải lại.' USING ERRCODE = '40001';
+    -- The optimistic lock fails here. The error code is PT409, not the SQL
+    -- state 40001: PostgREST treats a serialization failure as a transient
+    -- error and retries it forever, so the request would hang instead of
+    -- answering 409. A PT code carries the HTTP status directly.
+    RAISE EXCEPTION 'Kế hoạch đã thay đổi, hãy tải lại.' USING ERRCODE = 'PT409';
   END IF;
   IF p_allocations IS NULL
      OR pg_catalog.jsonb_typeof(p_allocations) <> 'array' THEN
