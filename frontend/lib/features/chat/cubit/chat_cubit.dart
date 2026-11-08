@@ -120,6 +120,7 @@ class ChatCubit extends Cubit<ChatState> {
               content: turn.reply,
               toolName: turn.toolName,
               options: turn.options,
+              questions: turn.questions,
             ),
           ],
           slots: turn.slots,

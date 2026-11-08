@@ -15,6 +15,7 @@ from app.application.chat_tools import (
     CreateBudgetPlanArgs,
     SearchNearbySimilarPlacesArgs,
     SimulatePurchaseImpactArgs,
+    SumAmountsArgs,
     ToolHandler,
     ToolRegistry,
     ToolSpec,
@@ -167,10 +168,11 @@ def _registry(handler_calls: list[dict]) -> ToolRegistry:
 
     async def question_handler(arguments):
         handler_calls.append({"name": "ask_user_question", "args": arguments})
-        return {
-            "question": arguments.question,
-            "options": list(arguments.options),
-        }
+        return {"questions": _questions_payload(arguments)}
+
+    async def sum_handler(arguments):
+        handler_calls.append({"name": "sum_amounts", "args": arguments})
+        return {"total": str(sum(arguments.amounts, Decimal("0")))}
 
     return ToolRegistry(
         (
@@ -213,14 +215,54 @@ def _registry(handler_calls: list[dict]) -> ToolRegistry:
             ToolHandler(
                 spec=ToolSpec(
                     name="ask_user_question",
-                    description="Ask a multiple-choice question",
+                    description="Ask a batch of multiple-choice questions",
                     writes=False,
                     input_model=AskUserQuestionArgs,
                 ),
                 handler=question_handler,
             ),
+            ToolHandler(
+                spec=ToolSpec(
+                    name="sum_amounts",
+                    description="Add up the amounts the user picked",
+                    writes=False,
+                    input_model=SumAmountsArgs,
+                ),
+                handler=sum_handler,
+            ),
         )
     )
+
+
+def _questions_payload(arguments) -> list[dict]:
+    """Render the batch the way the real handler does."""
+    questions = []
+    for question in arguments.questions:
+        options = []
+        for option in question.options:
+            amount = None
+            if option.ratio is not None and option.base_amount is not None:
+                amount = str(
+                    (option.base_amount * Decimal(str(option.ratio))).quantize(
+                        Decimal("0.01")
+                    )
+                )
+            options.append(
+                {
+                    "label": option.label,
+                    "amount": amount,
+                    "exclusive": option.exclusive,
+                    "answer": amount if amount is not None else option.label,
+                }
+            )
+        questions.append(
+            {
+                "question": question.question,
+                "multi_select": question.multi_select,
+                "options": options,
+            }
+        )
+    return questions
 
 
 class TestBudgetSlots:
@@ -307,7 +349,7 @@ class TestToolRegistry:
         assert not outcome.ok
         assert outcome.error_code == "unknown_tool"
 
-    def test_declarations_cover_the_five_tools(self):
+    def test_declarations_cover_the_six_tools(self):
         registry = _registry([])
         names = {item["name"] for item in registry.declarations()}
         assert names == {
@@ -316,6 +358,7 @@ class TestToolRegistry:
             "search_nearby_similar_places",
             "confirm_and_rebalance_budget",
             "ask_user_question",
+            "sum_amounts",
         }
 
     def test_declarations_do_not_leak_schema_noise(self):
@@ -429,8 +472,18 @@ class TestChatService:
                         ToolCall(
                             name="ask_user_question",
                             arguments={
-                                "question": "Ban muon ke hoach keo dai bao lau?",
-                                "options": ["1 thang", "3 thang", "6 thang"],
+                                "questions": [
+                                    {
+                                        "question": (
+                                            "Ban muon ke hoach keo dai bao lau?"
+                                        ),
+                                        "options": [
+                                            {"label": "1 thang"},
+                                            {"label": "3 thang"},
+                                            {"label": "6 thang"},
+                                        ],
+                                    }
+                                ]
                             },
                         ),
                     ),
@@ -445,7 +498,9 @@ class TestChatService:
         )
         turn = await service.run_turn(session_id=1, user_input="Lap ke hoach")
         assert turn.options == ("1 thang", "3 thang", "6 thang")
-        assert turn.reply == "Ban muon ke hoach keo dai bao lau?"
+        # The reply introduces the batch; the questions themselves are the
+        # caption of each group of chips.
+        assert turn.reply == "Mình cần bạn trả lời mấy câu sau:"
 
     @pytest.mark.asyncio
     async def test_a_question_with_too_few_options_is_refused(self):
@@ -458,7 +513,14 @@ class TestChatService:
                     (
                         ToolCall(
                             name="ask_user_question",
-                            arguments={"question": "Chon di", "options": ["Mot"]},
+                            arguments={
+                                "questions": [
+                                    {
+                                        "question": "Chon di",
+                                        "options": [{"label": "Mot"}],
+                                    }
+                                ]
+                            },
                         ),
                     ),
                 ),
@@ -473,6 +535,48 @@ class TestChatService:
         turn = await service.run_turn(session_id=1, user_input="Lap ke hoach")
         assert turn.options == ()
         assert not turn.tool_calls[0].ok
+
+    @pytest.mark.asyncio
+    async def test_a_refused_batch_shows_a_readable_message(self):
+        """The raw validation message names a Pydantic field, not a problem.
+
+        The user must never read "questions.1.options: List should have at most
+        4 items after validation, not 5"; they only need to know that the
+        questions did not come through.
+        """
+        calls: list[dict] = []
+        repository = FakeRepository()
+        model = FakeModel(
+            [
+                (
+                    "",
+                    (
+                        ToolCall(
+                            name="ask_user_question",
+                            arguments={
+                                "questions": [
+                                    {
+                                        "question": "Chon di",
+                                        "options": [{"label": "Mot"}],
+                                    }
+                                ]
+                            },
+                        ),
+                    ),
+                ),
+            ]
+        )
+        service = ChatService(
+            repository=repository,
+            registry=_registry(calls),
+            model=model,
+            system_prompt="system",
+        )
+        turn = await service.run_turn(session_id=1, user_input="Lap ke hoach")
+        assert "validation error" not in turn.reply.lower()
+        assert "at most" not in turn.reply.lower()
+        assert "options" not in turn.reply.lower()
+        assert "thử" in turn.reply.lower()
 
     @pytest.mark.asyncio
     async def test_the_tool_trace_records_the_validated_arguments(self):
@@ -790,6 +894,31 @@ class TestPromptSeparation:
         prompt = build_prompt(user_input="xin chao", slots=BudgetSlots(), history=())
         assert "ban la tro ly quan ly tai chinh" not in prompt.lower()
 
+    def test_the_prompt_shows_the_questions_of_an_earlier_batch(self):
+        """The answers carry the number, so the model needs the numbering."""
+        from app.domain.chat import ChatQuestion, ChatQuestionOption
+        from app.infrastructure.ai.chat.gemini_chat import build_prompt
+
+        prompt = build_prompt(
+            user_input="Trả lời:\n1. Ăn uống",
+            slots=BudgetSlots(),
+            history=(
+                ChatMessage(
+                    id=1,
+                    session_id=1,
+                    sender="assistant",
+                    content="Mình cần bạn trả lời mấy câu sau:",
+                    questions=(
+                        ChatQuestion(
+                            question="Bạn có khoản chi phí cố định nào không?",
+                            options=(ChatQuestionOption(label="Ăn uống"),),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        assert "1. Bạn có khoản chi phí cố định nào không?" in prompt
+
 
 class TestQuestionPrompt:
     """The prompt must push the model towards the question tool.
@@ -818,7 +947,372 @@ class TestQuestionPrompt:
     def test_the_prompt_version_was_bumped(self):
         from app.infrastructure.ai.chat.gemini_chat import SYSTEM_PROMPT_VERSION
 
-        assert SYSTEM_PROMPT_VERSION == "finance-assistant-v2"
+        assert SYSTEM_PROMPT_VERSION == "finance-assistant-v3"
+
+
+class TestQuestionBatch:
+    """One turn may carry a batch of questions."""
+
+    def test_a_batch_holds_up_to_five_questions(self):
+        from app.application.chat_tools import AskUserQuestionArgs
+
+        question = {
+            "question": "Chon di",
+            "options": [{"label": "A"}, {"label": "B"}],
+        }
+        with pytest.raises(ValueError):
+            AskUserQuestionArgs(questions=[question] * 6)
+
+    def test_a_batch_needs_at_least_one_question(self):
+        from app.application.chat_tools import AskUserQuestionArgs
+
+        with pytest.raises(ValueError):
+            AskUserQuestionArgs(questions=[])
+
+    def test_a_ratio_needs_its_base_amount(self):
+        from app.application.chat_tools import AskUserQuestionArgs
+
+        with pytest.raises(ValueError):
+            AskUserQuestionArgs(
+                questions=[
+                    {
+                        "question": "Chon di",
+                        "options": [
+                            {"label": "40%", "ratio": 0.4},
+                            {"label": "50%", "ratio": 0.5},
+                        ],
+                    }
+                ]
+            )
+
+    def test_a_ratio_of_zero_is_allowed(self):
+        """Zero is a real answer: "không tiết kiệm" means nothing saved."""
+        from app.api.v1.chat_tools import _option_amount
+        from app.application.chat_tools import QuestionOptionArgs
+
+        option = QuestionOptionArgs(
+            label="Khong tiet kiem", ratio=0, base_amount=Decimal("500000")
+        )
+        assert _option_amount(option) == "0.00"
+
+    @pytest.mark.asyncio
+    async def test_a_number_the_model_added_is_removed(self):
+        """The client numbers the questions itself, so the text stays clean."""
+        calls: list[dict] = []
+        repository = FakeRepository()
+        model = FakeModel(
+            [
+                (
+                    "",
+                    (
+                        ToolCall(
+                            name="ask_user_question",
+                            arguments={
+                                "questions": [
+                                    {
+                                        "question": "1. An uong het bao nhieu?",
+                                        "options": [
+                                            {"label": "40%"},
+                                            {"label": "50%"},
+                                        ],
+                                    }
+                                ]
+                            },
+                        ),
+                    ),
+                ),
+            ]
+        )
+        service = ChatService(
+            repository=repository,
+            registry=_registry(calls),
+            model=model,
+            system_prompt="system",
+        )
+        turn = await service.run_turn(session_id=1, user_input="500k")
+        assert turn.questions[0].question == "An uong het bao nhieu?"
+
+    def test_the_ratio_is_computed_by_the_server(self):
+        """The model proposes a ratio; the server does the multiplication."""
+        from app.api.v1.chat_tools import _option_amount
+        from app.application.chat_tools import QuestionOptionArgs
+
+        option = QuestionOptionArgs(
+            label="40%", ratio=0.4, base_amount=Decimal("500000")
+        )
+        assert _option_amount(option) == "200000.00"
+
+        option = QuestionOptionArgs(
+            label="50%", ratio=0.5, base_amount=Decimal("500000")
+        )
+        assert _option_amount(option) == "250000.00"
+
+        option = QuestionOptionArgs(
+            label="60%", ratio=0.6, base_amount=Decimal("500000")
+        )
+        assert _option_amount(option) == "300000.00"
+
+    def test_an_option_without_a_ratio_has_no_amount(self):
+        from app.api.v1.chat_tools import _option_amount
+        from app.application.chat_tools import QuestionOptionArgs
+
+        assert _option_amount(QuestionOptionArgs(label="An uong")) is None
+
+    @pytest.mark.asyncio
+    async def test_the_service_returns_every_question_of_the_batch(self):
+        calls: list[dict] = []
+        repository = FakeRepository()
+        model = FakeModel(
+            [
+                (
+                    "",
+                    (
+                        ToolCall(
+                            name="ask_user_question",
+                            arguments={
+                                "questions": [
+                                    {
+                                        "question": "Ban co khoan chi phi co dinh nao?",
+                                        "multi_select": True,
+                                        "options": [
+                                            {"label": "An uong"},
+                                            {"label": "Xang xe"},
+                                            {
+                                                "label": "Khong co khoan co dinh",
+                                                "exclusive": True,
+                                            },
+                                        ],
+                                    },
+                                    {
+                                        "question": "An uong het bao nhieu tien?",
+                                        "options": [
+                                            {
+                                                "label": "40%",
+                                                "ratio": 0.4,
+                                                "base_amount": "500000",
+                                            },
+                                            {
+                                                "label": "50%",
+                                                "ratio": 0.5,
+                                                "base_amount": "500000",
+                                            },
+                                        ],
+                                    },
+                                ]
+                            },
+                        ),
+                    ),
+                ),
+            ]
+        )
+        service = ChatService(
+            repository=repository,
+            registry=_registry(calls),
+            model=model,
+            system_prompt="system",
+        )
+        turn = await service.run_turn(session_id=1, user_input="500k trong 3 ngay")
+        assert len(turn.questions) == 2
+        assert turn.questions[0].multi_select is True
+        assert turn.questions[0].options[2].exclusive is True
+        assert turn.questions[1].options[0].amount == "200000.00"
+        # The reply introduces the batch; the questions are the captions of
+        # the chip groups, so the reply does not repeat them.
+        assert turn.reply == "Mình cần bạn trả lời mấy câu sau:"
+
+    @pytest.mark.asyncio
+    async def test_the_sum_tool_adds_the_picked_amounts(self):
+        calls: list[dict] = []
+        repository = FakeRepository()
+        model = FakeModel(
+            [
+                (
+                    "",
+                    (
+                        ToolCall(
+                            name="sum_amounts",
+                            arguments={"amounts": ["200000", "150000"]},
+                        ),
+                    ),
+                ),
+            ]
+        )
+        service = ChatService(
+            repository=repository,
+            registry=_registry(calls),
+            model=model,
+            system_prompt="system",
+        )
+        turn = await service.run_turn(session_id=1, user_input="cong giup toi")
+        assert calls[0]["name"] == "sum_amounts"
+        assert turn.tool_calls[0].ok
+        assert turn.tool_calls[0].data["total"] == "350000"
+
+    @pytest.mark.asyncio
+    async def test_a_negative_amount_is_refused(self):
+        calls: list[dict] = []
+        registry = _registry(calls)
+        outcome = await registry.run(
+            ToolCall(name="sum_amounts", arguments={"amounts": ["-1"]})
+        )
+        assert not outcome.ok
+        assert outcome.error_code == "invalid_arguments"
+        assert calls == []
+
+    def test_the_batch_schema_is_valid_for_the_api(self):
+        """A nested model must not reach the API as a `$ref`."""
+        from google.genai import types
+
+        registry = _registry([])
+        types.Tool(function_declarations=registry.declarations())
+
+    def test_the_nested_schema_is_inlined(self):
+        from app.application.chat_tools import _clean_schema
+
+        cleaned = _clean_schema(AskUserQuestionArgs.model_json_schema())
+        items = cleaned["properties"]["questions"]["items"]
+        assert "properties" in items
+        option_items = items["properties"]["options"]["items"]
+        assert option_items["type"] == "OBJECT"
+        assert option_items["properties"]["ratio"]["type"] == "NUMBER"
+        assert "$defs" not in cleaned
+
+
+class TestQuestionBatchRobustness:
+    """A batch must survive a model that offers one choice too many.
+
+    The model counts its own choices badly from time to time. When it hands
+    over five options for a question that fits four, the user must still get
+    the questions instead of an error line and nothing else.
+    """
+
+    def test_a_question_may_offer_five_options(self):
+        from app.application.chat_tools import AskUserQuestionArgs
+
+        question = {
+            "question": "Chon di",
+            "options": [{"label": str(index)} for index in range(5)],
+        }
+        parsed = AskUserQuestionArgs(questions=[question])
+        assert len(parsed.questions[0].options) == 5
+
+    def test_a_sixth_option_is_trimmed_instead_of_refused(self):
+        from app.application.chat_tools import AskUserQuestionArgs
+
+        question = {
+            "question": "Chon di",
+            "options": [{"label": str(index)} for index in range(6)],
+        }
+        parsed = AskUserQuestionArgs(questions=[question])
+        labels = [option.label for option in parsed.questions[0].options]
+        assert len(labels) == 5
+        assert "5" not in labels
+
+    def test_the_trim_keeps_the_exclusive_answer(self):
+        """The "không có" answer is the one the user needs to see."""
+        from app.application.chat_tools import AskUserQuestionArgs
+
+        question = {
+            "question": "Chon di",
+            "options": [
+                {"label": "A"},
+                {"label": "B"},
+                {"label": "C"},
+                {"label": "D"},
+                {"label": "E"},
+                {"label": "Khong co", "exclusive": True},
+            ],
+        }
+        parsed = AskUserQuestionArgs(questions=[question])
+        options = parsed.questions[0].options
+        assert len(options) == 5
+        assert any(option.exclusive for option in options)
+
+    def test_a_question_with_one_option_is_dropped_not_the_batch(self):
+        """A question that cannot render is dropped; the others survive."""
+        from app.application.chat_tools import AskUserQuestionArgs
+
+        parsed = AskUserQuestionArgs(
+            questions=[
+                {"question": "Chon di", "options": [{"label": "Mot"}]},
+                {
+                    "question": "Cau hai",
+                    "options": [{"label": "A"}, {"label": "B"}],
+                },
+            ]
+        )
+        assert len(parsed.questions) == 1
+        assert parsed.questions[0].question == "Cau hai"
+
+    @pytest.mark.asyncio
+    async def test_the_user_still_gets_the_batch_when_a_choice_is_surplus(self):
+        """The whole batch must not be lost over one surplus choice."""
+        calls: list[dict] = []
+        repository = FakeRepository()
+        model = FakeModel(
+            [
+                (
+                    "",
+                    (
+                        ToolCall(
+                            name="ask_user_question",
+                            arguments={
+                                "questions": [
+                                    {
+                                        "question": "Ban co khoan chi phi co dinh nao?",
+                                        "multi_select": True,
+                                        "options": [
+                                            {"label": "An uong"},
+                                            {"label": "Xang xe"},
+                                            {"label": "Nha hang"},
+                                            {"label": "The"},
+                                            {"label": "Da nang"},
+                                            {"label": "Xa gia"},
+                                        ],
+                                    },
+                                    {
+                                        "question": "An uong het bao nhieu tien?",
+                                        "options": [
+                                            {
+                                                "label": "40%",
+                                                "ratio": 0.4,
+                                                "base_amount": "500000",
+                                            },
+                                            {
+                                                "label": "50%",
+                                                "ratio": 0.5,
+                                                "base_amount": "500000",
+                                            },
+                                        ],
+                                    },
+                                ]
+                            },
+                        ),
+                    ),
+                ),
+            ]
+        )
+        service = ChatService(
+            repository=repository,
+            registry=_registry(calls),
+            model=model,
+            system_prompt="system",
+        )
+        turn = await service.run_turn(session_id=1, user_input="500k trong 3 ngay")
+        assert turn.tool_calls[0].ok
+        assert len(turn.questions) == 2
+        assert len(turn.questions[0].options) == 5
+        assert turn.questions[1].options[0].amount == "200000.00"
+
+    def test_the_prompt_states_the_choice_limit(self):
+        from app.infrastructure.ai.chat.gemini_chat import SYSTEM_PROMPT
+
+        assert "TỐI ĐA 5 lựa chọn" in SYSTEM_PROMPT
+
+    def test_the_tool_description_states_the_choice_limit(self):
+        from app.api.v1.chat_tools import _ASK_DESCRIPTION
+
+        assert "tối đa 5 lựa chọn" in _ASK_DESCRIPTION
 
 
 class TestPlanInput:

@@ -10,6 +10,7 @@ on the server so an interrupted session resumes without re-asking (ADR 0010).
 """
 
 import logging
+import re
 import uuid
 from collections.abc import Sequence
 from decimal import Decimal, InvalidOperation
@@ -20,6 +21,8 @@ from app.domain.chat import (
     BudgetSlots,
     ChatError,
     ChatMessage,
+    ChatQuestion,
+    ChatQuestionOption,
     ChatRepository,
     ChatSession,
     ChatTurn,
@@ -108,19 +111,80 @@ def looks_like_injection(text: str) -> bool:
 QUESTION_TOOL = "ask_user_question"
 
 
-def _question_options(outcomes: tuple[ToolOutcome, ...]) -> tuple[str, ...]:
-    """Read the offered choices out of the question tool's result.
+def _strip_number(question: str) -> str:
+    """Remove a number the model put in front of the question.
 
-    Only a successful question carries options: a failed call is an error the
-    user must be told about, not a set of choices to tap.
+    The client numbers the questions of a batch itself, and the model reads
+    the questions back by that number. A number in the question text would
+    show up twice on the screen.
+    """
+    return re.sub(r"^\s*\d+[.)]\s*", "", question).strip() or question.strip()
+
+
+def _question_questions(outcomes: tuple[ToolOutcome, ...]) -> tuple[ChatQuestion, ...]:
+    """Read the offered questions out of the question tool's result.
+
+    Only a successful question carries questions: a failed call is an error
+    the user must be told about, not a set of choices to tap.
     """
     for outcome in outcomes:
         if outcome.name != QUESTION_TOOL or not outcome.ok:
             continue
         data = outcome.data or {}
-        options = data.get("options") or []
-        return tuple(str(option) for option in options)
+        raw_questions = data.get("questions") or []
+        questions: list[ChatQuestion] = []
+        for raw in raw_questions:
+            if not isinstance(raw, dict):
+                continue
+            options = tuple(
+                ChatQuestionOption(
+                    label=str(item.get("label") or ""),
+                    amount=(
+                        str(item["amount"]) if item.get("amount") is not None else None
+                    ),
+                    exclusive=bool(item.get("exclusive")),
+                    answer=str(item.get("answer") or item.get("label") or ""),
+                )
+                for item in (raw.get("options") or [])
+                if isinstance(item, dict) and item.get("label")
+            )
+            if not options:
+                continue
+            questions.append(
+                ChatQuestion(
+                    question=_strip_number(str(raw.get("question") or "")),
+                    options=options,
+                    multi_select=bool(raw.get("multi_select")),
+                )
+            )
+        return tuple(questions)
     return ()
+
+
+def _question_options(outcomes: tuple[ToolOutcome, ...]) -> tuple[str, ...]:
+    """Read the flat list of labels out of the question tool's result.
+
+    The client renders the questions as separate chip groups, so the flat list
+    is only kept for the older clients that expect a single group.
+    """
+    labels: list[str] = []
+    for question in _question_questions(outcomes):
+        labels.extend(option.label for option in question.options)
+    return tuple(labels)
+
+
+#: The introduction of a batch of questions.
+BATCH_INTRO = "Mình cần bạn trả lời mấy câu sau:"
+
+
+def _batch_text(questions: tuple[ChatQuestion, ...]) -> str:
+    """Render the introduction of a batch.
+
+    The questions themselves are rendered by the client as the caption of
+    each group of chips. The numbered list the model reads back lives in the
+    tool trace, so it does not have to be repeated in the reply.
+    """
+    return BATCH_INTRO
 
 
 class ChatService:
@@ -187,6 +251,7 @@ class ChatService:
 
         slots = slots.merge(collected)
         options = _question_options(outcomes)
+        questions = _question_questions(outcomes)
         self.repository.save_slots(session_id, slots)
         self.repository.append_message(
             session_id,
@@ -202,6 +267,7 @@ class ChatService:
             tool_calls=tuple(outcomes),
             slots=slots,
             options=options,
+            questions=questions,
         )
 
     async def _converse(
@@ -235,8 +301,9 @@ class ChatService:
         if not outcome.ok:
             return collected, self._explain_failure(outcome), (outcome,)
         if call.name == QUESTION_TOOL:
-            # The question itself is the answer. Asking the model to narrate
-            # it would only add words around the choices the user must tap.
+            # The questions themselves are the answer. Asking the model to
+            # narrate them would only add words around the choices the user
+            # must tap.
             return collected, self._question_text(outcome), (outcome,)
 
         explanation = await self._explain_result(outcome)
@@ -264,7 +331,15 @@ class ChatService:
         return ToolCall(name=call.name, arguments=arguments)
 
     def _question_text(self, outcome: ToolOutcome) -> str:
-        """Return the question the assistant asked."""
+        """Return the questions the assistant asked.
+
+        A batch is rendered as a numbered list so the user can answer every
+        question in one message and the model can map each answer back to
+        the question it asked.
+        """
+        questions = _question_questions((outcome,))
+        if questions:
+            return _batch_text(questions)
         data = outcome.data or {}
         question = str(data.get("question") or "").strip()
         return question or "Bạn muốn mình giúp gì tiếp theo?"
@@ -293,6 +368,14 @@ class ChatService:
 
     def _explain_failure(self, outcome: ToolOutcome) -> str:
         """Explain a failed tool call without inventing a result."""
+        if outcome.error_code == "invalid_arguments" and outcome.name == QUESTION_TOOL:
+            # The raw validation message names the Pydantic field and the
+            # limit, which means nothing to the user. They only need to know
+            # that the questions did not come through and that they can try
+            # again.
+            return (
+                "Mình chưa gửi được câu hỏi lên. Bạn thử nói lại giúp mình nhé."
+            )
         message = outcome.error or "Công cụ không thực hiện được."
         return f"{message}\n\nBạn có thể kiểm tra lại thông tin và thử lại nhé."
     async def _collect_slots(

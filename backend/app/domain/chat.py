@@ -140,10 +140,44 @@ class ChatSession(BaseModel):
 
 
 #: How many options one question may offer.
-MAX_QUESTION_OPTIONS = 4
+#:
+#: Five is the limit because the client labels the choices with the letters
+#: A to E. The model sometimes offers one choice too many, so the tool trims
+#: the surplus instead of refusing the whole batch.
+MAX_QUESTION_OPTIONS = 5
+
+#: How many questions one assistant turn may carry.
+MAX_QUESTIONS_PER_BATCH = 5
 
 #: The tool the assistant uses to ask a multiple-choice question.
 QUESTION_TOOL = "ask_user_question"
+
+
+class ChatQuestionOption(BaseModel):
+    """One choice offered with a question.
+
+    An option is either a plain label or a label with a figure the server
+    computed from a ratio of a figure the user already gave. The model never
+    produces the figure itself: it proposes a ratio and the server multiplies
+    it (ADR 0009).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    label: str = Field(min_length=1, max_length=200)
+    amount: str | None = None
+    exclusive: bool = False
+    answer: str = ""
+
+
+class ChatQuestion(BaseModel):
+    """One question of a batch, with the choices offered for it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    question: str = Field(min_length=1, max_length=500)
+    options: tuple[ChatQuestionOption, ...] = ()
+    multi_select: bool = False
 
 
 class ChatMessage(BaseModel):
@@ -160,6 +194,7 @@ class ChatMessage(BaseModel):
     tool_result: dict | None = None
     created_at: str | None = None
     options: tuple[str, ...] = ()
+    questions: tuple[ChatQuestion, ...] = ()
 
 
 class ToolCall(BaseModel):
@@ -212,6 +247,7 @@ class ChatTurn(BaseModel):
     slots: BudgetSlots = Field(default_factory=BudgetSlots)
     created_at: str | None = None
     options: tuple[str, ...] = ()
+    questions: tuple[ChatQuestion, ...] = ()
 
 
 class ChatRepository(Protocol):

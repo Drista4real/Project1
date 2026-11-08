@@ -111,10 +111,21 @@
   (`tool_name`, `tool_args`, `tool_result`). It is written for auditing only; the
   ledger never stores the trace as finance data.
 - **Question options**: the choices the assistant offers with a question, at
-  most four. They reach the user as tappable chips labelled A, B, C, D plus a
+  most five. They reach the user as tappable chips labelled A, B, C, D, E plus a
   "Khác" chip that opens a text field. The user answers by tapping one, so the
   question never has to be typed by hand. They are stored in the tool trace of
-  the question message and restored from there.
+  the question message and restored from there. A choice the model offers too
+  many of is trimmed instead of refused, so one slip never costs the user the
+  questions of the whole batch.
+- **Question batch**: the set of questions one assistant turn carries. A turn
+  offers every question it still needs at once, so the user answers them in
+  one message instead of one turn per question.
+- **Multi-select question**: a question whose user may pick several answers,
+  such as the fixed expenses they have. Its options are independent of each
+  other.
+- **Exclusive option**: an answer that rules the other answers of its own
+  question out, such as "no fixed expense". Picking it clears the other
+  options of that question; it never clears the options of another question.
 - **Deterministic guard**: the rule that the language model may only propose a
   tool call. The validation, the money arithmetic and the database write are
   owned by the backend service and the database function.

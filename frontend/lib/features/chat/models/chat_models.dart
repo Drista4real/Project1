@@ -43,6 +43,95 @@ class BudgetSlots {
   bool get isComplete => missing.isEmpty;
 }
 
+/// One choice offered with a question.
+class ChatQuestionOption {
+  const ChatQuestionOption({
+    required this.label,
+    this.amount,
+    this.exclusive = false,
+    String? answer,
+  }) : _answer = answer ?? '';
+
+  /// The text shown on the chip.
+  final String label;
+
+  /// The figure the server computed from a ratio, if the option carries one.
+  final String? amount;
+
+  /// True when picking this option clears the other options of the question.
+  final bool exclusive;
+
+  final String _answer;
+
+  /// The text sent back to the assistant when the user picks this option.
+  ///
+  /// An option without its own answer answers with its label: the assistant
+  /// reads the label, and only a figure is worth a different answer.
+  String get answer => _answer.isNotEmpty ? _answer : label;
+
+  factory ChatQuestionOption.fromJson(Map<String, dynamic> json) =>
+      ChatQuestionOption(
+        label: json['label'] as String? ?? '',
+        amount: json['amount']?.toString(),
+        exclusive: json['exclusive'] as bool? ?? false,
+        answer: json['answer'] as String? ?? json['label'] as String? ?? '',
+      );
+}
+
+/// The caption of a question, without the number the model may have added.
+///
+/// The client numbers the questions of a batch itself, so a number the model
+/// put in front of the question would show up twice.
+String questionCaption(String question) {
+  return question.replaceFirst(RegExp(r'^\s*\d+[.)]\s*'), '').trim();
+}
+
+/// One question of a batch, with the choices offered for it.
+class ChatQuestion {
+  const ChatQuestion({
+    required this.question,
+    required this.options,
+    this.multiSelect = false,
+  });
+
+  final String question;
+  final List<ChatQuestionOption> options;
+
+  /// True when the user may pick several options of this question.
+  final bool multiSelect;
+
+  factory ChatQuestion.fromJson(Map<String, dynamic> json) => ChatQuestion(
+    question: json['question'] as String? ?? '',
+    options: ((json['options'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((item) => ChatQuestionOption.fromJson(item.cast<String, dynamic>()))
+        .where((item) => item.label.trim().isNotEmpty)
+        .toList(),
+    multiSelect: json['multi_select'] as bool? ?? false,
+  );
+}
+
+/// Reads the answers of a batch back from the message the user sent.
+///
+/// The client sends the answers of a batch as one numbered message, so the
+/// history can show which chips were picked when the conversation is opened
+/// again.
+List<String> parseBatchAnswers(String content) {
+  final answers = <String>[];
+  for (final line in content.split('\n')) {
+    final trimmed = line.trim();
+    final match = RegExp(r'^(\d+)\.\s*(.*)$').firstMatch(trimmed);
+    if (match == null) continue;
+    final index = int.parse(match.group(1)!);
+    if (index < 1) continue;
+    while (answers.length < index) {
+      answers.add('');
+    }
+    answers[index - 1] = match.group(2)!.trim();
+  }
+  return answers;
+}
+
 /// One message inside a conversation.
 class ChatMessage {
   const ChatMessage({
@@ -51,6 +140,7 @@ class ChatMessage {
     required this.content,
     this.toolName,
     this.options = const [],
+    this.questions = const [],
   });
 
   final int id;
@@ -61,8 +151,12 @@ class ChatMessage {
   /// The choices the assistant offered, shown as tappable chips.
   final List<String> options;
 
+  /// The questions the assistant offered, each with its own chips.
+  final List<ChatQuestion> questions;
+
   bool get isUser => sender == 'user';
   bool get hasOptions => options.isNotEmpty;
+  bool get hasQuestions => questions.isNotEmpty;
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) => ChatMessage(
     id: (json['id'] as num?)?.toInt() ?? 0,
@@ -72,6 +166,11 @@ class ChatMessage {
     options: ((json['options'] as List?) ?? const [])
         .map((item) => item.toString())
         .where((item) => item.trim().isNotEmpty)
+        .toList(),
+    questions: ((json['questions'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((item) => ChatQuestion.fromJson(item.cast<String, dynamic>()))
+        .where((item) => item.options.isNotEmpty)
         .toList(),
   );
 }
@@ -105,6 +204,7 @@ class ChatTurn {
     required this.slots,
     this.toolName,
     this.options = const [],
+    this.questions = const [],
   });
 
   final int sessionId;
@@ -114,6 +214,9 @@ class ChatTurn {
 
   /// The choices the assistant offered, shown as tappable chips.
   final List<String> options;
+
+  /// The questions the assistant offered, each with its own chips.
+  final List<ChatQuestion> questions;
 
   factory ChatTurn.fromJson(Map<String, dynamic> json) {
     final calls = (json['tool_calls'] as List?) ?? const [];
@@ -130,6 +233,11 @@ class ChatTurn {
       options: ((json['options'] as List?) ?? const [])
           .map((item) => item.toString())
           .where((item) => item.trim().isNotEmpty)
+          .toList(),
+      questions: ((json['questions'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((item) => ChatQuestion.fromJson(item.cast<String, dynamic>()))
+          .where((item) => item.options.isNotEmpty)
           .toList(),
     );
   }

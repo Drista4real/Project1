@@ -155,3 +155,73 @@ class TestMissingMigration:
 
         with pytest.raises(APIError):
             repository.messages(1, 50)
+
+
+class TestQuestionBatchRestore:
+    """A batch of questions comes back from the tool trace."""
+
+    def setup_method(self):
+        self.user_id = "user-1"
+
+    def test_the_questions_are_restored_from_the_tool_trace(self):
+        query = _Query(
+            result=_result(
+                [
+                    {
+                        "id": 5,
+                        "session_id": 1,
+                        "sender": "assistant",
+                        "content": "Hai cau hoi",
+                        "tool_name": "ask_user_question",
+                        "tool_result": {
+                            "questions": [
+                                {
+                                    "question": "Chi phi co dinh?",
+                                    "multi_select": True,
+                                    "options": [
+                                        {"label": "An uong", "answer": "An uong"},
+                                        {
+                                            "label": "Khong co",
+                                            "exclusive": True,
+                                            "answer": "Khong co",
+                                        },
+                                    ],
+                                },
+                                {
+                                    "question": "An uong bao nhieu?",
+                                    "options": [
+                                        {
+                                            "label": "40%",
+                                            "amount": "200000.00",
+                                            "answer": "200000.00",
+                                        }
+                                    ],
+                                },
+                            ]
+                        },
+                    }
+                ]
+            )
+        )
+        client = _Client([query])
+        repository = SupabaseChatRepository(client, self.user_id)
+
+        messages = repository.messages(1, 50)
+
+        assert len(messages[0].questions) == 2
+        assert messages[0].questions[0].multi_select is True
+        assert messages[0].questions[0].options[1].exclusive is True
+        assert messages[0].questions[1].options[0].amount == "200000.00"
+
+    def test_a_message_without_a_batch_has_no_questions(self):
+        query = _Query(
+            result=_result(
+                [{"id": 6, "session_id": 1, "sender": "user", "content": "Hi"}]
+            )
+        )
+        client = _Client([query])
+        repository = SupabaseChatRepository(client, self.user_id)
+
+        messages = repository.messages(1, 50)
+
+        assert messages[0].questions == ()

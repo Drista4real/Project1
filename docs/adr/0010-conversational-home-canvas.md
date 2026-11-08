@@ -144,16 +144,16 @@ answer. The canvas can offer the choices as tappable chips instead, but only
 if the assistant actually proposes them.
 
 The choices are therefore a fifth tool, `ask_user_question`. It carries a
-question and two to four short options and writes nothing: it exists so the
-client can render the options as chips labelled `A.`, `B.`, `C.`, `D.`, plus a
-`Khác` chip that lets the user type an answer of their own. The server reads
-the options out of the tool result and returns them with the turn; the client
-never invents an option.
+question and two to five short options and writes nothing: it exists so the
+client can render the options as chips labelled `A.`, `B.`, `C.`, `D.`, `E.`,
+plus a `Khác` chip that lets the user type an answer of their own. The server
+reads the options out of the tool result and returns them with the turn; the
+client never invents an option.
 
 The tool is only useful if the model calls it. A prompt that merely names the
 tool leaves the model free to answer in prose, and the user then sees no
 options at all without any error. The system prompt therefore states the rule
-plainly: a question whose answer is two to four discrete choices must go
+plainly: a question whose answer is two to five discrete choices must go
 through the tool, and the choices must not be listed in prose. A question that
 needs a free-form number the user has to type — income, fixed expenses — is
 still asked in text, because there is nothing to tap.
@@ -170,3 +170,56 @@ instead of being told to retry a service that is not busy. Every other
 provider failure stays a **503**, because the assistant is genuinely
 unavailable and a later retry may succeed. The client passes the chat
 message through for both, so the Vietnamese text reaches the screen unchanged.
+
+## Amendment: one turn carries a batch of questions
+
+A question the user answers with one tap is one turn, but a question batch
+that arrives one question per turn makes the user wait for every single
+answer. The assistant therefore offers **every** question it still needs in
+one turn, and the user answers the whole batch with one message.
+
+The batch is still one tool call, so the rule of at most one tool call per
+turn is untouched. What changed is the shape of the tool arguments:
+`ask_user_question` now takes a list of questions instead of a single
+question, and each question carries its own options. The server returns the
+batch with the turn, and the client renders one group of chips per question.
+
+A question may allow several answers (`multi_select`), and one option may
+rule the other options of its own question out (`exclusive`). The batch is
+rendered as a numbered list, so the user answers with the numbers and the
+model can map every answer onto the question it asked.
+
+ADR 0009 is not weakened by this. The model never computes money: when it
+wants to suggest amounts, it proposes a **ratio** of a figure the user
+already gave and copies that figure verbatim. The server does the
+multiplication and sends the computed amount with the option. A model that
+invents a figure has no way to express it, so the number on a chip is
+always deterministic. The same rule applies to a total: the model calls
+`sum_amounts` instead of adding up the picked amounts in its head.
+
+A nested model is another trap for the function-calling API: Pydantic writes
+it into `$defs` and points at it with `$ref`, and the API knows neither. The
+registry resolves the reference before it converts the schema, so a batch of
+questions reaches the model as a plain nested schema.
+
+## Amendment: a malformed batch must not cost the user the batch
+
+The model counts its own choices badly from time to time. It offers six
+options for a question that fits five, and a validator that refuses the
+surplus refuses the **whole** batch: the user is left with an error line
+instead of the questions they were asked.
+
+The protocol therefore absorbs the slip instead of propagating it. A question
+with too many options is **trimmed** to the ones the client can label, and an
+exclusive option — the "no fixed expense" answer the user needs to see —
+survives the trim even when the model listed it last. A question that cannot
+render at all, because it carries a single option, is dropped from the batch
+while the other questions still reach the user.
+
+The client applies the same rule on its side. The free-text entry is offered
+by the client itself, so a "Khác" the model wrote is left out instead of
+showing the same entry twice.
+
+The limit is stated in the prompt and in the tool description as well, so the
+model has a reason to stay inside it. The trim is the safety net, not the
+mechanism: the tool still refuses a batch that has nothing left to show.

@@ -15,8 +15,10 @@ from app.application.chat_tools import (
     AskUserQuestionArgs,
     ConfirmRebalanceArgs,
     CreateBudgetPlanArgs,
+    QuestionOptionArgs,
     SearchNearbySimilarPlacesArgs,
     SimulatePurchaseImpactArgs,
+    SumAmountsArgs,
     ToolHandler,
     ToolRegistry,
     ToolSpec,
@@ -61,9 +63,19 @@ _REBALANCE_DESCRIPTION = (
 )
 
 _ASK_DESCRIPTION = (
-    "Hỏi người dùng một câu hỏi có lựa chọn. Dùng khi cần người dùng chọn "
-    "một trong vài hướng đi tiếp, thay vì hỏi họ phải tự diễn đạt. Tối đa 4 lựa "
-    "chọn, mỗi lựa chọn ngắn gọn và dễ đọc."
+    "Hỏi người dùng một hoặc nhiều câu hỏi có lựa chọn. Gộp TẤT CẢ các câu "
+    "hỏi còn thiếu vào MỘT lần gọi này (tối đa 5 câu). Dùng khi cần người dùng "
+    "chọn một trong vài hướng đi tiếp, thay vì hỏi họ phải tự diễn đạt. Mỗi câu "
+    "tối đa 5 lựa chọn, mỗi lựa chọn ngắn gọn và dễ đọc. Đặt multi_select=true "
+    "khi người dùng được chọn nhiều; đặt exclusive=true cho đáp án loại trừ như "
+    "'không có'. Với câu hỏi về số tiền, dùng ratio và base_amount thay vì tự "
+    "tính ra con số. Không tự thêm lựa chọn 'Khác': người dùng luôn có ô nhập "
+    "tự do."
+)
+
+_SUM_DESCRIPTION = (
+    "Cộng tổng các khoản tiền người dùng đã chọn. Dùng khi cần tổng chi phí "
+    "cố định hoặc tổng một nhóm khoản chi. Không tự cộng trong đầu."
 )
 
 
@@ -247,18 +259,70 @@ def _search_places_handler(places: PlacesSearch):
     return handler
 
 
+def _option_amount(option: QuestionOptionArgs) -> str | None:
+    """Compute the figure behind a ratio option.
+
+    The model proposes a ratio of a figure the user already gave; the
+    multiplication happens here, so the number on the chip is computed
+    deterministically and never typed by the model (ADR 0009).
+    """
+    if option.ratio is None or option.base_amount is None:
+        return None
+    amount = (option.base_amount * Decimal(str(option.ratio))).quantize(
+        Decimal("0.01")
+    )
+    return str(amount)
+
+
 def _ask_user_question_handler():
     """Bind the question tool to the echo of its own arguments.
 
-    The question is not a computation: the tool only carries the question and
-    its options back so the client can render them as tappable chips. The
-    user picks one and the answer arrives as the next message.
+    The question is not a computation: the tool only carries the questions
+    and their options back so the client can render them as tappable chips.
+    The user picks one and the answer arrives as the next message.
     """
 
     async def handler(arguments: AskUserQuestionArgs) -> dict:
+        questions = []
+        for question in arguments.questions:
+            options = []
+            for option in question.options:
+                amount = _option_amount(option)
+                options.append(
+                    {
+                        "label": option.label,
+                        "amount": amount,
+                        "exclusive": option.exclusive,
+                        # The answer is what the client sends back when the
+                        # user picks this option. A ratio option answers
+                        # with the computed figure, not with the ratio.
+                        "answer": amount if amount is not None else option.label,
+                    }
+                )
+            questions.append(
+                {
+                    "question": question.question,
+                    "multi_select": question.multi_select,
+                    "options": options,
+                }
+            )
+        return {"questions": questions}
+
+    return handler
+
+
+def _sum_amounts_handler():
+    """Bind the addition tool to a plain sum of the picked amounts.
+
+    The model adds up the amounts the user picked, never in its head: the
+    sum is the deterministic answer the model then reads (ADR 0009).
+    """
+
+    async def handler(arguments: SumAmountsArgs) -> dict:
+        total = sum(arguments.amounts, Decimal("0")).quantize(Decimal("0.01"))
         return {
-            "question": arguments.question,
-            "options": list(arguments.options),
+            "amounts": [str(amount) for amount in arguments.amounts],
+            "total": str(total),
         }
 
     return handler
@@ -313,6 +377,15 @@ def build_tool_registry(
                 input_model=AskUserQuestionArgs,
             ),
             handler=_ask_user_question_handler(),
+        ),
+        ToolHandler(
+            spec=ToolSpec(
+                name="sum_amounts",
+                description=_SUM_DESCRIPTION,
+                writes=False,
+                input_model=SumAmountsArgs,
+            ),
+            handler=_sum_amounts_handler(),
         ),
     )
     return ToolRegistry(handlers)

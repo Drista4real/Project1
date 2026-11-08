@@ -108,6 +108,49 @@ gate tổng hợp chạy mọi PR khi bật branch protection.
 - SonarCloud quality gate của PR #97: **OK** — security rating 1, reliability 1,
   maintainability 1, duplication 0.28%, hotspot review 100%.
 
+## Kết quả kiểm tra tại máy ngày 08/11/2026 (lô câu hỏi trong một lượt)
+
+- Ruff backend: đạt (`All checks passed!`).
+- Pytest toàn backend (`pytest tests -q`): **807 passed**.
+- Flutter analyze: đạt (`No issues found!`); Flutter unit/widget: **192 passed**.
+- Lô câu hỏi: `ask_user_question` mang `questions[]` (tối đa 5 câu), mỗi câu
+  có `multi_select`, mỗi lựa chọn có `exclusive` và `ratio` + `base_amount`.
+  Server nhân ra tiền (500k × 40/50/60% → 200.000đ / 250.000đ / 300.000đ), model
+  không tự tính. Tool mới `sum_amounts` cộng các khoản đã chọn.
+- Client: mỗi câu một nhóm chips, một nút "Gửi câu trả lời" gửi cả lô trong một
+  tin nhắn đánh số; câu đã trả lời hiện chỉ chip đã chọn.
+- Schema lồng (`$defs`/`$ref`) được inline trước khi gửi Gemini; test build
+  `types.Tool(function_declarations=...)` để chắc chắn API chấp nhận.
+- **Kiểm bằng provider thật** (Gemini `gemini-2.5-flash`): lượt đầu model gọi
+  `ask_user_question` với **2 câu** trong một lô (`multi_select=true` cho câu chi
+  phí cố định, `exclusive=true` cho "Không có khoản cố định nào"); lượt sau, sau
+  khi user trả lời, model hỏi tiếp **3 câu con** ("Ăn uống hết bao nhiêu tiền?",
+  "Xăng xe hết bao nhiêu tiền?", "Bạn muốn tiết kiệm bao nhiêu?") với `ratio` +
+  `base_amount=500000` → server tính ra 200.000đ / 250.000đ / 300.000đ.
+- Hai lỗi phát hiện nhờ provider thật, đã sửa: `ratio=0` bị validator chặn
+  (giờ cho phép, "không tiết kiệm" = 0 đồng); model tự thêm số thứ tự vào câu
+  hỏi (giờ server bỏ số, client tự đánh số).
+
+## Kết quả kiểm tra tại máy ngày 08/11/2026 (lần 2 — model gửi quá lựa chọn)
+
+Báo cáo lỗi từ người dùng trên bản chạy thật: màn hình chỉ hiện dòng lỗi
+`questions.1.options: List should have at most 4 items after validation, not 5`
+và **không có câu hỏi nào**.
+
+- Nguyên nhân: model đếm sai và gửi 6 lựa chọn cho một câu; validator
+  `max_length=4` bác lô câu hỏi **toàn bộ**.
+- Sửa: `MAX_QUESTION_OPTIONS` = 5; validator **cắt bớt** thay vì bác (giữ
+  lựa chọn `exclusive` nếu nó nằm ngoài phần bị cắt); câu hỏi chỉ có 1 lựa chọn
+  bị loại khỏi lô, phần còn lại vẫn tới người dùng; client bỏ lựa chọn "Khác"
+  do model tự viết (client đã có sẵn "Khác" mở ô nhập tự do).
+- Prompt (`finance-assistant-v3`) và tool description nói rõ "tối đa 5 lựa
+  chọn" và "đừng tự thêm lựa chọn Khác".
+- Ruff backend: đạt (`All checks passed!`).
+- Pytest toàn backend (`pytest tests -q`): **814 passed** (thêm 7 test cho lô
+  câu hỏi quá lựa chọn).
+- Flutter analyze: đạt (`No issues found!`); Flutter unit/widget: **193 passed**
+  (thêm test chip "Khác" của model không bị trùng).
+
 ## Kết quả kiểm tra tại máy ngày 17/10/2026
 
 - Ruff backend: đạt; pytest API + unit: **66 passed**.

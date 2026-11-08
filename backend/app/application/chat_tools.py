@@ -1,7 +1,8 @@
 """Tool contract for the conversational assistant.
 
-Five tools are exposed to the language model. They are described to the model
-as function declarations, and each one has a Pydantic argument model that is
+Five tools are exposed to the language model, plus one that only adds up the
+amounts the user picked. They are described to the model as function
+declarations, and each one has a Pydantic argument model that is
 validated before any service runs. A tool never computes money: it delegates
 to the deterministic budget services (ADR 0009).
 
@@ -35,15 +36,21 @@ from app.domain.budget_plan import (
     PlanAllocation,
     RebalanceRequest,
 )
-from app.domain.chat import MAX_QUESTION_OPTIONS, ToolCall, ToolOutcome
+from app.domain.chat import (
+    MAX_QUESTION_OPTIONS,
+    MAX_QUESTIONS_PER_BATCH,
+    ToolCall,
+    ToolOutcome,
+)
 
-#: The five tools the assistant may call.
+#: The tools the assistant may call.
 TOOL_NAMES: tuple[str, ...] = (
     "create_budget_plan",
     "simulate_purchase_impact",
     "search_nearby_similar_places",
     "confirm_and_rebalance_budget",
     "ask_user_question",
+    "sum_amounts",
 )
 
 #: Tools that write to the database. Only these need an idempotency key.
@@ -113,35 +120,121 @@ class ConfirmRebalanceArgs(BaseModel):
     idempotency_key: str | None = Field(default=None, min_length=36, max_length=36)
 
 
-class AskUserQuestionArgs(BaseModel):
-    """Arguments for `ask_user_question`.
+class QuestionOptionArgs(BaseModel):
+    """One choice offered with a question.
 
-    The assistant asks a multiple-choice question. The options are what the
-    user sees as tappable chips, so they are short and mutually exclusive.
+    A figure is never typed by the model. The model proposes a `ratio` of a
+    `base_amount` the user already gave, and the server multiplies them, so
+    the amount on the chip is computed deterministically (ADR 0009).
     """
 
     model_config = ConfigDict(extra="forbid")
 
+    label: str = Field(min_length=1, max_length=200)
+    ratio: float | None = Field(default=None, ge=0, le=1)
+    base_amount: Decimal | None = Field(
+        default=None, ge=0, max_digits=15, decimal_places=2
+    )
+    exclusive: bool = False
+
+    @model_validator(mode="after")
+    def validate_ratio(self):
+        """A ratio only counts when the base figure is there too."""
+        if (self.ratio is None) != (self.base_amount is None):
+            raise ValueError("A ratio needs its base amount")
+        return self
+
+
+class QuestionArgs(BaseModel):
+    """One question of a batch, with the choices offered for it."""
+
+    model_config = ConfigDict(extra="forbid")
+
     question: str = Field(min_length=1, max_length=500)
-    options: list[str] = Field(min_length=2, max_length=MAX_QUESTION_OPTIONS)
+    options: list[QuestionOptionArgs]
+    multi_select: bool = False
 
     @field_validator("options")
     @classmethod
-    def clean_options(cls, values: list[str]) -> list[str]:
-        """Trim the options and drop the empty ones.
+    def clean_options(
+        cls, values: list[QuestionOptionArgs]
+    ) -> list[QuestionOptionArgs]:
+        """Make the options renderable.
 
-        An option the user cannot read is worse than one option fewer, so a
-        blank entry is removed instead of being rendered as an empty chip.
+        A label the user cannot read is dropped, and a question with more
+        choices than the client can label is trimmed instead of refused: one
+        choice too many must not cost the user the whole batch of questions.
         """
-        cleaned = [value.strip()[:200] for value in values]
-        return [value for value in cleaned if value]
+        cleaned = [item.model_copy(update={"label": item.label.strip()[:200]})
+                   for item in values]
+        cleaned = [item for item in cleaned if item.label]
+        if len(cleaned) <= MAX_QUESTION_OPTIONS:
+            return cleaned
+        kept = cleaned[:MAX_QUESTION_OPTIONS]
+        surplus = cleaned[MAX_QUESTION_OPTIONS:]
+        # An exclusive answer is the one the user needs to see, so it survives
+        # the trim even when the model listed it last.
+        survivor = next((item for item in surplus if item.exclusive), None)
+        if survivor is None:
+            return kept
+        for index in range(len(kept) - 1, -1, -1):
+            if not kept[index].exclusive:
+                kept[index] = survivor
+                break
+        return kept
+
+
+class AskUserQuestionArgs(BaseModel):
+    """Arguments for `ask_user_question`.
+
+    The assistant asks a batch of questions in one go. The options are what
+    the user sees as tappable chips, so they are short and mutually exclusive
+    unless the question asks for several answers.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    questions: list[QuestionArgs] = Field(
+        min_length=1, max_length=MAX_QUESTIONS_PER_BATCH
+    )
+
+    @field_validator("questions")
+    @classmethod
+    def clean_questions(cls, values: list[QuestionArgs]) -> list[QuestionArgs]:
+        """Trim the question texts and drop the ones that cannot be rendered.
+
+        A question with a single choice cannot become a row of chips, so it
+        is dropped instead of taking the whole batch down with it: the other
+        questions of the batch still reach the user.
+        """
+        trimmed = [
+            item.model_copy(update={"question": item.question.strip()[:500]})
+            for item in values
+        ]
+        return [item for item in trimmed if len(item.options) >= 2]
 
     @model_validator(mode="after")
-    def validate_options(self):
-        """Refuse a question that would render without a single choice."""
-        if len(self.options) < 2:
-            raise ValueError("A question needs at least two options")
+    def validate_questions(self):
+        """Refuse a batch that would render without a single choice."""
+        if not self.questions:
+            raise ValueError("A batch needs at least one question")
         return self
+
+
+class SumAmountsArgs(BaseModel):
+    """Arguments for `sum_amounts`."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    amounts: list[Decimal] = Field(min_length=1, max_length=20)
+
+    @field_validator("amounts")
+    @classmethod
+    def clean_amounts(cls, values: list[Decimal]) -> list[Decimal]:
+        """Refuse a negative amount: the user picked a spending, not a refund."""
+        if any(value < 0 for value in values):
+            raise ValueError("An amount cannot be negative")
+        return values
 
 
 class ToolSpec(BaseModel):
@@ -283,8 +376,52 @@ def _clean_schema(schema: dict) -> dict:
     `exclusiveMinimum`, no `pattern` and no `anyOf`. A schema with those
     keywords is rejected before the request leaves the process, so the
     assistant would answer nothing at all.
+
+    A nested model is another trap: Pydantic writes it into `$defs` and
+    points at it with `$ref`, and the API knows neither. The reference is
+    therefore resolved before the dialect conversion.
     """
-    return _clean_node(schema)
+    return _clean_node(_inline_refs(schema))
+
+
+def _inline_refs(node: dict, defs: dict | None = None, depth: int = 0) -> dict:
+    """Replace every `$ref` with the definition it points at.
+
+    A schema that refers to itself is cut off after one round, so a recursive
+    model cannot loop forever. The Gemini dialect has no way to express a
+    recursion anyway.
+    """
+    if not isinstance(node, dict):
+        return node
+    definitions = defs if defs is not None else node.get("$defs") or {}
+    if not definitions or depth > 8:
+        return node
+
+    reference = node.get("$ref")
+    if isinstance(reference, str) and reference.startswith("#/$defs/"):
+        name = reference.removeprefix("#/$defs/")
+        target = definitions.get(name)
+        if isinstance(target, dict):
+            resolved = _inline_refs(target, definitions, depth + 1)
+            return {key: value for key, value in resolved.items() if key != "$defs"}
+
+    inlined: dict = {}
+    for key, value in node.items():
+        if key == "$defs":
+            continue
+        if isinstance(value, dict):
+            inlined[key] = _inline_refs(value, definitions, depth + 1)
+            continue
+        if isinstance(value, list):
+            inlined[key] = [
+                _inline_refs(item, definitions, depth + 1)
+                if isinstance(item, dict)
+                else item
+                for item in value
+            ]
+            continue
+        inlined[key] = value
+    return inlined
 
 
 def _clean_node(node: dict) -> dict:

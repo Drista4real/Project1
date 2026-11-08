@@ -95,6 +95,7 @@ def client(monkeypatch):
         CreateBudgetPlanArgs,
         SearchNearbySimilarPlacesArgs,
         SimulatePurchaseImpactArgs,
+        SumAmountsArgs,
         ToolHandler,
         ToolRegistry,
         ToolSpec,
@@ -102,6 +103,11 @@ def client(monkeypatch):
 
     async def noop(arguments):
         return {"ok": True}
+
+    async def question_handler(arguments):
+        from app.api.v1.chat_tools import _ask_user_question_handler
+
+        return await _ask_user_question_handler()(arguments)
 
     registry = ToolRegistry(
         (
@@ -144,9 +150,18 @@ def client(monkeypatch):
             ToolHandler(
                 spec=ToolSpec(
                     name="ask_user_question",
-                    description="Ask a multiple-choice question",
+                    description="Ask a batch of multiple-choice questions",
                     writes=False,
                     input_model=AskUserQuestionArgs,
+                ),
+                handler=question_handler,
+            ),
+            ToolHandler(
+                spec=ToolSpec(
+                    name="sum_amounts",
+                    description="Add up the amounts the user picked",
+                    writes=False,
+                    input_model=SumAmountsArgs,
                 ),
                 handler=noop,
             ),
@@ -206,6 +221,73 @@ class TestChatEndpoints:
             "/api/v1/chat/turn", json={"session_id": 1, "message": "   "}
         )
         assert response.status_code == 422
+
+    def test_the_turn_carries_the_questions_of_the_batch(self, client):
+        """The client renders the chips from the questions of the turn."""
+        from app.domain.chat import ToolCall
+
+        original = app.dependency_overrides[get_chat_service]()
+
+        class QuestionModel:
+            is_mock = False
+
+            async def complete(self, **kwargs):
+                return "", (
+                    ToolCall(
+                        name="ask_user_question",
+                        arguments={
+                            "questions": [
+                                {
+                                    "question": "Bạn có khoản chi cố định nào?",
+                                    "multi_select": True,
+                                    "options": [
+                                        {"label": "Ăn uống"},
+                                        {"label": "Xăng xe"},
+                                        {
+                                            "label": "Không có",
+                                            "exclusive": True,
+                                        },
+                                    ],
+                                },
+                                {
+                                    "question": "Ăn uống hết bao nhiêu tiền?",
+                                    "options": [
+                                        {
+                                            "label": "40%",
+                                            "ratio": 0.4,
+                                            "base_amount": "500000",
+                                        },
+                                        {
+                                            "label": "50%",
+                                            "ratio": 0.5,
+                                            "base_amount": "500000",
+                                        },
+                                    ],
+                                },
+                            ]
+                        },
+                    ),
+                )
+
+        question_service = ChatService(
+            repository=original.repository,
+            registry=original.registry,
+            model=QuestionModel(),
+            system_prompt="system",
+        )
+        app.dependency_overrides[get_chat_service] = lambda: question_service
+
+        response = client.post(
+            "/api/v1/chat/turn", json={"session_id": 1, "message": "500k"}
+        )
+        assert response.status_code == 200
+        questions = response.json()["turn"]["questions"]
+        assert len(questions) == 2
+        assert questions[0]["multi_select"] is True
+        assert questions[0]["options"][2]["exclusive"] is True
+        # The figure behind a ratio is computed by the server.
+        assert questions[1]["options"][0]["amount"] == "200000.00"
+        assert questions[1]["options"][0]["answer"] == "200000.00"
 
 
 class TestQuotaEndpoint:
