@@ -2,10 +2,11 @@
 type: d2-architect-index
 feature: _shared
 status: draft
-updated: 2026-10-19
+updated: 2026-10-29
 links:
   - GLOSSARY.md
   - docs/adr/0004-three-tier-ai-and-modality-fallback.md
+  - docs/adr/0008-shared-ingestion-model-runtime.md
   - docs/SPECIFICATION.md
 ---
 
@@ -13,6 +14,7 @@ links:
 
 | Sơ đồ | Các khối | Dịch vụ cloud | Cập nhật |
 |---|---|---|---|
+| [Thay đổi Model 1, 3 và 4](model-runtime-changes.svg) | So sánh trước–sau: classifier, luồng chữ/giọng nói, receipt adapter | Qwen được giữ nguyên; fallback không vẽ chi tiết | 2026-10-29 |
 | [Kiến trúc AI 3 tầng](ai-three-tier.svg) | Thiết bị, backend CPU, cloud; phân bố Model 1–4 | Qwen inference, Gemini | 2026-10-19 |
 
 ![Kiến trúc AI 3 tầng và bốn phân hệ](ai-three-tier.svg)

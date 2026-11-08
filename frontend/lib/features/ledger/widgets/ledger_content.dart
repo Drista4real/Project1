@@ -32,7 +32,7 @@ extension LedgerContent on _LedgerScreenState {
             children: [
               Expanded(
                 child: Text(
-                  'Sổ thu chi',
+                  'Trang chủ',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,

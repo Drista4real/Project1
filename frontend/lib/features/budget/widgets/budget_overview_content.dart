@@ -15,6 +15,7 @@ class BudgetOverviewContent extends StatelessWidget {
     required this.overview,
     required this.onMonth,
     required this.onManage,
+    required this.onPlan,
     required this.onRebalance,
     required this.onSavingGoals,
     required this.onEdit,
@@ -22,7 +23,7 @@ class BudgetOverviewContent extends StatelessWidget {
   });
   final BudgetMonthOverview overview;
   final ValueChanged<int> onMonth;
-  final VoidCallback onManage, onRebalance, onSavingGoals, onAdvanced;
+  final VoidCallback onManage, onPlan, onRebalance, onSavingGoals, onAdvanced;
   final ValueChanged<FinanceRecord> onEdit;
   @override
   Widget build(BuildContext context) {
@@ -74,6 +75,15 @@ class BudgetOverviewContent extends StatelessWidget {
                 onPressed: onManage,
                 icon: const Icon(Icons.category_outlined, size: 19),
                 label: const Text('Quản lý danh mục & phong bao'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: onPlan,
+                icon: const Icon(Icons.route_outlined, size: 18),
+                label: const Text('Xem kế hoạch chi tiêu'),
               ),
             ),
             const SizedBox(height: 8),

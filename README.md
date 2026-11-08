@@ -16,6 +16,8 @@ các mô hình dự báo dòng tiền, nhận dạng giọng nói, đọc hóa �
 | Sổ thu chi | Xem, thêm, sửa, xóa giao dịch; chọn ví, danh mục, ngày; hỗ trợ thu, chi và chuyển ví. Trigger PostgreSQL cập nhật số dư. |
 | Quản lý tài chính | Quản lý ví, danh mục, thẻ, ngân sách, mục tiêu tiết kiệm, sổ nợ và lịch giao dịch định kỳ. Lưu lịch định kỳ chưa đồng nghĩa tự động tạo giao dịch. |
 | Ngân sách và báo cáo | Tổng hợp giao dịch thật theo kỳ, danh mục và trụ cột Kakeibo; xuất XLSX/PDF theo bộ lọc. Chuyển ví không tính vào tổng thu/chi. |
+| Kế hoạch chi tiêu động | Backend tính kế hoạch, hạn mức/ngày, sàn sống, mức cảnh báo khoản mua và đề xuất điều chỉnh bằng code tất định; LLM không tự tính tiền. Ghi điều chỉnh qua một RPC PostgreSQL. |
+| Trang chủ hội thoại | Trang chủ (`/`) là canvas hội thoại: gọi chào, gợi ý câu hỏi nhanh, khung chat và ô soạn thảo. Backend giữ phiên, slot và trace tool; LLM chỉ trích xuất slot và đề xuất tool. Sổ thu chi chuyển sang route `/ledger`. |
 | Cài đặt thiết bị | Giao diện sáng/tối, khóa ứng dụng bằng xác thực thiết bị và nhắc nhập liệu hằng ngày. Tùy chọn lưu cục bộ theo UID; nhắc hằng ngày hỗ trợ Android/iOS/macOS. |
 | Nhập nhanh AI | Flutter gọi `POST /api/v1/ingestion/text` để tạo một hoặc nhiều nháp; người dùng kiểm tra, sửa và xác nhận trước khi lưu. Có phiên âm PhoWhisper trên Android sau khi chuẩn bị assets. |
 | Dự báo trong Flutter | Đọc dự báo, cảnh báo và tư vấn đã lưu; cập nhật trạng thái đã đọc/đã xử lý của cảnh báo. Chưa có luồng tự chạy Model 2 từ màn hình dự báo. |
@@ -115,6 +117,8 @@ chạy các migration trong [`backend/supabase/migrations/`](backend/supabase/mi
 2. `202610030002_management_guards.sql`
 3. `202610060001_management_category_parent_guard.sql`
 4. `202610180001_auth_profile_email_sync.sql`
+5. `202610220001_wallet_initial_income.sql`
+6. `202611010001_budget_plan_engine.sql`
 
 Với database đã có dữ liệu, kiểm tra các migration đã áp dụng và chạy phần còn
 thiếu. Khởi động FastAPI không tự áp dụng schema/migration.
@@ -176,6 +180,10 @@ flutter run -d chrome --web-port=5173 --dart-define=API_BASE_URL=http://localhos
 `SUPABASE_ANON_KEY` là tên biến phía Flutter, có thể nhận publishable key của
 project. Hai biến Supabase trên ghi đè giá trị mặc định trong
 [`supabase_config.dart`](frontend/lib/core/config/supabase_config.dart).
+
+Backend và Flutter **phải trỏ cùng một Supabase project**. Backend xác thực token
+bằng `SUPABASE_URL` + `SUPABASE_PUBLISHABLE_KEY` trong `backend/.env`; token do
+project khác ký sẽ bị từ chối với `401` và frontend hiện "Phiên đã hết hạn".
 
 Với Android emulator, đổi URL API thành `http://10.0.2.2:8000` và chọn thiết bị
 Android bằng `-d <device-id>`. Điện thoại thật dùng IP LAN của máy chạy backend.

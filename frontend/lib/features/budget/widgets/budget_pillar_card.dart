@@ -25,13 +25,14 @@ class BudgetPillarCard extends StatelessWidget {
     final warning = limit > 0 && progress * 100 >= threshold;
     final records = overview.categoryBudgets(pillar);
     final remaining = limit - used;
+    final theme = Theme.of(context);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -156,29 +157,35 @@ class BudgetPillarCard extends StatelessWidget {
               data: Theme.of(
                 context,
               ).copyWith(dividerColor: Colors.transparent),
-              child: ExpansionTile(
-                key: PageStorageKey(
-                  'budget-${overview.envelopes.monthKey}-${pillar.key}',
-                ),
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: EdgeInsets.zero,
-                title: Text(
-                  '${records.length} hạn mức danh mục',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+              child: Material(
+                // The card above paints a background, so the ExpansionTile
+                // needs its own Material ancestor; otherwise its ink splashes
+                // stay invisible.
+                type: MaterialType.transparency,
+                child: ExpansionTile(
+                  key: PageStorageKey(
+                    'budget-${overview.envelopes.monthKey}-${pillar.key}',
                   ),
-                ),
-                children: [
-                  for (final record in records)
-                    BudgetCategoryLimitRow(
-                      title: overview.data.title(record),
-                      used: overview.data.used(record, overview.month),
-                      record: record,
-                      pillar: pillar,
-                      onEdit: () => onEdit(record),
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: EdgeInsets.zero,
+                  title: Text(
+                    '${records.length} hạn mức danh mục',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
-                ],
+                  ),
+                  children: [
+                    for (final record in records)
+                      BudgetCategoryLimitRow(
+                        title: overview.data.title(record),
+                        used: overview.data.used(record, overview.month),
+                        record: record,
+                        pillar: pillar,
+                        onEdit: () => onEdit(record),
+                      ),
+                  ],
+                ),
               ),
             ),
         ],

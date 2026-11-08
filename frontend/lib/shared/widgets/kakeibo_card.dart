@@ -18,6 +18,8 @@ class KakeiboCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(19),
       border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
-    child: child,
+    // The card paints a background, so a tile inside it needs its own
+    // Material ancestor; otherwise its ink splashes stay invisible.
+    child: Material(type: MaterialType.transparency, child: child),
   );
 }

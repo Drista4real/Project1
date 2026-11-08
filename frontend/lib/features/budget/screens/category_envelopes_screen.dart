@@ -254,8 +254,8 @@ class _CategoryEnvelopesScreenState extends State<CategoryEnvelopesScreen> {
         },
       ),
       bottomNavigationBar: AppScreenNavigation(
-        selectedIndex: 2,
-        onSelectedTab: () {
+      selectedIndex: 3,
+      onSelectedTab: () {
           final router = GoRouter.of(context);
           Navigator.pop(context);
           router.go(AppRoutes.budget);

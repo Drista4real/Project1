@@ -1,7 +1,7 @@
 """Authenticated analysis returns editable drafts and never writes transactions."""
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -89,12 +89,11 @@ def test_ambiguous_amounts_are_not_added(ingestion):
 def test_low_confidence_uses_category_fallback_only(ingestion, monkeypatch):
     """Cloud suggestions never replace deterministic amounts."""
     api, cloud = ingestion
+    classify = Mock(return_value=ClassificationResult("Khác", 0.4))
     monkeypatch.setattr(
         parser_module,
         "local_classifier",
-        lambda: SimpleNamespace(
-            classify=lambda text: ClassificationResult("Khác", 0.4)
-        ),
+        lambda: SimpleNamespace(classify=classify),
     )
     cloud.return_value = parser_module.CategorySuggestion(
         category="Đi lại", confidence=0.9
@@ -106,6 +105,8 @@ def test_low_confidence_uses_category_fallback_only(ingestion, monkeypatch):
     assert draft["category"] == "Đi lại"
     assert draft["source"] == "GEMINI"
     cloud.assert_awaited_once()
+    classify.assert_called_once()
+    assert not draft["warnings"]
 
 
 def test_missing_models_return_honest_unclassified_draft(ingestion, monkeypatch):
