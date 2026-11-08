@@ -165,6 +165,14 @@ CREATE OR REPLACE FUNCTION public.rebalance_plan(
 ) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
 DECLARE
+  -- The SQL states this function raises. Naming them once keeps the
+  -- meaning of every raise in one place.
+  c_err_unauthenticated constant text := '42501';
+  c_err_input          constant text := '22023';
+  -- The allocation payload names the engine and the tables share.
+  c_group_key          constant text := 'group_key';
+  -- The status a plan carries after a rebalance.
+  c_status_rebalanced  constant text := 'REBALANCED';
   v_owner uuid := auth.uid();
   v_plan  public.budget_plans%ROWTYPE;
   v_event public.budget_plan_events%ROWTYPE;
@@ -189,17 +197,17 @@ DECLARE
   v_month date;
 BEGIN
   IF v_owner IS NULL THEN
-    RAISE EXCEPTION 'Authentication required' USING ERRCODE = '42501';
+    RAISE EXCEPTION 'Authentication required' USING ERRCODE = c_err_unauthenticated;
   END IF;
   IF p_idempotency_key IS NULL THEN
-    RAISE EXCEPTION 'Thiếu idempotency key.' USING ERRCODE = '22023';
+    RAISE EXCEPTION 'Thiếu idempotency key.' USING ERRCODE = c_err_input;
   END IF;
 
   SELECT * INTO v_plan FROM public.budget_plans
    WHERE id = p_plan_id AND user_id = v_owner
    FOR UPDATE;
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'Kế hoạch không khả dụng.' USING ERRCODE = '42501';
+    RAISE EXCEPTION 'Kế hoạch không khả dụng.' USING ERRCODE = c_err_unauthenticated;
   END IF;
 
   -- A repeated request returns the previous result without writing again.
@@ -210,11 +218,14 @@ BEGIN
   END IF;
 
   IF v_plan.plan_version <> p_expected_version THEN
-    RAISE EXCEPTION 'Kế hoạch đã thay đổi, hãy tải lại.' USING ERRCODE = '40001';
+    -- PT409, not 40001: PostgREST treats a serialization failure as a
+    -- transient error and retries it forever, so the request would hang
+    -- instead of answering 409. A PT code carries the HTTP status directly.
+    RAISE EXCEPTION 'Kế hoạch đã thay đổi, hãy tải lại.' USING ERRCODE = 'PT409';
   END IF;
   IF p_allocations IS NULL
      OR pg_catalog.jsonb_typeof(p_allocations) <> 'array' THEN
-    RAISE EXCEPTION 'Danh sách phân bổ không hợp lệ.' USING ERRCODE = '22023';
+    RAISE EXCEPTION 'Danh sách phân bổ không hợp lệ.' USING ERRCODE = c_err_input;
   END IF;
 
   -- The current per-group daily amount is the "before" state.
@@ -233,26 +244,26 @@ BEGIN
   END LOOP;
 
   FOR v_item IN SELECT * FROM pg_catalog.jsonb_array_elements(p_allocations) LOOP
-    v_group := v_item ->> 'group_key';
+    v_group := v_item ->> c_group_key;
     v_pillar := v_item ->> 'pillar';
     v_amount := (v_item ->> 'daily_amount')::numeric;
     IF v_group IS NULL OR v_pillar IS NULL OR v_amount IS NULL THEN
-      RAISE EXCEPTION 'Phân bổ thiếu trường bắt buộc.' USING ERRCODE = '22023';
+      RAISE EXCEPTION 'Phân bổ thiếu trường bắt buộc.' USING ERRCODE = c_err_input;
     END IF;
     IF v_amount < 0 THEN
-      RAISE EXCEPTION 'Hạn mức không được âm.' USING ERRCODE = '22023';
+      RAISE EXCEPTION 'Hạn mức không được âm.' USING ERRCODE = c_err_input;
     END IF;
     IF v_group NOT IN ('food','transport','lifestyle','other') THEN
-      RAISE EXCEPTION 'Nhóm chi tiêu không hợp lệ.' USING ERRCODE = '22023';
+      RAISE EXCEPTION 'Nhóm chi tiêu không hợp lệ.' USING ERRCODE = c_err_input;
     END IF;
     IF v_pillar NOT IN ('needs','wants','culture','unexpected') THEN
-      RAISE EXCEPTION 'Trụ cột không hợp lệ.' USING ERRCODE = '22023';
+      RAISE EXCEPTION 'Trụ cột không hợp lệ.' USING ERRCODE = c_err_input;
     END IF;
     IF NOT EXISTS (
       SELECT 1 FROM public.daily_allocations a
        WHERE a.plan_id = p_plan_id AND a.group_key = v_group
     ) THEN
-      RAISE EXCEPTION 'Nhóm % không thuộc kế hoạch này.', v_group USING ERRCODE = '22023';
+      RAISE EXCEPTION 'Nhóm % không thuộc kế hoạch này.', v_group USING ERRCODE = c_err_input;
     END IF;
     v_after := v_after || pg_catalog.jsonb_build_object(v_group, v_amount);
     v_pillar_after := v_pillar_after || pg_catalog.jsonb_build_object(
@@ -262,7 +273,7 @@ BEGIN
 
   IF v_total_after > v_total_before THEN
     RAISE EXCEPTION 'Tổng hạn mức mới không được lớn hơn tổng hiện tại.'
-      USING ERRCODE = '22023';
+      USING ERRCODE = c_err_input;
   END IF;
 
   v_month := v_plan.start_date - (EXTRACT(DAY FROM v_plan.start_date)::int - 1);
@@ -273,7 +284,7 @@ BEGIN
     UPDATE public.daily_allocations a
        SET amount = (v_item ->> 'daily_amount')::numeric
      WHERE a.plan_id = p_plan_id
-       AND a.group_key = v_item ->> 'group_key'
+       AND a.group_key = v_item ->> c_group_key
        AND a.alloc_date >= CURRENT_DATE;
   END LOOP;
 
@@ -283,9 +294,9 @@ BEGIN
     v_account_id := (p_purchase ->> 'account_id')::bigint;
     v_category_id := (p_purchase ->> 'category_id')::bigint;
     v_description := p_purchase ->> 'description';
-    v_purchase_group := p_purchase ->> 'group_key';
+    v_purchase_group := p_purchase ->> c_group_key;
     IF v_account_id IS NULL THEN
-      RAISE EXCEPTION 'Cần chọn ví để ghi giao dịch.' USING ERRCODE = '22023';
+      RAISE EXCEPTION 'Cần chọn ví để ghi giao dịch.' USING ERRCODE = c_err_input;
     END IF;
     INSERT INTO public.transactions (
       user_id, account_id, amount, transaction_type, transaction_date,
@@ -306,7 +317,7 @@ BEGIN
   UPDATE public.budget_plans
      SET plan_version = plan_version + 1,
          daily_allowance = v_total_after,
-         status = 'REBALANCED',
+         status = c_status_rebalanced,
          updated_at = pg_catalog.now()
    WHERE id = p_plan_id;
 
@@ -315,7 +326,8 @@ BEGIN
     before_state, after_state, result, idempotency_key
   ) VALUES (
     p_plan_id, v_owner,
-    CASE WHEN v_purchase_amount > 0 THEN 'PURCHASE_CONFIRMED' ELSE 'REBALANCED' END,
+    CASE WHEN v_purchase_amount > 0
+         THEN 'PURCHASE_CONFIRMED' ELSE c_status_rebalanced END,
     p_allocations, p_allocations,
     v_before, v_after,
     pg_catalog.jsonb_build_object(

@@ -98,6 +98,7 @@ class BudgetPlanService:
             plan_version=1,
             config_version="budget-engine-v1",
             groups=totals.groups,
+            idempotency_key=data.idempotency_key,
         )
         return self.repository.create(plan, allocations)
 

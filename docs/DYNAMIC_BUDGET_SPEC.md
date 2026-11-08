@@ -185,7 +185,7 @@ POST /api/v1/chat   { session_id, message }
   ├─3. Xây context: system prompt (versioned) + USER_INPUT + slot hiện có
   ├─4. Gọi Gemini với tools = [create_budget_plan, simulate_purchase_impact,
   │                              search_nearby_similar_places, confirm_and_rebalance_budget,
-  │                              ask_user_question]
+  │                              ask_user_question, sum_amounts]
   │
   ├─5a. Gemini trả TEXT → trả về user, lưu message, kết thúc lượt
   │
@@ -491,7 +491,7 @@ begin
 
   -- 3. Optimistic lock
   if v_plan.plan_version <> p_expected_version then
-    raise exception 'Kế hoạch đã thay đổi, hãy tải lại.' using errcode = '40001';
+    raise exception 'Kế hoạch đã thay đổi, hãy tải lại.' using errcode = 'PT409';
   end if;
 
   -- 4. Validate envelope capacity theo ADR 0005
@@ -508,7 +508,13 @@ end $$;
 
 > `validate_envelope_capacity` là hàm **tái sử dụng** rule của ADR 0005, không viết lại logic riêng. Phải nằm trong DB để chống race condition giữa 2 client.
 
-> **Mã lỗi → HTTP:** `40001` → 409 (version conflict) · `42501` → 403 (không sở hữu) · `23514`/`22023` → 422 (vi phạm envelope / input sai) · lỗi khác → 503.
+> **Mã lỗi → HTTP:** `PT409` → 409 (version conflict) · `42501` → 403 (không sở hữu) · `23514`/`22023` → 422 (vi phạm envelope / input sai) · lỗi khác → 503.
+>
+> **Vì sao `PT409` chứ không phải `40001`:** `40001` là `serialization_failure` — PostgREST
+> coi đây là lỗi transient và **retry transaction vô hạn**, request treo tới 504 rồi ra 503.
+> `PT409` là mã lỗi custom của PostgREST (`PT<status_code>`): trả thẳng HTTP 409, không retry.
+> Xem `backend/supabase/migrations/202611010001_budget_plan_engine.sql` (hằng `PT409` được
+> khai báo ngay trong RPC) và `202611010003_budget_plan_event_arrays.sql`.
 
 ### 6.5 Ghi giao dịch
 
@@ -741,15 +747,22 @@ Cần thêm cột `tool_name`, `tool_args` (jsonb), `tool_result` (jsonb) để 
 
 | Tool | Input (Pydantic) | Output | Ghi DB |
 |---|---|---|---|
-| `create_budget_plan` | `total_income ≥ 0`, `duration_days ∈ [1,365]`, `savings_target ≥ 0`, `fixed_expenses ≥ 0`, `group_ratios` tổng = 100 | `plan_id`, `daily_allowance`, `survival_floor`, `groups`, `plan_version` | INSERT plan + allocations |
+| `create_budget_plan` | `total_income ≥ 0`, `duration_days ∈ [1,365]`, `savings_target ≥ 0`, `fixed_expenses ≥ 0`, `group_ratios` tổng = 100, `idempotency_key` (tuỳ chọn) | `plan_id`, `daily_allowance`, `survival_floor`, `groups`, `plan_version` | INSERT plan + allocations |
 | `simulate_purchase_impact` | `plan_id`, `current_day ∈ [1,N]`, `amount > 0`, `group`, `category` | `level`, `daily_allowance_now`, `daily_allowance_after`, `survival_floor` | **Không** (read-only) |
 | `search_nearby_similar_places` | `query`, `lat`, `lng`, `radius_m`, `max_price_level`, `min_rating` | danh sách place | **Không** |
 | `confirm_and_rebalance_budget` | `plan_id`, `expected_version`, `allocations`, `idempotency_key` | `plan_version` mới, before/after, `transaction_id` | UPDATE + INSERT (1 RPC) |
-| `ask_user_question` | `question` (≤500 ký tự), `options` (2–4 lựa chọn) | `question`, `options` | **Không** (chỉ mang lựa chọn về client) |
+| `ask_user_question` | `questions[]` (1–5 câu), mỗi câu: `question` (≤500 ký tự), `options[]` (2–5 lựa chọn), `multi_select`; mỗi lựa chọn: `label`, `ratio` + `base_amount`, `exclusive` | `questions[]` kèm `amount` đã tính và `answer` | **Không** (chỉ mang lựa chọn về client) |
+| `sum_amounts` | `amounts[]` (1–20 số ≥ 0) | `total` | **Không** (chỉ cộng) |
 
-> `ask_user_question` không tính tiền và không ghi DB: nó mang câu hỏi và các
-> lựa chọn về client để người dùng bấm chọn thay vì tự gõ. Tối đa 4 lựa chọn,
-> luôn kèm một lựa chọn "Khác" để người dùng tự nhập.
+> `ask_user_question` không tính tiền và không ghi DB: nó mang **cả lô câu hỏi**
+> về client để người dùng bấm chọn thay vì tự gõ. Một lượt = một lô, tối đa 5
+> câu; mỗi câu tối đa 5 lựa chọn, luôn kèm một lựa chọn "Khác" để người dùng tự
+> nhập. `multi_select=true` cho phép chọn nhiều; `exclusive=true` cho đáp án loại
+> trừ (bấm vào sẽ bỏ chọn các đáp án khác **cùng câu**).
+>
+> Lựa chọn có số tiền dùng `ratio` + `base_amount`: model chép nguyên con số
+> người dùng đã nói và chọn tỉ lệ, **server nhân ra tiền** và gửi kèm `amount`.
+> Model không bao giờ tự tính ra một con số tiền. `sum_amounts` dùng cho tổng.
 
 > Endpoint HTTP hiện có (Ticket A):
 > `POST /api/v1/budget-plans`, `GET /api/v1/budget-plans`,
@@ -859,7 +872,7 @@ flowchart LR
     C --> E["Pre-purchase advisor<br/>chạy đầy đủ"]
 ```
 
-### Ticket A — Budget Engine deterministic ⭐ *độc lập AI, test được 100%* — ✅ **Đã xong 2026-11-01**
+### Ticket A — Budget Engine deterministic ⭐ *độc lập AI, test được 100%* — ✅ **Đã xong 2026-11-01, đóng 2026-11-06**
 
 **Nội dung:**
 - Migration `budget_plans` + `daily_allocations` + `budget_plan_events` + RLS + index
@@ -893,7 +906,7 @@ flowchart LR
 - Tổng 3 nhóm luôn bằng `B_spendable` (kể cả khi làm tròn) ✅
 - Sàn pillar: zero-out pillar có hạn mức danh mục → bị chặn ✅
 - 3 mức cảnh báo + `INSUFFICIENT_DATA` ✅
-- 409 version conflict ✅ (RPC trả `40001` → API 409)
+- 409 version conflict ✅ (RPC trả `PT409` → API 409)
 - Idempotency trùng → không ghi 2 lần ✅ (RPC trả kết quả đã lưu)
 - `B_spendable ≤ 0` → từ chối ✅
 
@@ -915,6 +928,28 @@ flowchart LR
   Truy cập từ màn Ngân sách (nút "Xem kế hoạch chi tiêu"), route `/plan`.
 
 > **Nên làm trước** — là nền cho cả pre-purchase advisor lẫn rebalance, và **không phụ thuộc Gemini**.
+
+**Bổ sung 2026-11-06 (vòng 3 — đóng Ticket A):**
+
+| Thành phần | Vị trí |
+|---|---|
+| Idempotency khi tạo kế hoạch | `backend/app/domain/budget_plan.py`, `backend/app/application/budget_plan.py`, `backend/app/infrastructure/repositories/budget_plans.py` |
+| RPC version conflict dùng `PT409` | `backend/supabase/migrations/202611010001_budget_plan_engine.sql` |
+| Constraint mảng cho audit trail | `backend/supabase/migrations/202611010003_budget_plan_event_arrays.sql` |
+| Unit test repository | `backend/tests/unit/test_budget_plan_repository.py` |
+| Unit test endpoint rebalance | `backend/tests/unit/test_budget_plan_endpoints.py` |
+| E2E Java trên Postgres thật | `tests/backend-e2e/src/test/java/vn/kakeibo/e2e/BudgetPlanIT.java` |
+
+- **Idempotency khi tạo kế hoạch**: `budget_plans.idempotency_key` đã có unique
+  `(user_id, idempotency_key)` nhưng `create()` bỏ sót field này khỏi payload insert.
+  Nay key được truyền xuyên domain → service → repository; khi trùng unique
+  (`23505`) repository trả lại plan đã có thay vì tạo thêm plan và thêm daily allocations.
+  Key là tuỳ chọn; server tự suy ra key từ `turn_key` (id message) cho tool chat,
+  nên LLM không bao giờ phải tự bịa UUID.
+- **Version conflict**: `rebalance_plan` raise `PT409` (không phải `40001`) — xem mục 6.4.
+- **Kết quả kiểm chứng**: pytest `791 passed`, Ruff sạch. E2E Java trên PostgreSQL 17
+  thật: `68/68` test pass (`BudgetPlanIT` 11/11). SonarCloud quality gate: **OK**
+  (security 1, duplication 0.28%).
 
 ### Ticket B — Nền media cho pre-purchase advisor — đã tách nhỏ (2026-11-04)
 
@@ -990,6 +1025,58 @@ tự do (thu nhập, chi phí cố định) vẫn hỏi bằng văn bản vì kh
 
 > **Bài học:** tính năng dựa trên tool call phải kiểm bằng provider thật. Unit test
 > với model giả luôn pass và không bắt được prompt chưa đủ mạnh.
+
+### Lô câu hỏi trong một lượt (2026-11-08)
+
+`SYSTEM_PROMPT` (`finance-assistant-v3`) gom **mọi** câu hỏi còn thiếu vào
+**một** lần gọi `ask_user_question` (tối đa 5 câu), thay vì hỏi – trả lời – hỏi.
+Câu hỏi phụ thuộc câu trước (sau khi biết người dùng chọn "Ăn uống" và
+"Xăng xe" thì hỏi tiếp "Ăn uống hết bao nhiêu tiền?" và "Xăng xe hết bao nhiêu
+tiền?") cũng nằm trong cùng lô.
+
+Giao thức mới:
+
+- `ask_user_question` nhận `questions[]`; mỗi câu có `options[]` và
+  `multi_select`.
+- Mỗi lựa chọn có `exclusive` (đáp án loại trừ, bấm vào bỏ chọn các đáp án
+  khác **cùng câu**).
+- Mỗi lựa chọn có thể có `ratio` + `base_amount`. **Server nhân ra tiền** và
+  gửi kèm `amount`; model không tự tính (giữ đúng ADR 0009).
+- Tool mới `sum_amounts` để model cộng các khoản đã chọn thay vì tự cộng.
+
+Client: mỗi câu một nhóm chips; **một nút "Gửi câu trả lời"** ở cuối lô gửi
+tất cả trong một tin nhắn đánh số (`1. …`, `2. …`) để model đối chiếu được.
+Câu đã trả lời hiện chỉ chip đã chọn, không bấm được.
+
+> **Bài học:** schema lồng (`$defs`/`$ref`) phải được inline trước khi gửi
+> Gemini — API function-calling không hiểu `$ref`, và cả lô câu hỏi sẽ không
+> bao giờ tới được model.
+
+> **Bài học (tiếp):** provider thật phát hiện 2 lỗi mà unit test không thấy —
+> `ratio=0` bị validator chặn, và model tự thêm số thứ tự vào câu hỏi. Mọi
+> validator phải chấp nhận đúng những giá trị provider thật sẽ gửi.
+
+### Model gửi quá số lựa chọn (2026-11-08)
+
+Provider thật đếm sai và gửi **6 lựa chọn** cho một câu hỏi. Validator cũ
+(`max_length=4`) bác lô câu hỏi **toàn bộ**: người dùng chỉ thấy dòng lỗi
+validator, không thấy câu hỏi nào.
+
+Sửa:
+
+- `MAX_QUESTION_OPTIONS` = 5 (client đánh chữ A–E, thêm "Khác" là F).
+- Validator **cắt bớt** thay vì bác: giữ 5 lựa chọn đầu, và nếu có lựa chọn
+  `exclusive` nằm ngoài thì giữ lại nó thay cho lựa chọn thường cuối cùng.
+- Câu hỏi chỉ có 1 lựa chọn bị **loại khỏi lô**, phần còn lại vẫn tới người
+  dùng.
+- Prompt và tool description nói rõ "tối đa 5 lựa chọn" và "đừng tự thêm
+  lựa chọn Khác".
+- Client bỏ lựa chọn "Khác" do model tự viết, vì client đã có sẵn một "Khác"
+  mở ô nhập tự do — hiện trùng hai chip cho cùng một việc.
+
+> **Bài học:** một lỗi hình thức của model không được phép lấy mất nội dung
+> lượt trò chuyện. Validator nên **sửa** dữ liệu vừa đủ để hiển thị, chỉ bác
+> khi không còn gì để hiển thị.
 
 ### Hạn mức provider (2026-11-06)
 

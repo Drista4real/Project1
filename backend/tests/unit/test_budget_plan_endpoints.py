@@ -5,11 +5,15 @@ repository dependency replaced, so the routing, the response models and the
 service wiring are covered without a live Supabase project.
 """
 
+from contextlib import contextmanager
 from datetime import date
 from decimal import Decimal
+from unittest.mock import Mock
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
+from postgrest.exceptions import APIError
 
 from app.api.dependencies import UserContext, get_user_context
 from app.api.v1.endpoints.budget_plans import (
@@ -137,3 +141,152 @@ class TestBudgetPlanEndpoints:
         response = client.get("/api/v1/budget-plans/1/events")
         assert response.status_code == 200
         assert response.json()["items"] == []
+
+
+class _RpcQuery:
+    """A query double for the rebalance RPC."""
+
+    def __init__(self, result=None, error=None):
+        self.result = result
+        self.error = error
+
+    def execute(self):
+        if self.error is not None:
+            error = self.error
+            self.error = None
+            raise error
+        return self.result
+
+
+class _RpcClient:
+    """A Supabase client double that answers the rebalance RPC."""
+
+    def __init__(self, result=None, error=None):
+        self.query = _RpcQuery(result=result, error=error)
+        self.payloads: list[dict] = []
+
+    def rpc(self, name, payload):
+        self.payloads.append(payload)
+        return self.query
+
+
+class TestRebalanceEndpoint:
+    """The rebalance endpoint answers with the documented statuses."""
+
+    @contextmanager
+    def _client(self, rpc_client):
+        """A test client whose rebalance talks to the given RPC double."""
+
+        async def fake_context():
+            yield UserContext(client=rpc_client, user_id="user-1")
+
+        app.dependency_overrides[get_user_context] = fake_context
+        try:
+            with TestClient(app) as test_client:
+                yield test_client
+        finally:
+            app.dependency_overrides.clear()
+
+    def _body(self, **overrides) -> dict:
+        body = {
+            "expected_version": 2,
+            "current_day": 1,
+            "purchase_amount": "0",
+            "allocations": [
+                {
+                    "group_key": "food",
+                    "pillar": "needs",
+                    "daily_amount": "480000.00",
+                }
+            ],
+            "idempotency_key": str(uuid4()),
+        }
+        body.update(overrides)
+        return body
+
+    def _result(self, version: int = 3):
+        result = Mock()
+        result.data = {
+            "plan_id": 1,
+            "plan_version": version,
+            "rebalanced": True,
+            "before": {"food": "480000.00"},
+            "after": {"food": "400000.00"},
+            "daily_allowance_before": "800000.00",
+            "daily_allowance_after": "700000.00",
+            "survival_floor": "200000.00",
+            "transaction_id": None,
+        }
+        return result
+
+    def test_a_stale_version_answers_with_a_conflict(self):
+        rpc = _RpcClient(
+            error=APIError(
+                {
+                    "code": "40001",
+                    "message": "Kế hoạch đã thay đổi, hãy tải lại.",
+                }
+            )
+        )
+        with self._client(rpc) as client:
+            response = client.post(
+                "/api/v1/budget-plans/1/rebalance", json=self._body()
+            )
+        assert response.status_code == 409
+        assert response.json()["detail"] == "Kế hoạch đã thay đổi, hãy tải lại."
+
+    def test_an_accepted_rebalance_returns_the_new_version(self):
+        rpc = _RpcClient(result=self._result())
+        with self._client(rpc) as client:
+            response = client.post(
+                "/api/v1/budget-plans/1/rebalance", json=self._body()
+            )
+        assert response.status_code == 200
+        assert response.json()["plan_version"] == 3
+        assert rpc.payloads[0]["p_expected_version"] == 2
+
+    def test_the_idempotency_key_reaches_the_rpc(self):
+        rpc = _RpcClient(result=self._result())
+        key = str(uuid4())
+        with self._client(rpc) as client:
+            client.post(
+                "/api/v1/budget-plans/1/rebalance",
+                json=self._body(idempotency_key=key),
+            )
+        assert rpc.payloads[0]["p_idempotency_key"] == key
+
+    def test_a_missing_idempotency_key_is_refused(self):
+        rpc = _RpcClient(result=self._result())
+        body = self._body()
+        del body["idempotency_key"]
+        with self._client(rpc) as client:
+            response = client.post("/api/v1/budget-plans/1/rebalance", json=body)
+        assert response.status_code == 422
+        assert rpc.payloads == []
+
+    def test_a_missing_expected_version_is_refused(self):
+        rpc = _RpcClient(result=self._result())
+        body = self._body()
+        del body["expected_version"]
+        with self._client(rpc) as client:
+            response = client.post("/api/v1/budget-plans/1/rebalance", json=body)
+        assert response.status_code == 422
+        assert rpc.payloads == []
+
+    def test_a_forbidden_plan_answers_with_a_refusal(self):
+        rpc = _RpcClient(
+            error=APIError({"code": "42501", "message": "Kế hoạch không khả dụng."})
+        )
+        with self._client(rpc) as client:
+            response = client.post(
+                "/api/v1/budget-plans/1/rebalance", json=self._body()
+            )
+        assert response.status_code == 403
+
+    def test_an_invalid_allocation_answers_with_a_refusal(self):
+        rpc = _RpcClient(result=self._result())
+        body = self._body(allocations=[])
+        with self._client(rpc) as client:
+            response = client.post("/api/v1/budget-plans/1/rebalance", json=body)
+        assert response.status_code == 422
+        assert rpc.payloads == []

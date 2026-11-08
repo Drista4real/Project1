@@ -5,6 +5,19 @@ import 'package:project_one/features/chat/data/chat_repository.dart';
 import 'package:project_one/features/chat/models/chat_models.dart';
 import 'package:project_one/features/chat/screens/chat_home_screen.dart';
 
+/// Tap a chip that may sit below the fold of the conversation.
+///
+/// The batch renders several groups of chips, so the last ones are outside
+/// the viewport of the test window. The tap only lands when the widget was
+/// brought on screen first.
+Future<void> tapOption(WidgetTester tester, String label) async {
+  final finder = find.text(label);
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
+  await tester.pumpAndSettle();
+}
+
 class FakeChatRepository implements ChatRepository {
   FakeChatRepository({this.available = true, this.failHistory = false});
 
@@ -48,6 +61,64 @@ class FakeChatRepository implements ChatRepository {
         reply: 'Bạn muốn kế hoạch kéo dài bao lâu?',
         slots: const BudgetSlots(totalIncome: 20000000),
         options: const ['1 tháng', '3 tháng', '6 tháng'],
+      );
+    }
+    if (message == 'Lô câu hỏi') {
+      return ChatTurn(
+        sessionId: sessionId,
+        reply:
+            'Mình cần bạn trả lời mấy câu sau:\n'
+            '1. Bạn có khoản chi phí cố định nào không?\n'
+            '2. Ăn uống hết bao nhiêu tiền?',
+        slots: const BudgetSlots(totalIncome: 500000),
+        questions: const [
+          ChatQuestion(
+            question: 'Bạn có khoản chi phí cố định nào không?',
+            multiSelect: true,
+            options: [
+              ChatQuestionOption(label: 'Ăn uống'),
+              ChatQuestionOption(label: 'Xăng xe'),
+              ChatQuestionOption(label: 'Không có khoản cố định', exclusive: true),
+            ],
+          ),
+          ChatQuestion(
+            question: 'Ăn uống hết bao nhiêu tiền?',
+            options: [
+              ChatQuestionOption(
+                label: '40%',
+                amount: '200000.00',
+                answer: '200000.00',
+              ),
+              ChatQuestionOption(
+                label: '50%',
+                amount: '250000.00',
+                answer: '250000.00',
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+    if (message == 'Lô nhiều lựa chọn') {
+      // The model offered five choices and a "Khác" of its own.
+      return ChatTurn(
+        sessionId: sessionId,
+        reply: 'Mình cần bạn trả lời mấy câu sau:',
+        slots: const BudgetSlots(totalIncome: 500000),
+        questions: const [
+          ChatQuestion(
+            question: 'Bạn chi tiêu cho những khoản nào?',
+            multiSelect: true,
+            options: [
+              ChatQuestionOption(label: 'Ăn uống'),
+              ChatQuestionOption(label: 'Xăng xe'),
+              ChatQuestionOption(label: 'Nhà hàng'),
+              ChatQuestionOption(label: 'Thể thao'),
+              ChatQuestionOption(label: 'Du lịch'),
+              ChatQuestionOption(label: 'Khác'),
+            ],
+          ),
+        ],
       );
     }
     return ChatTurn(
@@ -170,6 +241,180 @@ void main() {
     );
     expect(field.enabled, isTrue);
     expect(find.text('Không tải được lịch sử trò chuyện.'), findsOneWidget);
+  });
+
+  testWidgets('a batch shows a chip group for every question', (tester) async {
+    final repository = FakeChatRepository();
+    await tester.pumpWidget(
+      MaterialApp(home: ChatHomeScreen(repository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('chatMessageField')),
+      'Lô câu hỏi',
+    );
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    // Both questions are on screen at once, not one per turn.
+    expect(
+      find.text('1. Bạn có khoản chi phí cố định nào không?'),
+      findsOneWidget,
+    );
+    expect(find.text('2. Ăn uống hết bao nhiêu tiền?'), findsOneWidget);
+    expect(find.text('Ăn uống'), findsOneWidget);
+    expect(find.text('Xăng xe'), findsOneWidget);
+    expect(find.text('Không có khoản cố định'), findsOneWidget);
+    // The figure behind a ratio travels with the chip.
+    expect(find.text('200000.00'), findsOneWidget);
+    expect(find.text('250000.00'), findsOneWidget);
+  });
+
+  testWidgets('one button sends the answers of the whole batch', (
+    tester,
+  ) async {
+    final repository = FakeChatRepository();
+    await tester.pumpWidget(
+      MaterialApp(home: ChatHomeScreen(repository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('chatMessageField')),
+      'Lô câu hỏi',
+    );
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    // The button stays off until every question has an answer.
+    final button = tester.widget<FilledButton>(
+      find.byKey(const ValueKey('chatSendAnswersButton')),
+    );
+    expect(button.onPressed, isNull);
+
+    await tapOption(tester, 'Ăn uống');
+    await tapOption(tester, '40%');
+
+    await tester.tap(find.byKey(const ValueKey('chatSendAnswersButton')));
+    await tester.pumpAndSettle();
+
+    expect(repository.sent.last, 'Trả lời:\n1. Ăn uống\n2. 200000.00');
+  });
+  testWidgets('a multi-select question keeps every picked option', (
+    tester,
+  ) async {
+    final repository = FakeChatRepository();
+    await tester.pumpWidget(
+      MaterialApp(home: ChatHomeScreen(repository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('chatMessageField')),
+      'Lô câu hỏi',
+    );
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    await tapOption(tester, 'Ăn uống');
+    await tapOption(tester, 'Xăng xe');
+    await tapOption(tester, '50%');
+
+    await tester.tap(find.byKey(const ValueKey('chatSendAnswersButton')));
+    await tester.pumpAndSettle();
+
+    expect(repository.sent.last, 'Trả lời:\n1. Ăn uống | Xăng xe\n2. 250000.00');
+  });
+
+  testWidgets('an exclusive option clears the other options', (tester) async {
+    final repository = FakeChatRepository();
+    await tester.pumpWidget(
+      MaterialApp(home: ChatHomeScreen(repository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('chatMessageField')),
+      'Lô câu hỏi',
+    );
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    await tapOption(tester, 'Ăn uống');
+    await tapOption(tester, 'Không có khoản cố định');
+    await tapOption(tester, '40%');
+
+    await tester.tap(find.byKey(const ValueKey('chatSendAnswersButton')));
+    await tester.pumpAndSettle();
+
+    // "Không có khoản cố định" rules the other options of its question out.
+    expect(
+      repository.sent.last,
+      'Trả lời:\n1. Không có khoản cố định\n2. 200000.00',
+    );
+  });
+
+  testWidgets('an answered batch shows only the picked chips', (
+    tester,
+  ) async {
+    final repository = FakeChatRepository();
+    await tester.pumpWidget(
+      MaterialApp(home: ChatHomeScreen(repository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('chatMessageField')),
+      'Lô câu hỏi',
+    );
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    await tapOption(tester, 'Ăn uống');
+    await tapOption(tester, '40%');
+    await tester.tap(find.byKey(const ValueKey('chatSendAnswersButton')));
+    await tester.pumpAndSettle();
+
+    // The answer stays on screen, but the options that were not picked are
+    // gone and the chips cannot be tapped any more.
+    expect(find.text('Ăn uống'), findsOneWidget);
+    expect(find.text('Xăng xe'), findsNothing);
+    expect(find.text('Không có khoản cố định'), findsNothing);
+    expect(find.byKey(const ValueKey('chatSendAnswersButton')), findsNothing);
+  });
+
+  testWidgets('a model option named "Khác" does not double the free-text entry', (
+    tester,
+  ) async {
+    final repository = FakeChatRepository();
+    await tester.pumpWidget(
+      MaterialApp(home: ChatHomeScreen(repository: repository)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('chatMessageField')),
+      'Lô nhiều lựa chọn',
+    );
+    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+    await tester.pumpAndSettle();
+
+    // The client offers its own "Khác" that opens the input field, so the
+    // one the model wrote is not shown a second time.
+    expect(find.text('Khác'), findsOneWidget);
+    expect(find.text('Ăn uống'), findsOneWidget);
+    expect(find.text('Du lịch'), findsOneWidget);
+
+    // The letters keep their order without a gap: the five real choices are
+    // A to E and the free-text entry follows them as F.
+    expect(find.text('A.'), findsOneWidget);
+    expect(find.text('E.'), findsOneWidget);
+    expect(find.text('F.'), findsOneWidget);
+
+    // The free-text entry still opens the input field.
+    await tapOption(tester, 'Khác');
+    expect(find.byKey(const ValueKey('chatCustomOptionField')), findsOneWidget);
   });
 
   testWidgets('an unavailable assistant offers a retry', (tester) async {

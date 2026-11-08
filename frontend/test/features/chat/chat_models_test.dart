@@ -64,6 +64,65 @@ void main() {
       expect(turn.slots.totalIncome, 8000000);
       expect(turn.slots.durationDays, 7);
     });
+
+    test('reads the questions of a batch', () {
+      final turn = ChatTurn.fromJson(const {
+        'session_id': 5,
+        'reply': 'Mình cần bạn trả lời mấy câu sau:',
+        'questions': [
+          {
+            'question': 'Bạn có khoản chi phí cố định nào không?',
+            'multi_select': true,
+            'options': [
+              {'label': 'Ăn uống'},
+              {'label': 'Xăng xe'},
+              {'label': 'Không có khoản cố định', 'exclusive': true},
+            ],
+          },
+          {
+            'question': 'Ăn uống hết bao nhiêu tiền?',
+            'options': [
+              {'label': '40%', 'amount': '200000.00', 'answer': '200000.00'},
+              {'label': '50%', 'amount': '250000.00', 'answer': '250000.00'},
+            ],
+          },
+        ],
+      });
+
+      expect(turn.questions, hasLength(2));
+      expect(turn.questions.first.multiSelect, isTrue);
+      expect(turn.questions.first.options.last.exclusive, isTrue);
+      expect(turn.questions.last.options.first.amount, '200000.00');
+      expect(turn.questions.last.options.first.answer, '200000.00');
+    });
+  });
+
+  group('parseBatchAnswers', () {
+    test('reads the answers of a batch back', () {
+      final answers = parseBatchAnswers(
+        'Trả lời:\n1. Ăn uống | Xăng xe\n2. 200000',
+      );
+
+      expect(answers, ['Ăn uống | Xăng xe', '200000']);
+    });
+
+    test('an ordinary message has no answers', () {
+      expect(parseBatchAnswers('Xin chào'), isEmpty);
+    });
+  });
+
+  group('questionCaption', () {
+    test('removes a number the model put in front of the question', () {
+      expect(questionCaption('1. Ăn uống hết bao nhiêu tiền?'),
+          'Ăn uống hết bao nhiêu tiền?');
+      expect(questionCaption('2) Xăng xe hết bao nhiêu tiền?'),
+          'Xăng xe hết bao nhiêu tiền?');
+    });
+
+    test('keeps a question without a number', () {
+      expect(questionCaption('Ăn uống hết bao nhiêu tiền?'),
+          'Ăn uống hết bao nhiêu tiền?');
+    });
   });
 
   group('BudgetPlan', () {

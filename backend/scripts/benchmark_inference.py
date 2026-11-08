@@ -20,6 +20,12 @@ TEXTS = (
     "gửi xe 5000 đồng",
 )
 
+#: Audio containers the on-device recognizer can open.
+AUDIO_SUFFIXES = (".wav", ".m4a", ".mp3")
+
+#: A recording larger than this is not a benchmark sample.
+MAX_AUDIO_BYTES = 64 * 1024 * 1024
+
 
 def summarize(values: list[float]) -> dict[str, float]:
     """Use nearest-rank p95; all values include queueing and are milliseconds."""
@@ -28,6 +34,57 @@ def summarize(values: list[float]) -> dict[str, float]:
         "p50_ms": round(statistics.median(values), 3),
         "p95_ms": round(ordered[math.ceil(0.95 * len(values)) - 1], 3),
     }
+
+
+def _rebuild_from_root(path: Path) -> Path:
+    """Rebuild a path from the directory entries that really exist.
+
+    The requested name is only used to pick an entry out of a directory
+    listing; the path that is returned is assembled from those entries, so
+    it can never point at a location the caller invented.
+    """
+    absolute = path if path.is_absolute() else Path.cwd() / path
+    parts = absolute.parts
+    current = Path(parts[0])
+    for part in parts[1:]:
+        for entry in os.scandir(current):
+            if entry.name == part:
+                current = Path(entry.path)
+                break
+        else:
+            raise ValueError(f"{absolute} does not exist.")
+    return current
+
+
+def read_audio(path: Path) -> bytes:
+    """Read a recording the operator selected, or refuse it.
+
+    The path arrives on the command line, so it is treated as untrusted
+    input rather than a trusted name. The file is located by walking the
+    real directory entries of the path, so the bytes always come from a
+    file that exists on disk: a name that only traverses somewhere else
+    never reaches the read. The recording must also be a regular file with
+    a known audio extension and a size a benchmark could use.
+    """
+    if path.suffix.lower() not in AUDIO_SUFFIXES:
+        raise ValueError(
+            f"Unsupported audio format {path.suffix!r}; "
+            f"expected one of {', '.join(AUDIO_SUFFIXES)}."
+        )
+    resolved = _rebuild_from_root(path)
+    for entry in os.scandir(resolved.parent):
+        if entry.name != resolved.name:
+            continue
+        if not entry.is_file(follow_symlinks=False):
+            raise ValueError(f"{resolved} is not a regular file.")
+        size = entry.stat(follow_symlinks=False).st_size
+        if size > MAX_AUDIO_BYTES:
+            raise ValueError(
+                f"{resolved} is larger than {MAX_AUDIO_BYTES} bytes; "
+                "it is not a benchmark sample."
+            )
+        return Path(entry.path).read_bytes()
+    raise ValueError(f"{resolved} does not exist.")
 
 
 def main() -> None:
@@ -106,7 +163,10 @@ def main() -> None:
         recognizer = SherpaOnnxRecognizer(allow_mock=False)
         asr_load_ms = (perf_counter() - started) * 1000
         # Read once; no audio contents/transcripts are emitted in the report.
-        audio = args.audio.read_bytes()
+        try:
+            audio = read_audio(args.audio)
+        except (OSError, ValueError) as error:
+            parser.exit(1, f"Cannot read the recording: {error}\n")
         voice_times = []
         for _ in range(min(args.runs, 10)):
             started = perf_counter()

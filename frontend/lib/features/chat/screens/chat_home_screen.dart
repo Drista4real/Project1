@@ -7,6 +7,7 @@ import 'package:project_one/core/config/supabase_config.dart';
 import 'package:project_one/core/theme/app_theme.dart';
 import 'package:project_one/features/chat/cubit/chat_cubit.dart';
 import 'package:project_one/features/chat/data/chat_repository.dart';
+import 'package:project_one/features/chat/models/chat_models.dart';
 import 'package:project_one/features/chat/widgets/chat_greeting.dart';
 import 'package:project_one/features/chat/widgets/chat_message_block.dart';
 import 'package:project_one/features/chat/widgets/chat_message_bubble.dart';
@@ -65,6 +66,27 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
       // The assistant still works without a signed-in profile.
     }
     return '';
+  }
+
+  /// The answers the user gave to the batch of an earlier message.
+  ///
+  /// The answers travel in the next user message, so the batch that is still
+  /// on screen is read together with the message that follows it.
+  Map<int, List<String>> _answeredPicks(List<ChatMessage> messages, int index) {
+    final message = messages[index];
+    if (!message.hasQuestions || message.isUser) return const {};
+    for (var next = index + 1; next < messages.length; next++) {
+      final candidate = messages[next];
+      if (!candidate.isUser) break;
+      final answers = parseBatchAnswers(candidate.content);
+      if (answers.isEmpty) continue;
+      return {
+        for (var question = 0; question < answers.length; question++)
+          if (answers[question].isNotEmpty)
+            question: [answers[question]],
+      };
+    }
+    return const {};
   }
 
   @override
@@ -193,6 +215,7 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
               isLast: index == state.messages.length - 1,
               busy: state.sending,
               onSend: _send,
+              answeredPicks: _answeredPicks(state.messages, index),
             ),
           if (state.sending)
             const ChatMessageBubble(message: '', isUser: false, pending: true),

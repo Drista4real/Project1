@@ -2,9 +2,11 @@
 
 from datetime import date
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 
+from app.application.budget_plan import validate_rebalance_payload
 from app.domain.budget_plan import (
     BudgetPlan,
     EnvelopeCapacity,
@@ -16,6 +18,7 @@ from app.domain.budget_plan import (
     evaluate_purchase_impact,
     propose_rebalance,
 )
+from app.domain.transactions import TransactionError
 
 
 def _totals(
@@ -302,3 +305,79 @@ class TestProposeRebalance:
         assert proposal.remaining_days == 28
         expected = (Decimal("2600000") - Decimal("400000")) / 28
         assert proposal.daily_allowance_after == expected.quantize(Decimal("0.01"))
+
+
+def _rebalance_payload(**overrides) -> dict:
+    """A valid rebalance body as the client sends it."""
+    payload = {
+        "plan_id": 42,
+        "expected_version": 3,
+        "current_day": 2,
+        "purchase_amount": "0",
+        "allocations": [
+            {
+                "group_key": "food",
+                "pillar": "needs",
+                "daily_amount": "480000.00",
+            }
+        ],
+        "idempotency_key": str(uuid4()),
+    }
+    payload.update(overrides)
+    return payload
+
+
+class TestRebalancePayloadValidation:
+    """The payload is validated before anything is written."""
+
+    def test_a_valid_payload_is_accepted(self):
+        request = validate_rebalance_payload(_rebalance_payload())
+        assert request.plan_id == 42
+        assert request.expected_version == 3
+        assert request.allocations[0].group_key == "food"
+
+    def test_a_missing_expected_version_is_refused(self):
+        payload = _rebalance_payload()
+        del payload["expected_version"]
+        with pytest.raises(TransactionError) as caught:
+            validate_rebalance_payload(payload)
+        assert caught.value.status == 422
+
+    def test_a_missing_idempotency_key_is_refused(self):
+        payload = _rebalance_payload()
+        del payload["idempotency_key"]
+        with pytest.raises(TransactionError) as caught:
+            validate_rebalance_payload(payload)
+        assert caught.value.status == 422
+
+    def test_an_unknown_field_is_refused(self):
+        payload = _rebalance_payload(user_id="someone-else")
+        with pytest.raises(TransactionError) as caught:
+            validate_rebalance_payload(payload)
+        assert caught.value.status == 422
+
+    def test_a_version_below_one_is_refused(self):
+        payload = _rebalance_payload(expected_version=0)
+        with pytest.raises(TransactionError) as caught:
+            validate_rebalance_payload(payload)
+        assert caught.value.status == 422
+
+    def test_an_empty_allocation_list_is_refused(self):
+        payload = _rebalance_payload(allocations=[])
+        with pytest.raises(TransactionError) as caught:
+            validate_rebalance_payload(payload)
+        assert caught.value.status == 422
+
+    def test_a_negative_daily_amount_is_refused(self):
+        payload = _rebalance_payload(
+            allocations=[
+                {
+                    "group_key": "food",
+                    "pillar": "needs",
+                    "daily_amount": "-1.00",
+                }
+            ]
+        )
+        with pytest.raises(TransactionError) as caught:
+            validate_rebalance_payload(payload)
+        assert caught.value.status == 422

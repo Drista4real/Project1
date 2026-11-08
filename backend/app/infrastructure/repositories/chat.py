@@ -6,6 +6,7 @@ generated finance data (ADR 0001).
 """
 
 import logging
+import re
 from datetime import UTC, datetime
 from typing import Any
 
@@ -17,6 +18,8 @@ from app.domain.chat import (
     BudgetSlots,
     ChatError,
     ChatMessage,
+    ChatQuestion,
+    ChatQuestionOption,
     ChatSession,
     Sender,
 )
@@ -35,6 +38,15 @@ _LEGACY_MESSAGE_COLUMNS = "id, session_id, sender, content, created_at"
 #: PostgREST reports a missing column with 42703 and a missing relation with
 #: PGRST204. Both mean the migration has not been applied yet.
 _MISSING_COLUMN_CODES = {"42703", "PGRST204"}
+
+
+def _strip_number(question: str) -> str:
+    """Remove a number the model put in front of the question.
+
+    The client numbers the questions of a batch itself, so a number in the
+    question text would show up twice on the screen.
+    """
+    return re.sub(r"^\s*\d+[.)]\s*", "", question).strip() or question.strip()
 
 
 def _is_missing_column(error: Exception) -> bool:
@@ -67,7 +79,58 @@ def _message_options(row: dict[str, Any]) -> tuple[str, ...]:
     if not isinstance(result, dict):
         return ()
     options = result.get("options") or []
-    return tuple(str(option) for option in options)
+    if options:
+        return tuple(str(option) for option in options)
+    # A batch carries its choices inside the questions; the flat list is kept
+    # for the older clients that expect a single group.
+    labels: list[str] = []
+    for raw in result.get("questions") or []:
+        if not isinstance(raw, dict):
+            continue
+        for item in raw.get("options") or []:
+            if isinstance(item, dict) and item.get("label"):
+                labels.append(str(item["label"]))
+    return tuple(labels)
+
+
+def _message_questions(row: dict[str, Any]) -> tuple[ChatQuestion, ...]:
+    """Read the offered questions out of a stored question message.
+
+    A batch of questions lives in the tool result of the question tool, so
+    it is restored from there. A message written before the batch existed
+    carries a single question and is read the old way.
+    """
+    if row.get("tool_name") != QUESTION_TOOL:
+        return ()
+    result = row.get("tool_result")
+    if not isinstance(result, dict):
+        return ()
+    questions: list[ChatQuestion] = []
+    for raw in result.get("questions") or []:
+        if not isinstance(raw, dict):
+            continue
+        options = tuple(
+            ChatQuestionOption(
+                label=str(item.get("label") or ""),
+                amount=(
+                    str(item["amount"]) if item.get("amount") is not None else None
+                ),
+                exclusive=bool(item.get("exclusive")),
+                answer=str(item.get("answer") or item.get("label") or ""),
+            )
+            for item in (raw.get("options") or [])
+            if isinstance(item, dict) and item.get("label")
+        )
+        if not options:
+            continue
+        questions.append(
+            ChatQuestion(
+                question=_strip_number(str(raw.get("question") or "")),
+                options=options,
+                multi_select=bool(raw.get("multi_select")),
+            )
+        )
+    return tuple(questions)
 
 
 class SupabaseChatRepository:
@@ -199,6 +262,7 @@ class SupabaseChatRepository:
                 tool_result=row.get("tool_result"),
                 created_at=row.get("created_at"),
                 options=_message_options(row),
+                questions=_message_questions(row),
             )
             for row in rows
         ]
@@ -255,6 +319,7 @@ class SupabaseChatRepository:
             tool_result=row.get("tool_result"),
             created_at=row.get("created_at"),
             options=_message_options(row),
+            questions=_message_questions(row),
         )
 
     def save_slots(self, session_id: int, slots: BudgetSlots) -> None:
