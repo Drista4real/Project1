@@ -19,6 +19,15 @@ abstract interface class BudgetPlanRepository {
     String groupKey,
     String? category,
   });
+
+  /// The engine's figures for [draft], computed without saving a plan.
+  Future<PlanPreview> preview(PlanDraft draft);
+
+  /// Save [draft] as a new active plan.
+  Future<BudgetPlan> create(PlanDraft draft);
+
+  /// The balances, income date and fixed expenses that prefill the setup.
+  Future<SetupDefaults> setupDefaults();
 }
 
 class BackendBudgetPlanRepository implements BudgetPlanRepository {
@@ -87,5 +96,34 @@ class BackendBudgetPlanRepository implements BudgetPlanRepository {
             )
             as Map<String, dynamic>;
     return PurchaseImpact.fromJson(response);
+  }
+
+  @override
+  Future<PlanPreview> preview(PlanDraft draft) async {
+    final response =
+        await client.request(
+              'POST',
+              '/budget-plans/preview',
+              body: draft.toJson(),
+            )
+            as Map<String, dynamic>;
+    return PlanPreview.fromJson(response);
+  }
+
+  @override
+  Future<BudgetPlan> create(PlanDraft draft) async {
+    final response =
+        await client.request('POST', '/budget-plans', body: draft.toJson())
+            as Map<String, dynamic>;
+    final plan = (response['plan'] as Map?)?.cast<String, dynamic>() ?? const {};
+    return BudgetPlan.fromJson(plan);
+  }
+
+  @override
+  Future<SetupDefaults> setupDefaults() async {
+    final response =
+        await client.request('GET', '/budget-plans/setup-defaults')
+            as Map<String, dynamic>;
+    return SetupDefaults.fromJson(response);
   }
 }

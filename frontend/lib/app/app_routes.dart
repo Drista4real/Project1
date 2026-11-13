@@ -8,4 +8,5 @@ abstract final class AppRoutes {
   static const addTransaction = '/add-transaction';
   static const aiQuickInput = '/ai-quick-input';
   static const forecast = '/forecast';
+  static const monthlySetup = '/monthly-setup';
 }

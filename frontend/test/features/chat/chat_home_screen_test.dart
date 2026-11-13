@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
+import 'package:project_one/app/app_routes.dart';
 import 'package:project_one/core/network/backend_client.dart';
+import 'package:project_one/features/onboarding/data/monthly_setup_gate.dart';
 import 'package:project_one/features/chat/data/chat_repository.dart';
 import 'package:project_one/features/chat/models/chat_models.dart';
 import 'package:project_one/features/chat/screens/chat_home_screen.dart';
@@ -17,6 +20,22 @@ Future<void> tapOption(WidgetTester tester, String label) async {
   await tester.tap(finder);
   await tester.pumpAndSettle();
 }
+
+/// Scroll the conversation until [text] is built.
+///
+/// The empty canvas holds the greeting, the monthly setup entry and the
+/// suggestions, so a message under them sits below the 600 px test window.
+Future<void> scrollCanvasTo(WidgetTester tester, String text) =>
+    tester.scrollUntilVisible(
+      find.text(text),
+      120,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
 
 class FakeChatRepository implements ChatRepository {
   FakeChatRepository({this.available = true, this.failHistory = false});
@@ -129,6 +148,41 @@ class FakeChatRepository implements ChatRepository {
   }
 }
 
+class _FakeSetupGate implements MonthlySetupGate {
+  _FakeSetupGate({required this.open});
+
+  final bool open;
+  int marked = 0;
+
+  @override
+  Future<bool> shouldAutoOpen() async => open && marked == 0;
+
+  @override
+  Future<void> markPrompted() async => marked++;
+}
+
+Future<void> _pumpHomeWithRouter(
+  WidgetTester tester,
+  MonthlySetupGate gate,
+) async {
+  final router = GoRouter(
+    routes: [
+      GoRoute(
+        path: AppRoutes.home,
+        builder: (_, _) =>
+            ChatHomeScreen(repository: FakeChatRepository(), setupGate: gate),
+      ),
+      GoRoute(
+        path: AppRoutes.monthlySetup,
+        builder: (_, _) => const Scaffold(body: Text('SETUP')),
+      ),
+    ],
+  );
+  addTearDown(router.dispose);
+  await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('empty conversation shows the greeting and the suggestions', (
     tester,
@@ -142,6 +196,37 @@ void main() {
     expect(find.text('GỢI Ý CÂU HỎI NHANH'), findsOneWidget);
     expect(find.text('Phân bổ ngân sách tháng'), findsOneWidget);
     expect(find.byKey(const ValueKey('chatMessageField')), findsOneWidget);
+  });
+
+  testWidgets('the home screen offers the monthly setup next to the suggestions', (
+    tester,
+  ) async {
+    await _pumpHomeWithRouter(tester, _FakeSetupGate(open: false));
+
+    expect(find.text('Thiết lập kế hoạch tháng'), findsOneWidget);
+    expect(find.text('Tiết kiệm tiền như thế nào?'), findsOneWidget);
+    expect(find.text('Kiểm tra số dư hiện tại'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('monthly-setup-entry')));
+    await tester.pumpAndSettle();
+    expect(find.text('SETUP'), findsOneWidget);
+  });
+
+  testWidgets('a first sign-in opens the monthly setup once', (tester) async {
+    final gate = _FakeSetupGate(open: true);
+    await _pumpHomeWithRouter(tester, gate);
+
+    expect(find.text('SETUP'), findsOneWidget);
+    expect(gate.marked, 1);
+  });
+
+  testWidgets('a prompted user stays on the home screen', (tester) async {
+    final gate = _FakeSetupGate(open: false);
+    await _pumpHomeWithRouter(tester, gate);
+
+    expect(find.text('SETUP'), findsNothing);
+    expect(find.text('Chào bạn!'), findsOneWidget);
+    expect(gate.marked, 0);
   });
 
   testWidgets('a suggestion starts the conversation', (tester) async {
@@ -240,6 +325,7 @@ void main() {
       find.byKey(const ValueKey('chatMessageField')),
     );
     expect(field.enabled, isTrue);
+    await scrollCanvasTo(tester, 'Không tải được lịch sử trò chuyện.');
     expect(find.text('Không tải được lịch sử trò chuyện.'), findsOneWidget);
   });
 
@@ -447,6 +533,7 @@ void main() {
     // The conversation stays: the composer keeps working and the error is
     // shown next to the messages instead of replacing the whole canvas.
     expect(find.text('Trợ lý hội thoại chưa sẵn sàng'), findsNothing);
+    await scrollCanvasTo(tester, 'Không gửi được tin nhắn.');
     expect(find.text('Không gửi được tin nhắn.'), findsOneWidget);
     final field = tester.widget<TextField>(
       find.byKey(const ValueKey('chatMessageField')),

@@ -111,6 +111,23 @@ Code tiền tệ mới: không có. Chỉ dùng lại `compute_plan_totals` ([ba
 | `POST /api/v1/budget-plans` *(giữ nguyên)* | Dùng để tạo kế hoạch ở bước cuối. |
 
 - Quy tắc ở mục 4 viết thành một **hàm thuần** trong `app/domain/budget_plan.py`: nhận `today`, danh sách ngày thu định kỳ và `payroll_day`, không đụng DB, nên test được trực tiếp.
+
+### Hợp đồng frontend đang dùng (đã chốt khi làm giai đoạn frontend)
+
+- Tiền gửi lên và trả về đều là chuỗi 2 chữ số thập phân (`"8000000.00"`). Ngày dạng `YYYY-MM-DD`.
+- `POST /budget-plans/preview`:
+  - Thân request giống hệt `POST /budget-plans`, gồm cả `group_ratios` `{food, transport, lifestyle}`.
+  - Trả về đúng `PlanTotals`: `{spendable_budget, daily_allowance, survival_floor, groups[]}`.
+  - Khi không lập được kế hoạch thì trả **422 với `detail` là câu tiếng Việt**. Frontend hiện nguyên văn câu này, chỉ cho riêng đường dẫn `/budget-plans/preview`. Câu hiện tại của engine là tiếng Anh ("Total income must exceed…"), nên endpoint phải tự dịch, ví dụ: "Số tiền hiện có phải nhiều hơn chi cố định và tiền để dành."
+- `GET /budget-plans/setup-defaults` trả về:
+  - `available_balance`
+  - `next_income_date` (có thể `null`)
+  - `next_income_source` (`recurring` / `payroll_day` / `none`)
+  - `next_income_label` (tên khoản thu định kỳ, có thể `null`)
+  - `fixed_expenses[] {description, amount, next_date}`
+  - `monthly_savings_target`
+  - `has_plans`
+- Việc tự mở lần đầu dùng `GET /budget-plans?active=false` có sẵn, không phụ thuộc `has_plans`.
 - Đọc dữ liệu qua repository Supabase hiện có (`account_totals.py`, `management.py`). Phân quyền theo hàng (RLS) và `user_id` phía server như các endpoint khác.
 
 ## 6. Thay đổi frontend
@@ -176,7 +193,7 @@ Bạn duyệt thiết kế xong mới sang giai đoạn 2.
 |---|---|---|
 | 1. Figma | 8 khung như mục 7 | Bạn duyệt trên Figma |
 | 2. Backend | Hàm tính ngày thu nhập, 2 endpoint mới | `pytest backend/tests`: tính ngày (có thu định kỳ, chỉ có payroll_day, ngày 31, không có gì, ≤ 3 ngày); xem trước khớp tạo thật; 422 khi được chi ≤ 0; preview không ghi DB; chỉ đọc dữ liệu của chính người dùng |
-| 3. Frontend | Cubit, màn 6 bước, nút trang chủ, tự mở lần đầu | `flutter analyze`; `flutter test`: cubit (cộng khoản cố định, bỏ khoản đã trả, % tiết kiệm, khóa nút khi được chi ≤ 0), widget bộ thiết lập, `chat_home_screen_test` (vẫn còn 3 câu gợi ý, có nút mới, tự mở đúng một lần) |
+| 3. Frontend **(xong 2026-11-12)** | Cubit, màn 6 bước, nút trang chủ, tự mở lần đầu, màn Kế hoạch dạng lịch | `flutter analyze`; `flutter test`: cubit (cộng khoản cố định, bỏ khoản đã trả, % tiết kiệm, khóa nút khi được chi ≤ 0), widget bộ thiết lập, `chat_home_screen_test` (vẫn còn 3 câu gợi ý, có nút mới, tự mở đúng một lần) |
 | 4. Chạy thật | Đăng nhập tài khoản thử, đi hết luồng, đối chiếu kết quả ở màn Kế hoạch | Ảnh chụp từng bước |
 | 5. Tài liệu | ADR 0011 (thiết lập lần đầu và cờ trên máy), thêm "Monthly setup" vào `GLOSSARY.md`, đánh dấu tiến độ U01 | Review PR vào `develop` |
 
