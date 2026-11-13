@@ -7,8 +7,12 @@ import 'package:project_one/features/onboarding/screens/monthly_setup_screen.dar
 import 'fake_setup_repository.dart';
 
 final _today = DateTime(2026, 11, 12);
+final syncedBalances = <num>[];
 
-Future<void> _pumpSetup(WidgetTester tester, FakeSetupRepository repository) async {
+Future<void> _pumpSetup(
+  WidgetTester tester,
+  FakeSetupRepository repository,
+) async {
   tester.view.physicalSize = const Size(412, 915);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -19,8 +23,11 @@ Future<void> _pumpSetup(WidgetTester tester, FakeSetupRepository repository) asy
       GoRoute(path: AppRoutes.plan, builder: (_, _) => const Text('PLAN')),
       GoRoute(
         path: AppRoutes.monthlySetup,
-        builder: (_, _) =>
-            MonthlySetupScreen(repository: repository, today: _today),
+        builder: (_, _) => MonthlySetupScreen(
+          repository: repository,
+          today: _today,
+          syncBalance: (amount) async => syncedBalances.add(amount),
+        ),
       ),
     ],
   );
@@ -59,7 +66,9 @@ void main() {
 
     await _next(tester);
     expect(find.text('Cân bằng'), findsOneWidget);
-    final bar = tester.getSize(find.byKey(const ValueKey('ratio-bar-balanced')));
+    final bar = tester.getSize(
+      find.byKey(const ValueKey('ratio-bar-balanced')),
+    );
     expect(bar.height, 8);
     expect(bar.width, greaterThan(300));
 
@@ -68,8 +77,10 @@ void main() {
     expect(find.text('178.261 ₫'), findsOneWidget);
     expect(find.text('Bắt đầu kế hoạch'), findsOneWidget);
 
+    syncedBalances.clear();
     await _next(tester);
     expect(repository.created, hasLength(1));
+    expect(syncedBalances, [8000000]);
     expect(find.text('PLAN'), findsOneWidget);
   });
 
@@ -109,14 +120,19 @@ void main() {
     expect(repository.created, isEmpty);
   });
 
-  testWidgets('without defaults the amount must be typed first', (tester) async {
+  testWidgets('without defaults the amount must be typed first', (
+    tester,
+  ) async {
     await _pumpSetup(tester, FakeSetupRepository(failDefaults: true));
 
     expect(find.textContaining('Chưa lấy được số dư'), findsOneWidget);
     await _next(tester);
     expect(find.text('BƯỚC 1/6'), findsOneWidget);
 
-    await tester.enterText(find.byKey(const ValueKey('setup-amount')), '5000000');
+    await tester.enterText(
+      find.byKey(const ValueKey('setup-amount')),
+      '5000000',
+    );
     await tester.pump();
     final field = tester.widget<TextField>(
       find.byKey(const ValueKey('setup-amount')),

@@ -79,11 +79,6 @@ extension LedgerContent on _LedgerScreenState {
             runSpacing: 4,
             children: [
               for (final module in [
-                (
-                  'accounts',
-                  Icons.account_balance_wallet_outlined,
-                  'Ví / Tài khoản',
-                ),
                 ('categories', Icons.category_outlined, 'Danh mục'),
                 (
                   'recurring_transactions',

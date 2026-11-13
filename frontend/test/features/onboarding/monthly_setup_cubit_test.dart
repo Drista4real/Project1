@@ -28,7 +28,10 @@ void main() {
         state.fixedExpenses.where((item) => item.label == 'Tiền nhà'),
         hasLength(1),
       );
-      expect(state.fixedExpenses.map((item) => item.label), contains('Học phí'));
+      expect(
+        state.fixedExpenses.map((item) => item.label),
+        contains('Học phí'),
+      );
     });
 
     test('a paid or unticked expense does not count', () async {
@@ -99,11 +102,10 @@ void main() {
       expect(draft.durationDays, 23);
       expect(draft.fixedExpenses, 3100000);
       expect(draft.savingsTarget, 800000);
-      expect([draft.foodRatio, draft.transportRatio, draft.lifestyleRatio], [
-        70,
-        15,
-        15,
-      ]);
+      expect(
+        [draft.foodRatio, draft.transportRatio, draft.lifestyleRatio],
+        [70, 15, 15],
+      );
       expect(draft.toJson()['start_date'], '2026-11-12');
       expect(draft.toJson()['total_income'], '8000000.00');
       expect(cubit.state.preview?.spendableBudget, 4100000);
@@ -112,7 +114,9 @@ void main() {
 
     test('a refused preview keeps the user on the last step', () async {
       final cubit = MonthlySetupCubit(
-        FakeSetupRepository(previewError: 'Số tiền chi tiêu được phải lớn hơn 0'),
+        FakeSetupRepository(
+          previewError: 'Số tiền chi tiêu được phải lớn hơn 0',
+        ),
         today: _today,
       );
       addTearDown(cubit.close);
@@ -152,8 +156,69 @@ void main() {
       expect(repository.created, hasLength(1));
       expect(
         repository.created.single.idempotencyKey,
-        matches(RegExp(r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')),
+        matches(
+          RegExp(
+            r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$',
+          ),
+        ),
       );
+    });
+  });
+
+  group('balance sync', () {
+    test(
+      'a started plan sets the ledger balance to the stated amount',
+      () async {
+        final synced = <num>[];
+        final cubit = MonthlySetupCubit(
+          FakeSetupRepository(),
+          today: _today,
+          syncBalance: (amount) async => synced.add(amount),
+        );
+        addTearDown(cubit.close);
+        await cubit.start();
+        cubit.setAmount(5000000);
+        await cubit.goTo(5);
+
+        await cubit.submit();
+
+        expect(cubit.state.created, isNotNull);
+        expect(synced, [5000000]);
+        expect(cubit.state.balanceSyncError, isNull);
+      },
+    );
+
+    test('a failed sync keeps the plan and warns the user', () async {
+      final cubit = MonthlySetupCubit(
+        FakeSetupRepository(),
+        today: _today,
+        syncBalance: (_) async => throw Exception('offline'),
+      );
+      addTearDown(cubit.close);
+      await cubit.start();
+      await cubit.goTo(5);
+
+      await cubit.submit();
+
+      expect(cubit.state.created, isNotNull);
+      expect(cubit.state.balanceSyncError, isNotNull);
+    });
+
+    test('nothing is synced when the plan is not saved', () async {
+      final synced = <num>[];
+      final cubit = MonthlySetupCubit(
+        FakeSetupRepository(previewError: 'Không đủ tiền'),
+        today: _today,
+        syncBalance: (amount) async => synced.add(amount),
+      );
+      addTearDown(cubit.close);
+      await cubit.start();
+      await cubit.goTo(5);
+
+      await cubit.submit();
+
+      expect(cubit.state.created, isNull);
+      expect(synced, isEmpty);
     });
   });
 }

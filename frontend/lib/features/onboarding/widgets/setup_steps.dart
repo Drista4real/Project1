@@ -10,32 +10,33 @@ import 'package:project_one/features/plan/widgets/plan_widgets.dart';
 import 'package:project_one/shared/formatters/currency_formatter.dart';
 
 /// The question and helper text of every setup step.
-({String title, String? subtitle}) setupStepCopy(MonthlySetupState state) =>
-    switch (state.step) {
-      0 => (
-        title: 'Bạn đang có bao nhiêu tiền?',
-        subtitle:
-            'Số tiền này sẽ được chia đều cho tới ngày bạn có thu nhập tiếp theo.',
-      ),
-      1 => (
-        title: 'Bạn có thu nhập cố định không?',
-        subtitle: 'Kế hoạch sẽ kéo dài tới ngày bạn có thu nhập tiếp theo.',
-      ),
-      2 => (
-        title: 'Khoản chi cố định trước ${formatDayMonth(state.endDate)}',
-        subtitle:
-            'Chọn các khoản phải trả trong kỳ này. Khoản đã trả rồi sẽ không bị trừ.',
-      ),
-      3 => (
-        title: 'Muốn để dành bao nhiêu?',
-        subtitle: 'Khoản này được giữ riêng, không tính vào tiền chi mỗi ngày.',
-      ),
-      4 => (
-        title: 'Kiểu chi tiêu của bạn',
-        subtitle: 'Chia tiền mỗi ngày cho ăn uống, đi lại và chi tiêu linh hoạt.',
-      ),
-      _ => (title: 'Kế hoạch của bạn', subtitle: null),
-    };
+({String title, String? subtitle}) setupStepCopy(
+  MonthlySetupState state,
+) => switch (state.step) {
+  0 => (
+    title: 'Bạn đang có bao nhiêu tiền?',
+    subtitle:
+        'Số tiền này sẽ được chia đều cho tới ngày bạn có thu nhập tiếp theo.',
+  ),
+  1 => (
+    title: 'Bạn có thu nhập cố định không?',
+    subtitle: 'Kế hoạch sẽ kéo dài tới ngày bạn có thu nhập tiếp theo.',
+  ),
+  2 => (
+    title: 'Khoản chi cố định trước ${formatDayMonth(state.endDate)}',
+    subtitle:
+        'Chọn các khoản phải trả trong kỳ này. Khoản đã trả rồi sẽ không bị trừ.',
+  ),
+  3 => (
+    title: 'Muốn để dành bao nhiêu?',
+    subtitle: 'Khoản này được giữ riêng, không tính vào tiền chi mỗi ngày.',
+  ),
+  4 => (
+    title: 'Kiểu chi tiêu của bạn',
+    subtitle: 'Chia tiền mỗi ngày cho ăn uống, đi lại và chi tiêu linh hoạt.',
+  ),
+  _ => (title: 'Kế hoạch của bạn', subtitle: null),
+};
 
 Widget setupStepBody(MonthlySetupState state) => switch (state.step) {
   0 => AmountStep(state: state),
@@ -60,7 +61,9 @@ class AmountStep extends StatefulWidget {
 
 class _AmountStepState extends State<AmountStep> {
   late final _controller = TextEditingController(
-    text: widget.state.amount > 0 ? envelopeAmountText(widget.state.amount) : '',
+    text: widget.state.amount > 0
+        ? envelopeAmountText(widget.state.amount)
+        : '',
   );
 
   @override
@@ -112,7 +115,7 @@ class _AmountStepState extends State<AmountStep> {
           _NoteRow(
             icon: Icons.account_balance_wallet_outlined,
             iconColor: AppTheme.incomeEmerald,
-            text: 'Đã điền từ tổng số dư các ví: ${formatVnd(prefilled)}',
+            text: 'Đã điền từ số dư hiện tại: ${formatVnd(prefilled)}',
           ),
         ],
         if (state.defaultsError != null) ...[
@@ -140,7 +143,8 @@ class _AmountStepState extends State<AmountStep> {
         const SetupInfoBox(
           icon: Icons.lightbulb_outline,
           text:
-              'Tính cả tiền mặt, tài khoản ngân hàng và ví điện tử bạn có thể dùng ngay.',
+              'Khi bắt đầu kế hoạch, số này sẽ thay cho số dư hiện tại trong '
+              'Sổ thu chi.',
         ),
       ],
     );
@@ -211,7 +215,10 @@ class IncomeStep extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
                 child: Row(
                   children: [
-                    Icon(Icons.event, color: theme.colorScheme.onSurfaceVariant),
+                    Icon(
+                      Icons.event,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -805,7 +812,10 @@ class PreviewStep extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Chia theo nhóm mỗi ngày', style: theme.textTheme.titleSmall),
+              Text(
+                'Chia theo nhóm mỗi ngày',
+                style: theme.textTheme.titleSmall,
+              ),
               const SizedBox(height: 8),
               for (final group in preview.groups)
                 Padding(

@@ -28,16 +28,18 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        await tester.ensureVisible(find.text('Ví và tài khoản'));
-        await tester.tap(find.text('Ví và tài khoản'));
+        // A single balance: wallets are not a management module.
+        expect(find.text('Ví và tài khoản'), findsNothing);
+        await tester.ensureVisible(find.text('Giao dịch định kỳ'));
+        await tester.tap(find.text('Giao dịch định kỳ'));
         await tester.pumpAndSettle();
-        await tester.tap(find.text('Tài khoản sinh hoạt'));
+        await tester.tap(find.text('Tiền nhà hằng tháng'));
         await tester.pumpAndSettle();
-        expect(find.text('12.500.000 ₫'), findsWidgets);
+        expect(find.text('4.000.000 ₫'), findsWidgets);
         await tester.tap(find.widgetWithText(FilledButton, 'Chỉnh sửa'));
         await tester.pumpAndSettle();
         expect(find.text('Lưu thay đổi'), findsOneWidget);
-        expect(find.byKey(const ValueKey('account_number')), findsNothing);
+        expect(find.byKey(const ValueKey('account_id')), findsNothing);
         expect(tester.takeException(), isNull);
       });
     }

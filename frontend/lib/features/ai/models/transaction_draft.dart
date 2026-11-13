@@ -77,27 +77,6 @@ class ReviewTransaction {
                       ))),
         )
         .toList();
-    String walletKey(String value) => value
-        .toLowerCase()
-        .replaceAll(RegExp(r'^(?:ví|tài khoản|ngân hàng)\s+'), '')
-        .replaceAll(RegExp(r'\s+'), '');
-    final inputKey = walletKey(draft.text);
-    final wallets = accounts
-        .where(
-          (account) =>
-              walletKey(account.name).isNotEmpty &&
-              inputKey.contains(walletKey(account.name)),
-        )
-        .toList();
-    final bankMention = RegExp(
-      r'chuyển khoản|ngân hàng|thẻ',
-    ).hasMatch(draft.text.toLowerCase());
-    final namedPayment = RegExp(
-      r'momo|mo mo|zalopay|zalo pay|tiền mặt|vietcombank|techcombank|mbbank|mb bank|bidv|vietinbank',
-    ).hasMatch(draft.text.toLowerCase());
-    final banks = accounts
-        .where((account) => !account.name.toLowerCase().contains('tiền mặt'))
-        .toList();
     final now = DateTime.now();
     var date = now;
     final time = RegExp(r'\b(\d{1,2})(?:h|:)(\d{2})\b').firstMatch(draft.text);
@@ -115,13 +94,8 @@ class ReviewTransaction {
       amount: draft.amount?.toDouble(),
       type: draft.type,
       date: date,
-      accountId: wallets.length == 1
-          ? wallets.single.id
-          : namedPayment
-          ? null
-          : bankMention
-          ? (banks.length == 1 ? banks.single.id : null)
-          : (accounts.isEmpty ? null : accounts.first.id),
+      // The app keeps one balance; it lives in the primary (oldest) wallet.
+      accountId: accounts.isEmpty ? null : accounts.first.id,
       categoryId: matches.length == 1 ? matches.single.id : null,
     );
   }

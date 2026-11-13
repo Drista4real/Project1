@@ -69,7 +69,9 @@ class FinanceRemoteDataSource {
     if (accountId == null) {
       final accounts = await getAccounts();
       if (accounts.isEmpty) {
-        throw const FinanceApiException('Bạn chưa có ví để ghi giao dịch.');
+        throw const FinanceApiException(
+          'Chưa có số dư để ghi giao dịch. Hãy thiết lập kế hoạch tháng.',
+        );
       }
       accountId = accounts.first.id;
     }

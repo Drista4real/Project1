@@ -59,7 +59,10 @@ class _ManagementScreenState extends State<ManagementScreen> {
                   ),
                 );
               }
-              final resources = state.data!;
+              // A single balance: wallets are not managed as a module.
+              final resources = state.data!
+                  .where((r) => r['name'] != 'accounts')
+                  .toList();
               final filtered = resources.where(_matches).toList();
               final editable = filtered
                   .where((r) => !generatedFinanceResources.contains(r['name']))
@@ -89,34 +92,18 @@ class _ManagementScreenState extends State<ManagementScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Chọn một mục để xem và sắp xếp thông tin. Bạn có thể bắt đầu từ ví đang sử dụng.',
+                        'Chọn một mục để xem và sắp xếp thông tin.',
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
-                      if (resources.any((r) => r['name'] == 'accounts')) ...[
-                        const SizedBox(height: 20),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: FilledButton.icon(
-                            onPressed: () => openFinanceModule(
-                              context,
-                              'accounts',
-                              create: true,
-                              repository: _repository,
-                            ),
-                            icon: const Icon(Icons.add),
-                            label: const Text('Thêm ví'),
-                          ),
-                        ),
-                      ],
                       const SizedBox(height: 20),
                       TextField(
                         controller: _search,
                         onChanged: (_) => setState(() {}),
                         decoration: InputDecoration(
                           labelText: 'Tìm mục quản lý',
-                          hintText: 'Ví, ngân sách, lịch thu chi…',
+                          hintText: 'Ngân sách, lịch thu chi, sổ nợ…',
                           prefixIcon: const Icon(Icons.search),
                           suffixIcon: _search.text.isEmpty
                               ? null

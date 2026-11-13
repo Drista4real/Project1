@@ -6,6 +6,18 @@ import 'package:project_one/core/network/backend_client.dart';
 import 'package:project_one/features/plan/data/budget_plan_repository.dart';
 import 'package:project_one/features/plan/models/budget_plan_models.dart';
 
+/// Sets the single available balance the ledger shows.
+typedef BalanceSync = Future<void> Function(num amount);
+
+/// The balance the user states becomes the ledger's "Còn dư khả dụng".
+Future<void> syncLedgerBalance(num amount) async {
+  await BackendClient().request(
+    'PUT',
+    '/balance',
+    body: {'amount': amount.toStringAsFixed(2)},
+  );
+}
+
 /// How the spendable budget is split between food, transport and lifestyle.
 enum SpendingStyle {
   saving(
@@ -116,6 +128,7 @@ class MonthlySetupState {
     this.submitting = false,
     this.submitError,
     this.created,
+    this.balanceSyncError,
   });
 
   final DateTime today;
@@ -142,6 +155,9 @@ class MonthlySetupState {
   final bool submitting;
   final String? submitError;
   final BudgetPlan? created;
+
+  /// Why the ledger balance was not updated after the plan was saved.
+  final String? balanceSyncError;
 
   /// The day the plan ends: the next fixed income, or 30 days without one.
   DateTime get endDate =>
@@ -202,6 +218,7 @@ class MonthlySetupState {
     String? submitError,
     bool clearSubmitError = false,
     BudgetPlan? created,
+    String? balanceSyncError,
   }) => MonthlySetupState(
     today: today,
     incomeDate: incomeDate ?? this.incomeDate,
@@ -228,6 +245,7 @@ class MonthlySetupState {
     submitting: submitting ?? this.submitting,
     submitError: clearSubmitError ? null : (submitError ?? this.submitError),
     created: created ?? this.created,
+    balanceSyncError: balanceSyncError ?? this.balanceSyncError,
   );
 }
 
@@ -237,15 +255,22 @@ class MonthlySetupState {
 /// savings share). Every plan figure — spendable budget, daily allowance,
 /// survival floor — comes from the engine (ADR 0009).
 class MonthlySetupCubit extends Cubit<MonthlySetupState> {
-  MonthlySetupCubit(this.repository, {required DateTime today})
-    : super(
-        MonthlySetupState(
-          today: _dateOnly(today),
-          incomeDate: _dateOnly(today).add(const Duration(days: 30)),
-        ),
-      );
+  MonthlySetupCubit(
+    this.repository, {
+    required DateTime today,
+    BalanceSync? syncBalance,
+  }) : syncBalance = syncBalance ?? syncLedgerBalance,
+       super(
+         MonthlySetupState(
+           today: _dateOnly(today),
+           incomeDate: _dateOnly(today).add(const Duration(days: 30)),
+         ),
+       );
 
   final BudgetPlanRepository repository;
+
+  /// Writes the stated amount as the single balance the ledger shows.
+  final BalanceSync syncBalance;
 
   /// One key per opened setup, so a double tap never creates two plans.
   final String _idempotencyKey = _uuidV4();
@@ -394,7 +419,20 @@ class MonthlySetupCubit extends Cubit<MonthlySetupState> {
       final plan = await repository.create(
         state.draft(idempotencyKey: _idempotencyKey),
       );
-      emit(state.copyWith(submitting: false, created: plan));
+      String? syncError;
+      try {
+        await syncBalance(state.amount);
+      } catch (error) {
+        // The plan is saved; the balance can still be fixed in the ledger.
+        syncError = _message(error);
+      }
+      emit(
+        state.copyWith(
+          submitting: false,
+          created: plan,
+          balanceSyncError: syncError,
+        ),
+      );
     } catch (error) {
       emit(state.copyWith(submitting: false, submitError: _message(error)));
     }

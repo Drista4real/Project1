@@ -11,9 +11,17 @@ import 'package:project_one/features/plan/data/budget_plan_repository.dart';
 /// It opens by itself once after the first sign-in and from the home screen
 /// any time later. Skipping it never blocks the rest of the app.
 class MonthlySetupScreen extends StatefulWidget {
-  const MonthlySetupScreen({super.key, this.repository, this.today});
+  const MonthlySetupScreen({
+    super.key,
+    this.repository,
+    this.today,
+    this.syncBalance,
+  });
 
   final BudgetPlanRepository? repository;
+
+  /// Writes the stated balance to the ledger; tests replace the backend.
+  final BalanceSync? syncBalance;
 
   /// The day the plan starts; tests pin it, the app uses the clock.
   final DateTime? today;
@@ -26,6 +34,7 @@ class _MonthlySetupScreenState extends State<MonthlySetupScreen> {
   late final MonthlySetupCubit _cubit = MonthlySetupCubit(
     widget.repository ?? BackendBudgetPlanRepository(),
     today: widget.today ?? DateTime.now(),
+    syncBalance: widget.syncBalance,
   )..start();
 
   @override
@@ -50,8 +59,16 @@ class _MonthlySetupScreenState extends State<MonthlySetupScreen> {
         listenWhen: (previous, current) =>
             previous.created == null && current.created != null,
         listener: (context, state) {
+          final synced = state.balanceSyncError == null;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Đã tạo kế hoạch tháng của bạn.')),
+            SnackBar(
+              content: Text(
+                synced
+                    ? 'Đã tạo kế hoạch và cập nhật số dư trong Sổ thu chi.'
+                    : 'Đã tạo kế hoạch, nhưng chưa cập nhật được số dư: '
+                          '${state.balanceSyncError}',
+              ),
+            ),
           );
           context.go(AppRoutes.plan);
         },

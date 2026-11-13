@@ -59,9 +59,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Xóa giao dịch?'),
-        content: const Text(
-          'Giao dịch sẽ bị xóa và số dư ví sẽ được cập nhật.',
-        ),
+        content: const Text('Giao dịch sẽ bị xóa và số dư sẽ được cập nhật.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
