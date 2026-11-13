@@ -116,7 +116,9 @@ Future<void> _pumpPlan(
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
-    MaterialApp(home: PlanScreen(repository: repository, today: _today)),
+    MaterialApp(
+      home: PlanScreen(repository: repository, today: _today),
+    ),
   );
   await tester.pumpAndSettle();
 }
@@ -145,7 +147,8 @@ void main() {
   ) async {
     await _pumpPlan(tester, FakeBudgetPlanRepository(activePlan: _plan()));
 
-    Color? colorOf(String text) => tester.widget<Text>(find.text(text)).style?.color;
+    Color? colorOf(String text) =>
+        tester.widget<Text>(find.text(text)).style?.color;
     expect(colorOf('133k'), planHealthyGreen);
     expect(colorOf('26k'), planLowAmber);
     expect(colorOf('-32k'), planOverRed);
@@ -185,7 +188,7 @@ void main() {
   testWidgets('the group limits stay below the calendar', (tester) async {
     await _pumpPlan(tester, FakeBudgetPlanRepository(activePlan: _plan()));
 
-    await tester.scrollUntilVisible(find.text('Hạn mức theo nhóm chi'), 200);
+    await tester.scrollUntilVisible(find.text('106.957 ₫/ngày'), 200);
     expect(find.text('Hạn mức theo nhóm chi'), findsOneWidget);
     expect(find.text('106.957 ₫/ngày'), findsOneWidget);
   });

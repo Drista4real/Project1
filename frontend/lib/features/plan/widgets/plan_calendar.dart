@@ -57,14 +57,48 @@ Map<DateTime, PlanDay> planDays(
   };
 }
 
-/// `152k`, `1,2tr`: an amount short enough for a calendar cell.
+/// How much of a limit is left: plenty, under half, or overspent.
+enum PlanTone { healthy, low, over }
+
+PlanTone planTone(num remaining, num limit) {
+  if (remaining < 0) return PlanTone.over;
+  if (limit > 0 && remaining < limit / 2) return PlanTone.low;
+  return PlanTone.healthy;
+}
+
+const planHealthyGreen = AppTheme.incomeEmerald;
+const planLowAmber = Color(0xFFE09B00);
+const planOverRed = Color(0xFFD32F2F);
+
+Color planToneColor(PlanTone tone) => switch (tone) {
+  PlanTone.healthy => planHealthyGreen,
+  PlanTone.low => planLowAmber,
+  PlanTone.over => planOverRed,
+};
+
+/// The same tones, light enough to read on the dark summary card.
+Color _planToneOnDark(PlanTone tone, Color healthy) => switch (tone) {
+  PlanTone.healthy => healthy,
+  PlanTone.low => const Color(0xFFFFD54F),
+  PlanTone.over => const Color(0xFFFF8A80),
+};
+
+/// `-31.739 ₫`: a VND amount that keeps its sign.
+String signedVnd(num amount) =>
+    amount < 0 ? '-${formatVnd(amount)}' : formatVnd(amount);
+
+/// `152k`, `-32k`, `1,2tr`: an amount short enough for a calendar cell.
 String formatCompactVnd(num amount) {
+  final sign = amount < 0 ? '-' : '';
   final value = amount.abs();
   if (value == 0) return '0đ';
-  if (value < 1000) return '${value.round()}đ';
-  if (value < 1000000) return '${(value / 1000).round()}k';
+  if (value < 1000) return '$sign${value.round()}đ';
+  if (value < 1000000) return '$sign${(value / 1000).round()}k';
   final millions = (value / 1000000).toStringAsFixed(1);
-  return '${millions.endsWith('.0') ? millions.substring(0, millions.length - 2) : millions.replaceAll('.', ',')}tr';
+  final shown = millions.endsWith('.0')
+      ? millions.substring(0, millions.length - 2)
+      : millions.replaceAll('.', ',');
+  return '$sign${shown}tr';
 }
 
 String _dayMonth(DateTime date) =>
@@ -142,11 +176,13 @@ class PlanTodayCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
-                  left >= 0
-                      ? 'Còn ${formatVnd(left)}'
-                      : 'Vượt ${formatVnd(left)}',
+                  'Còn ${signedVnd(left)}',
+                  key: const ValueKey('plan-left'),
                   style: theme.textTheme.labelSmall?.copyWith(
-                    color: onPrimary,
+                    color: _planToneOnDark(
+                      planTone(left, plan.spendableBudget),
+                      onPrimary,
+                    ),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -176,19 +212,22 @@ class PlanTodayCard extends StatelessWidget {
 
   List<Widget> _todayFigures(ThemeData theme, Color onPrimary, PlanDay day) {
     final room = day.limit - day.spent;
+    final tone = planTone(room, day.limit);
+    final toneColor = _planToneOnDark(tone, onPrimary);
+    // The bar shows what is left, so it empties as the day is spent.
     final progress = day.limit <= 0
         ? 0.0
-        : (day.spent / day.limit).clamp(0.0, 1.0).toDouble();
+        : (room / day.limit).clamp(0.0, 1.0).toDouble();
     return [
       Wrap(
         crossAxisAlignment: WrapCrossAlignment.end,
         spacing: 10,
         children: [
           Text(
-            formatVnd(room),
+            signedVnd(room),
             key: const ValueKey('plan-today-left'),
             style: theme.textTheme.headlineMedium?.copyWith(
-              color: room < 0 ? const Color(0xFFFFC4AE) : onPrimary,
+              color: toneColor,
               fontWeight: FontWeight.w800,
             ),
           ),
@@ -208,7 +247,7 @@ class PlanTodayCard extends StatelessWidget {
           value: progress,
           minHeight: 6,
           backgroundColor: onPrimary.withAlpha(64),
-          color: day.overLimit ? AppTheme.expenseCoral : AppTheme.secondaryMint,
+          color: tone == PlanTone.healthy ? AppTheme.secondaryMint : toneColor,
         ),
       ),
       const SizedBox(height: 8),
@@ -293,7 +332,15 @@ class PlanCalendar extends StatelessWidget {
           const SizedBox(height: 4),
           Row(
             children: [
-              for (final day in const ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'])
+              for (final day in const [
+                'T2',
+                'T3',
+                'T4',
+                'T5',
+                'T6',
+                'T7',
+                'CN',
+              ])
                 Expanded(
                   child: Center(
                     child: Text(
@@ -332,8 +379,9 @@ class PlanCalendar extends StatelessWidget {
             spacing: 14,
             runSpacing: 4,
             children: [
-              _legend(context, AppTheme.incomeEmerald, 'Trong hạn mức'),
-              _legend(context, AppTheme.expenseCoral, 'Vượt hạn mức'),
+              _legend(context, planHealthyGreen, 'Còn từ 50%'),
+              _legend(context, planLowAmber, 'Còn dưới 50%'),
+              _legend(context, planOverRed, 'Vượt hạn mức'),
               _legend(context, scheme.outline, 'Dự kiến'),
             ],
           ),
@@ -393,24 +441,25 @@ class PlanCalendar extends StatelessWidget {
 
     // A day with spending shows it, even ahead of today.
     final recorded = isPast || isToday || day.spent > 0;
+    // A recorded day shows what is left of its limit, toned by how much.
+    final remaining = day.limit - day.spent;
+    final toneColor = planToneColor(planTone(remaining, day.limit));
     final Color fill;
     final Color amountColor;
     if (isToday) {
       fill = scheme.primaryContainer;
-      amountColor = scheme.primary;
+      amountColor = toneColor;
     } else if (recorded) {
-      final tone = day.overLimit
-          ? AppTheme.expenseCoral
-          : AppTheme.incomeEmerald;
-      fill = tone.withAlpha(36);
-      amountColor = tone;
+      fill = toneColor.withAlpha(36);
+      amountColor = toneColor;
     } else {
       fill = Colors.transparent;
       amountColor = scheme.outline;
     }
-    final amount = recorded ? day.spent : day.limit;
+    final amount = recorded ? remaining : day.limit;
     final status = recorded
-        ? 'đã chi ${formatVnd(day.spent)}, hạn mức ${formatVnd(day.limit)}'
+        ? 'đã chi ${formatVnd(day.spent)}, còn ${signedVnd(remaining)}, '
+              'hạn mức ${formatVnd(day.limit)}'
         : 'hạn mức dự kiến ${formatVnd(day.limit)}';
     return Semantics(
       button: true,
@@ -500,28 +549,24 @@ class PlanDayDetail extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              Text(
-                future
-                    ? 'Dự kiến ${formatVnd(day.limit)}'
-                    : '${formatVnd(day.spent)} / ${formatVnd(day.limit)}',
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: day.overLimit && !future
-                      ? AppTheme.expenseCoral
-                      : scheme.primary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
+          Text(
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            future
+                ? 'Dự kiến ${formatVnd(day.limit)}'
+                : 'Còn ${signedVnd(day.limit - day.spent)} / '
+                      '${formatVnd(day.limit)}',
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: future
+                  ? scheme.primary
+                  : planToneColor(planTone(day.limit - day.spent, day.limit)),
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 10),
           for (final group in day.groups)
@@ -544,20 +589,28 @@ class PlanDayDetail extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      planGroupLabels[group.groupKey] ?? group.groupKey,
-                    ),
-                  ),
-                  Text(
-                    future
-                        ? formatVnd(group.amount)
-                        : '${formatVnd(group.actualSpent)} / '
-                              '${formatVnd(group.amount)}',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: !future && group.actualSpent > group.amount
-                          ? AppTheme.expenseCoral
-                          : null,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(planGroupLabels[group.groupKey] ?? group.groupKey),
+                        Text(
+                          future
+                              ? formatVnd(group.amount)
+                              : 'Còn ${signedVnd(group.amount - group.actualSpent)} / '
+                                    '${formatVnd(group.amount)}',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: future
+                                ? null
+                                : planToneColor(
+                                    planTone(
+                                      group.amount - group.actualSpent,
+                                      group.amount,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],

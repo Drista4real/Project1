@@ -297,31 +297,10 @@ class FixedExpensesStep extends StatelessWidget {
 
   Future<void> _add(BuildContext context) async {
     final cubit = context.read<MonthlySetupCubit>();
-    final controller = TextEditingController();
     final name = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Thêm khoản chi cố định'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          textCapitalization: TextCapitalization.sentences,
-          decoration: const InputDecoration(hintText: 'Ví dụ: Gửi xe'),
-          onSubmitted: (value) => Navigator.pop(context, value),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('Thêm'),
-          ),
-        ],
-      ),
+      builder: (_) => const _AddFixedExpenseDialog(),
     );
-    controller.dispose();
     if (name != null) cubit.addFixed(name);
   }
 
@@ -401,6 +380,49 @@ class FixedExpensesStep extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Asks for the name of a fixed expense.
+///
+/// The dialog owns its controller, so it is disposed only after the closing
+/// animation, which still reads it.
+class _AddFixedExpenseDialog extends StatefulWidget {
+  const _AddFixedExpenseDialog();
+
+  @override
+  State<_AddFixedExpenseDialog> createState() => _AddFixedExpenseDialogState();
+}
+
+class _AddFixedExpenseDialogState extends State<_AddFixedExpenseDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Thêm khoản chi cố định'),
+    content: TextField(
+      controller: _controller,
+      autofocus: true,
+      textCapitalization: TextCapitalization.sentences,
+      decoration: const InputDecoration(hintText: 'Ví dụ: Gửi xe'),
+      onSubmitted: (value) => Navigator.pop(context, value),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Hủy'),
+      ),
+      FilledButton(
+        onPressed: () => Navigator.pop(context, _controller.text),
+        child: const Text('Thêm'),
+      ),
+    ],
+  );
 }
 
 class _FixedExpenseRow extends StatelessWidget {
