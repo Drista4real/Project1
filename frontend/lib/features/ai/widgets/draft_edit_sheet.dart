@@ -24,7 +24,10 @@ class _DraftEditSheetState extends State<DraftEditSheet> {
   );
   late final _note = TextEditingController(text: widget.item.description);
   late String _type = widget.item.type == 'income' ? 'income' : 'expense';
-  late int? _accountId = widget.item.accountId;
+  // The single balance lives in the primary wallet.
+  late final int? _accountId =
+      widget.item.accountId ??
+      (widget.accounts.isEmpty ? null : widget.accounts.first.id);
   late int? _categoryId = widget.item.categoryId;
   late DateTime _date = widget.item.date;
 
@@ -37,6 +40,8 @@ class _DraftEditSheetState extends State<DraftEditSheet> {
 
   void _confirm() {
     if (!_form.currentState!.validate()) return;
+    final accountId = _accountId;
+    if (accountId == null) return;
     Navigator.pop(
       context,
       widget.item.edited(
@@ -45,7 +50,7 @@ class _DraftEditSheetState extends State<DraftEditSheet> {
           _amount.text.trim().replaceAll('.', '').replaceAll(',', '.'),
         ),
         type: _type,
-        accountId: _accountId!,
+        accountId: accountId,
         categoryId: _categoryId,
         date: _date,
       ),
@@ -121,16 +126,6 @@ class _DraftEditSheetState extends State<DraftEditSheet> {
             validator: (value) => value == null || value.trim().isEmpty
                 ? 'Nhập nội dung giao dịch'
                 : null,
-          ),
-          DropdownButtonFormField<int>(
-            initialValue: _accountId,
-            decoration: const InputDecoration(labelText: 'Ví thanh toán'),
-            items: [
-              for (final account in widget.accounts)
-                DropdownMenuItem(value: account.id, child: Text(account.name)),
-            ],
-            onChanged: (value) => setState(() => _accountId = value),
-            validator: (value) => value == null ? 'Hãy chọn ví' : null,
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<int>(

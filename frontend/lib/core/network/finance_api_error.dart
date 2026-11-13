@@ -23,6 +23,15 @@ String financeApiErrorMessage(int status, String path, Object? detail) {
       detail.length <= 2000) {
     return detail;
   }
+  // The plan preview explains in Vietnamese why the answers do not make a
+  // plan (the money does not cover the fixed costs and the saving).
+  if (path == '/budget-plans/preview' &&
+      status == 422 &&
+      detail is String &&
+      detail.trim().isNotEmpty &&
+      detail.length <= 2000) {
+    return detail;
+  }
   return switch (status) {
     401 => 'Phiên đã hết hạn. Vui lòng đăng nhập lại.',
     403 => 'Bạn không có quyền thực hiện thao tác này.',

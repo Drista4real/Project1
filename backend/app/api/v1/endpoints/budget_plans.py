@@ -1,5 +1,6 @@
 """HTTP endpoints for the deterministic budget engine."""
 
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -9,6 +10,7 @@ from app.api.dependencies import UserDependency
 from app.application.budget_plan import (
     BudgetPlanService,
     PurchaseImpactService,
+    SetupDefaultsService,
     rebalance,
     validate_rebalance_payload,
 )
@@ -18,12 +20,18 @@ from app.domain.budget_plan import (
     DailyAllocation,
     PlanAllocation,
     PlanEvent,
+    PlanTotals,
     PurchaseImpactRequest,
     PurchaseImpactResult,
     RebalanceResult,
+    SetupDefaults,
 )
+from app.domain.transactions import TransactionError
 from app.infrastructure.repositories.budget_plans import SupabaseBudgetPlanRepository
 from app.infrastructure.repositories.plan_balance import SupabasePlanBalanceSource
+from app.infrastructure.repositories.setup_defaults import (
+    SupabaseSetupDefaultsSource,
+)
 
 router = APIRouter(prefix="/api/v1/budget-plans", tags=["Budget plans"])
 
@@ -31,7 +39,15 @@ router = APIRouter(prefix="/api/v1/budget-plans", tags=["Budget plans"])
 def get_budget_plan_service(context: UserDependency) -> BudgetPlanService:
     """Build the plan service for the authenticated owner."""
     repository = SupabaseBudgetPlanRepository(context.client, context.user_id)
-    return BudgetPlanService(repository)
+    spending = SupabasePlanBalanceSource(context.client, context.user_id)
+    return BudgetPlanService(repository, spending_source=spending)
+
+
+def get_setup_defaults_service(context: UserDependency) -> SetupDefaultsService:
+    """Build the monthly setup prefill for the authenticated owner."""
+    return SetupDefaultsService(
+        SupabaseSetupDefaultsSource(context.client, context.user_id)
+    )
 
 
 def get_purchase_impact_service(context: UserDependency) -> PurchaseImpactService:
@@ -44,6 +60,7 @@ def get_purchase_impact_service(context: UserDependency) -> PurchaseImpactServic
 
 PlanService = Annotated[BudgetPlanService, Depends(get_budget_plan_service)]
 ImpactService = Annotated[PurchaseImpactService, Depends(get_purchase_impact_service)]
+SetupService = Annotated[SetupDefaultsService, Depends(get_setup_defaults_service)]
 
 
 class PlanResponse(BaseModel):
@@ -112,6 +129,32 @@ def list_plans(
     """List the plans owned by the authenticated user."""
     page = service.list_plans(active, limit, offset)
     return PlanListResponse(**page)
+
+
+# The setup routes are declared before `/{plan_id}` so their fixed paths are
+# not read as a plan id.
+@router.post("/preview", response_model=PlanTotals)
+def preview_plan(data: BudgetPlanCreateInput, service: PlanService) -> PlanTotals:
+    """Compute a plan from the setup answers without saving it."""
+    return service.preview(data)
+
+
+@router.get("/setup-defaults", response_model=SetupDefaults)
+def setup_defaults(
+    service: SetupService,
+    today: Annotated[date | None, Query()] = None,
+) -> SetupDefaults:
+    """Prefill the monthly setup from the owner's wallets, schedule and profile.
+
+    The client sends its own day, since the server clock runs on UTC; a day
+    further than one day from the server's is refused.
+    """
+    server_today = date.today()
+    if today is None:
+        today = server_today
+    elif abs((today - server_today).days) > 1:
+        raise TransactionError(422, "Ngày hiện tại không hợp lệ.")
+    return service.load(today)
 
 
 @router.get("/{plan_id}", response_model=PlanResponse)

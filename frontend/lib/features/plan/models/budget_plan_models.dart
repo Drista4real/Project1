@@ -106,6 +106,134 @@ class DailyAllocation {
   );
 }
 
+/// The figures the engine computed for a plan that is not saved yet.
+class PlanPreview {
+  const PlanPreview({
+    required this.spendableBudget,
+    required this.dailyAllowance,
+    required this.survivalFloor,
+    required this.groups,
+  });
+
+  final num spendableBudget;
+  final num dailyAllowance;
+  final num survivalFloor;
+  final List<PlanGroup> groups;
+
+  factory PlanPreview.fromJson(Map<String, dynamic> json) => PlanPreview(
+    spendableBudget: readDouble(json['spendable_budget']) ?? 0,
+    dailyAllowance: readDouble(json['daily_allowance']) ?? 0,
+    survivalFloor: readDouble(json['survival_floor']) ?? 0,
+    groups: ((json['groups'] as List?) ?? const [])
+        .map((item) => PlanGroup.fromJson((item as Map).cast<String, dynamic>()))
+        .toList(),
+  );
+}
+
+/// The inputs of a plan, as the monthly setup collects them.
+class PlanDraft {
+  const PlanDraft({
+    required this.totalIncome,
+    required this.durationDays,
+    required this.savingsTarget,
+    required this.fixedExpenses,
+    required this.foodRatio,
+    required this.transportRatio,
+    required this.lifestyleRatio,
+    required this.startDate,
+    this.idempotencyKey,
+  });
+
+  final num totalIncome;
+  final int durationDays;
+  final num savingsTarget;
+  final num fixedExpenses;
+  final int foodRatio;
+  final int transportRatio;
+  final int lifestyleRatio;
+  final DateTime startDate;
+  final String? idempotencyKey;
+
+  Map<String, dynamic> toJson() => {
+    'title': 'Kế hoạch tháng',
+    'total_income': totalIncome.toStringAsFixed(2),
+    'duration_days': durationDays,
+    'savings_target': savingsTarget.toStringAsFixed(2),
+    'fixed_expenses': fixedExpenses.toStringAsFixed(2),
+    'group_ratios': {
+      'food': foodRatio,
+      'transport': transportRatio,
+      'lifestyle': lifestyleRatio,
+    },
+    'start_date': isoDate(startDate),
+    if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+  };
+}
+
+/// One fixed expense the user already records as a recurring transaction.
+class SetupFixedExpense {
+  const SetupFixedExpense({
+    required this.description,
+    required this.amount,
+    this.nextDate,
+  });
+
+  final String description;
+  final num amount;
+  final DateTime? nextDate;
+
+  factory SetupFixedExpense.fromJson(Map<String, dynamic> json) =>
+      SetupFixedExpense(
+        description: json['description'] as String? ?? '',
+        amount: readDouble(json['amount']) ?? 0,
+        nextDate: DateTime.tryParse('${json['next_date']}'),
+      );
+}
+
+/// What the server already knows that can prefill the monthly setup.
+class SetupDefaults {
+  const SetupDefaults({
+    required this.availableBalance,
+    required this.nextIncomeDate,
+    required this.nextIncomeSource,
+    required this.nextIncomeLabel,
+    required this.fixedExpenses,
+    required this.monthlySavingsTarget,
+    required this.hasPlans,
+  });
+
+  final num availableBalance;
+  final DateTime? nextIncomeDate;
+
+  /// `recurring`, `payroll_day` or `none`.
+  final String nextIncomeSource;
+  final String? nextIncomeLabel;
+  final List<SetupFixedExpense> fixedExpenses;
+  final num monthlySavingsTarget;
+  final bool hasPlans;
+
+  factory SetupDefaults.fromJson(Map<String, dynamic> json) => SetupDefaults(
+    availableBalance: readDouble(json['available_balance']) ?? 0,
+    nextIncomeDate: DateTime.tryParse('${json['next_income_date']}'),
+    nextIncomeSource: json['next_income_source'] as String? ?? 'none',
+    nextIncomeLabel: json['next_income_label'] as String?,
+    fixedExpenses: ((json['fixed_expenses'] as List?) ?? const [])
+        .map(
+          (item) =>
+              SetupFixedExpense.fromJson((item as Map).cast<String, dynamic>()),
+        )
+        .toList(),
+    monthlySavingsTarget: readDouble(json['monthly_savings_target']) ?? 0,
+    hasPlans: json['has_plans'] as bool? ?? false,
+  );
+}
+
+/// A calendar date as the API writes it: `YYYY-MM-DD`.
+String isoDate(DateTime date) =>
+    '${date.year.toString().padLeft(4, '0')}-'
+    '${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
+
 /// The deterministic verdict for a proposed purchase.
 class PurchaseImpact {
   const PurchaseImpact({

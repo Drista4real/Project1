@@ -122,7 +122,8 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
         _categories = results[1] as List<Category>;
         _loading = false;
         if (_accounts.isEmpty) {
-          _error = 'Bạn cần tạo ví trước khi lưu giao dịch.';
+          _error =
+              'Chưa có số dư. Hãy đặt số dư ở Thiết lập kế hoạch tháng trên Trang chủ.';
         }
       });
     } catch (error) {
@@ -310,9 +311,9 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
   /// upload route, so the button reports the situation instead of failing
   /// silently.
   void _showReceiptUnavailable() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text(receiptUnavailableMessage)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text(receiptUnavailableMessage)));
   }
 
   Future<void> _edit(ReviewTransaction item) async {
@@ -360,7 +361,7 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
     if (_drafts.any((draft) => !draft.canSave)) {
       setState(
         () => _error =
-            'Hãy bổ sung số tiền, ví và danh mục cho từng giao dịch trước khi lưu.',
+            'Hãy bổ sung số tiền và danh mục cho từng giao dịch trước khi lưu.',
       );
       return;
     }
@@ -585,7 +586,7 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
                         content: const Text(
                           'Nhập hoặc nói một khoản thu chi, ví dụ: “ăn trưa 65k tiền mặt”. '
                           'Dùng dấu phẩy hoặc xuống dòng để tách nhiều khoản. '
-                          'Kiểm tra số tiền, ngày, ví và danh mục trước khi xác nhận. Giọng nói chạy offline trên Android.',
+                          'Kiểm tra số tiền, ngày và danh mục trước khi xác nhận. Giọng nói chạy offline trên Android.',
                         ),
                         actions: [
                           TextButton(
@@ -634,7 +635,7 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
                       if (_accounts.isEmpty)
                         TextButton(
                           onPressed: _loading ? null : _loadReferences,
-                          child: const Text('Tải lại ví và danh mục'),
+                          child: const Text('Tải lại dữ liệu'),
                         ),
                       if (_uncertainSave)
                         TextButton(

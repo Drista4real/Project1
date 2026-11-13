@@ -50,6 +50,25 @@ void main() {
     );
   });
 
+  test('only the plan preview passes its refusal through', () {
+    expect(
+      financeApiErrorMessage(
+        422,
+        '/budget-plans/preview',
+        'Số tiền hiện có phải nhiều hơn chi cố định và tiền để dành.',
+      ),
+      'Số tiền hiện có phải nhiều hơn chi cố định và tiền để dành.',
+    );
+    expect(
+      financeApiErrorMessage(
+        422,
+        '/budget-plans/7/rebalance',
+        'Total income must exceed fixed expenses plus savings target',
+      ),
+      contains('biểu mẫu'),
+    );
+  });
+
   test('a quota refusal without a detail keeps a generic message', () {
     expect(
       financeApiErrorMessage(429, '/chat/turn', null),

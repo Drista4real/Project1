@@ -187,7 +187,7 @@ class TransactionReviewCard extends StatelessWidget {
                         (item.canSave
                             ? 'Kiểm tra trước khi lưu'
                             : item.accountId == null
-                            ? 'Chưa có ví phù hợp — chọn ví để lưu'
+                            ? 'Chưa có số dư — hãy thiết lập kế hoạch tháng'
                             : 'Cần bổ sung thông tin'),
                     style: TextStyle(fontSize: 11, color: color),
                   ),

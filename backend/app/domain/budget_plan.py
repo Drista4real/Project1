@@ -9,10 +9,12 @@ allocations, while `public.budgets` stays the only source of truth about
 envelope limits.
 """
 
-from datetime import date
+import re
+from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal, Protocol
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -322,9 +324,7 @@ def compute_plan_totals(
     """Derive the spendable budget, daily allowance and group split."""
     spendable = total_income - fixed_expenses - savings_target
     if spendable <= 0:
-        raise ValueError(
-            "Total income must exceed fixed expenses plus savings target"
-        )
+        raise ValueError("Total income must exceed fixed expenses plus savings target")
     daily_allowance = quantize_money(spendable / duration_days)
     survival_floor = (
         quantize_money(survival_floor_override)
@@ -354,6 +354,156 @@ def compute_plan_totals(
         survival_floor=survival_floor,
         groups=groups,
     )
+
+
+#: The day of a ledger expense is the user's local day (the app is Vietnamese).
+LOCAL_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
+
+
+def group_for_category(name: str | None) -> GroupKey:
+    """The planning group an expense category spends from."""
+    words = set(re.findall(r"\w+", (name or "").lower()))
+    if words & {"ăn", "uống", "chợ", "cơm"}:
+        return "food"
+    if words & {"xăng", "xe", "giao", "taxi", "grab"}:
+        return "transport"
+    return "lifestyle"
+
+
+def spending_by_day_and_group(rows: list[dict]) -> dict[tuple[date, str], Decimal]:
+    """Sum ledger expenses by the user's local day and planning group."""
+    totals: dict[tuple[date, str], Decimal] = {}
+    for row in rows:
+        moment = datetime.fromisoformat(str(row["transaction_date"]))
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=UTC)
+        day = moment.astimezone(LOCAL_TIMEZONE).date()
+        category = row.get("categories") or {}
+        key = (day, group_for_category(category.get("name")))
+        totals[key] = totals.get(key, Decimal("0")) + Decimal(str(row["amount"]))
+    return totals
+
+
+def with_recorded_spending(
+    allocations: list[DailyAllocation],
+    spending: dict[tuple[date, str], Decimal],
+) -> list[DailyAllocation]:
+    """Replace each row's spending with what the ledger recorded.
+
+    The ledger already holds a confirmed chat purchase, so the stored
+    ``actual_spent`` is replaced, not added to. Spending in a group a day has
+    no row for falls on that day's last row so no expense is lost.
+    """
+    spent = {
+        key: Decimal("0") for key in ((a.alloc_date, a.group_key) for a in allocations)
+    }
+    last_of_day = {a.alloc_date: (a.alloc_date, a.group_key) for a in allocations}
+    for (day, group), amount in spending.items():
+        key = (day, group) if (day, group) in spent else last_of_day.get(day)
+        if key is not None:
+            spent[key] += amount
+    return [
+        allocation.model_copy(
+            update={
+                "actual_spent": spent[(allocation.alloc_date, allocation.group_key)]
+            }
+        )
+        for allocation in allocations
+    ]
+
+
+class SetupFixedExpense(BaseModel):
+    """A recurring expense due before the next income."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    description: str
+    amount: Decimal
+    next_date: date | None = None
+
+
+class SetupDefaults(BaseModel):
+    """What the server already knows that prefills the monthly setup."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    available_balance: Decimal
+    next_income_date: date | None
+    next_income_source: Literal["recurring", "payroll_day", "none"]
+    next_income_label: str | None
+    fixed_expenses: list[SetupFixedExpense]
+    monthly_savings_target: Decimal
+    has_plans: bool
+
+
+class PlanSpendingSource(Protocol):
+    """The owner's ledger expenses inside a window."""
+
+    def expenses_between(self, start: date, end: date) -> list[dict]: ...
+
+
+class SetupDefaultsSource(Protocol):
+    """The reads the monthly setup needs, scoped to one owner."""
+
+    def available_balance(self) -> str: ...
+
+    def recurring_income(self, after: date) -> list[dict]: ...
+
+    def recurring_expenses(self, start: date, end: date) -> list[dict]: ...
+
+    def profile(self) -> dict: ...
+
+    def has_plans(self) -> bool: ...
+
+
+#: An income closer than this many days is too near to plan for; the setup
+#: plans until the cycle after it instead (docs/monthly-setup/PLAN.md §4).
+MIN_PLAN_DAYS = 4
+
+
+class NextIncome(BaseModel):
+    """The day the next fixed income arrives and where that day comes from."""
+
+    model_config = ConfigDict(frozen=True)
+
+    date: date | None
+    source: Literal["recurring", "payroll_day", "none"]
+    label: str | None = None
+
+
+def _payroll_dates(after: date, payroll_day: int):
+    """Yield the payroll days after ``after``, clamped to short months."""
+    year, month = after.year, after.month
+    while True:
+        first_of_next = date(year + month // 12, month % 12 + 1, 1)
+        last = (first_of_next - timedelta(days=1)).day
+        candidate = date(year, month, min(payroll_day, last))
+        if candidate > after:
+            yield candidate
+        year, month = first_of_next.year, first_of_next.month
+
+
+def next_income_date(
+    today: date,
+    recurring_income: list[tuple[date, str]],
+    payroll_day: int | None,
+) -> NextIncome:
+    """Return the next fixed income at least ``MIN_PLAN_DAYS`` away.
+
+    A recurring income wins over the profile's payroll day; an income due
+    sooner than ``MIN_PLAN_DAYS`` gives way to the next one.
+    """
+    earliest = today + timedelta(days=MIN_PLAN_DAYS)
+    recurring = sorted(
+        (day, label) for day, label in recurring_income if day >= earliest
+    )
+    if recurring:
+        day, label = recurring[0]
+        return NextIncome(date=day, source="recurring", label=label)
+    if payroll_day is not None and 1 <= payroll_day <= 31:
+        day = next(d for d in _payroll_dates(today, payroll_day) if d >= earliest)
+        return NextIncome(date=day, source="payroll_day")
+    return NextIncome(date=None, source="none")
 
 
 def daily_group_amounts(total_amount: Decimal, duration_days: int) -> list[Decimal]:
@@ -455,9 +605,7 @@ def propose_rebalance(
     current_total = sum(current.values(), Decimal("0"))
     available = remaining_budget - purchase_amount
     if available < 0:
-        raise RebalanceInfeasible(
-            "Purchase exceeds the remaining budget of the plan"
-        )
+        raise RebalanceInfeasible("Purchase exceeds the remaining budget of the plan")
     target_daily = quantize_money(available / remaining_days)
 
     floors = _pillar_floors(capacity, duration_days)
@@ -535,9 +683,7 @@ def propose_rebalance(
     return RebalanceProposal(
         allocations=allocations,
         daily_allowance_before=quantize_money(current_total),
-        daily_allowance_after=quantize_money(
-            sum(proposed.values(), Decimal("0"))
-        ),
+        daily_allowance_after=quantize_money(sum(proposed.values(), Decimal("0"))),
         remaining_days=remaining_days,
         warnings=tuple(warnings),
     )

@@ -33,7 +33,7 @@ class EnvelopeFundingCard extends StatelessWidget {
                 ),
                 if (data.availableBalance != null)
                   _amount(
-                    'Số dư ví hiện tại',
+                    'Số dư hiện tại',
                     data.availableBalance!,
                     'envelope-available-balance',
                   ),

@@ -111,7 +111,7 @@ class _EnvelopeRebalanceSheetState extends State<EnvelopeRebalanceSheet> {
                       );
                     }),
               icon: const Icon(Icons.account_balance_wallet_outlined),
-              label: const Text('Dùng số dư ví làm ngân sách'),
+              label: const Text('Dùng số dư làm ngân sách'),
             ),
           const SizedBox(height: 12),
           for (final pillar in EnvelopePillar.values)

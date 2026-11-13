@@ -230,7 +230,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 color: Theme.of(context).colorScheme.primary,
               ),
               title: const Text('Quản lý tài chính'),
-              subtitle: const Text('Ví, lịch thu chi, mục tiêu và sổ nợ'),
+              subtitle: const Text(
+                'Lịch thu chi, ngân sách, mục tiêu và sổ nợ',
+              ),
               trailing: const Icon(Icons.chevron_right),
               onTap: () async {
                 await Navigator.of(context).push(
@@ -785,8 +787,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
       bottomNavigationBar: AppScreenNavigation(
-      selectedIndex: 4,
-      onTransactionAdded: _loadSettings,
+        selectedIndex: 4,
+        onTransactionAdded: _loadSettings,
       ),
     );
   }

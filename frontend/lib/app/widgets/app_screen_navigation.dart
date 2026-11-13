@@ -37,7 +37,7 @@ class AppScreenNavigation extends StatelessWidget {
             ListTile(
               leading: const Icon(Icons.edit_outlined),
               title: const Text('Nhập thủ công'),
-              subtitle: const Text('Tự chọn số tiền, ví và danh mục'),
+              subtitle: const Text('Tự chọn số tiền và danh mục'),
               onTap: () =>
                   Navigator.pop(sheetContext, AppRoutes.addTransaction),
             ),

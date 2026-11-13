@@ -11,6 +11,8 @@ import 'package:project_one/features/chat/models/chat_models.dart';
 import 'package:project_one/features/chat/widgets/chat_greeting.dart';
 import 'package:project_one/features/chat/widgets/chat_message_block.dart';
 import 'package:project_one/features/chat/widgets/chat_message_bubble.dart';
+import 'package:project_one/features/onboarding/data/monthly_setup_gate.dart';
+import 'package:project_one/features/onboarding/widgets/monthly_setup_entry_card.dart';
 
 /// The conversational home canvas.
 ///
@@ -18,9 +20,12 @@ import 'package:project_one/features/chat/widgets/chat_message_bubble.dart';
 /// question suggestions and the conversation itself. The ledger keeps its own
 /// route and navigation entry.
 class ChatHomeScreen extends StatefulWidget {
-  const ChatHomeScreen({super.key, this.repository});
+  const ChatHomeScreen({super.key, this.repository, this.setupGate});
 
   final ChatRepository? repository;
+
+  /// Decides whether the monthly setup opens by itself after sign-in.
+  final MonthlySetupGate? setupGate;
 
   @override
   State<ChatHomeScreen> createState() => _ChatHomeScreenState();
@@ -31,6 +36,27 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
   late final ChatCubit _cubit = ChatCubit(
     widget.repository ?? BackendChatRepository(),
   )..start();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeOpenSetup());
+  }
+
+  /// Open the monthly setup once for a signed-in user who has no plan yet.
+  Future<void> _maybeOpenSetup() async {
+    final gate = widget.setupGate ?? LocalMonthlySetupGate();
+    try {
+      if (!await gate.shouldAutoOpen()) return;
+      await gate.markPrompted();
+    } catch (_) {
+      // The setup stays one tap away on the home screen.
+      return;
+    }
+    if (mounted) _openSetup();
+  }
+
+  void _openSetup() => context.push(AppRoutes.monthlySetup);
 
   @override
   void dispose() {
@@ -201,6 +227,8 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
       children: [
         if (state.messages.isEmpty) ...[
           ChatGreeting(displayName: _displayName()),
+          MonthlySetupEntryCard(onTap: _openSetup),
+          const SizedBox(height: 20),
           ChatQuickSuggestions(onTap: _send),
           const SizedBox(height: 18),
           OutlinedButton.icon(
@@ -240,6 +268,7 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
       children: [
         ChatGreeting(displayName: _displayName()),
+        MonthlySetupEntryCard(onTap: _openSetup),
         const SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(16),

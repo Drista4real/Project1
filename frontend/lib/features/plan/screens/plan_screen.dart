@@ -3,21 +3,24 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:project_one/app/app_routes.dart';
 import 'package:project_one/app/widgets/app_screen_navigation.dart';
-import 'package:project_one/features/budget/models/envelope_pillar.dart';
 import 'package:project_one/features/plan/cubit/plan_cubit.dart';
 import 'package:project_one/features/plan/data/budget_plan_repository.dart';
 import 'package:project_one/features/plan/models/budget_plan_models.dart';
+import 'package:project_one/features/plan/widgets/plan_calendar.dart';
 import 'package:project_one/features/plan/widgets/plan_widgets.dart';
 import 'package:project_one/shared/formatters/currency_formatter.dart';
 
-/// The plan screen: the projection of the active budget plan.
+/// The plan screen: the active budget plan laid out as a month calendar.
 ///
-/// Every figure on this screen comes from the deterministic engine. The
-/// screen never computes money (ADR 0009).
+/// Every day shows what was spent against the engine's limit. The screen
+/// never computes a plan figure (ADR 0009).
 class PlanScreen extends StatefulWidget {
-  const PlanScreen({super.key, this.repository});
+  const PlanScreen({super.key, this.repository, this.today});
 
   final BudgetPlanRepository? repository;
+
+  /// The current day; tests pin it, the app uses the clock.
+  final DateTime? today;
 
   @override
   State<PlanScreen> createState() => _PlanScreenState();
@@ -27,6 +30,15 @@ class _PlanScreenState extends State<PlanScreen> {
   late final PlanCubit _cubit = PlanCubit(
     widget.repository ?? BackendBudgetPlanRepository(),
   )..load();
+
+  DateTime? _month;
+  DateTime? _selected;
+  int? _planId;
+
+  DateTime get _today {
+    final now = widget.today ?? DateTime.now();
+    return DateTime(now.year, now.month, now.day);
+  }
 
   @override
   void dispose() {
@@ -58,6 +70,11 @@ class _PlanScreenState extends State<PlanScreen> {
         ),
         actions: [
           IconButton(
+            tooltip: 'Thiết lập kế hoạch tháng',
+            onPressed: () => context.push(AppRoutes.monthlySetup),
+            icon: const Icon(Icons.tune),
+          ),
+          IconButton(
             tooltip: 'Tải lại',
             onPressed: state.loading ? null : _cubit.load,
             icon: const Icon(Icons.refresh_rounded),
@@ -79,6 +96,7 @@ class _PlanScreenState extends State<PlanScreen> {
         title: 'Không tải được kế hoạch',
         message: state.error!,
         actionLabel: 'Thử lại',
+        actionIcon: Icons.refresh_rounded,
         onAction: _cubit.load,
       );
     }
@@ -87,13 +105,18 @@ class _PlanScreenState extends State<PlanScreen> {
         context,
         title: 'Chưa có kế hoạch chi tiêu',
         message:
-            'Hỏi trợ lý ở trang chủ để lập kế hoạch, hoặc mở phần ngân sách để '
-            'phân bổ theo tháng.',
-        actionLabel: 'Mở trợ lý',
-        onAction: () => context.go(AppRoutes.home),
+            'Trả lời 6 câu ngắn để biết mỗi ngày được chi bao nhiêu, hoặc hỏi '
+            'trợ lý ở trang chủ.',
+        actionLabel: 'Thiết lập kế hoạch tháng',
+        actionIcon: Icons.event_note,
+        onAction: () => context.push(AppRoutes.monthlySetup),
       );
     }
     final plan = state.selected!;
+    final days = planDays(plan, state.allocations);
+    _syncCalendar(plan);
+    final selectedDay = _selected == null ? null : days[_selected!];
+    final theme = Theme.of(context);
     return RefreshIndicator(
       onRefresh: _cubit.load,
       child: ListView(
@@ -104,66 +127,75 @@ class _PlanScreenState extends State<PlanScreen> {
             _buildPlanPicker(context, state),
             const SizedBox(height: 12),
           ],
-          PlanHeaderCard(plan: plan),
+          PlanTodayCard(plan: plan, today: _today, days: days),
+          const SizedBox(height: 12),
+          PlanCalendar(
+            month: _month!,
+            days: days,
+            today: _today,
+            selected: _selected,
+            onSelect: (date) => setState(() => _selected = date),
+            onMoveMonth: (delta) => setState(
+              () => _month = DateTime(_month!.year, _month!.month + delta),
+            ),
+            canGoBack: _month!.isAfter(_firstMonth(plan)),
+            canGoForward: _month!.isBefore(_lastMonth(plan)),
+          ),
+          if (selectedDay != null) ...[
+            const SizedBox(height: 12),
+            PlanDayDetail(day: selectedDay, today: _today),
+          ],
           const SizedBox(height: 18),
           Text(
-            'Phân bổ theo trụ cột',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            'Hạn mức mỗi ngày và chi tiêu đã ghi nhận.',
-            style: TextStyle(
-              fontSize: 11,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 10),
-          for (final entry in _pillarTotals(plan, state.allocations).entries)
-            PlanPillarRow(
-              pillar: entry.key,
-              limit: entry.value.$1,
-              spent: entry.value.$2,
-            ),
-          const SizedBox(height: 10),
-          Text(
             'Hạn mức theo nhóm chi',
-            style: TextStyle(
-              fontSize: 16,
+            style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
-              color: Theme.of(context).colorScheme.primary,
+              color: theme.colorScheme.primary,
             ),
           ),
           const SizedBox(height: 10),
           PlanGroupList(plan: plan),
-          const SizedBox(height: 10),
-          Text(
-            'Dự báo từng ngày',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-          const SizedBox(height: 10),
-          PlanDayStrip(allocations: state.allocations),
           const SizedBox(height: 8),
           Text(
             'Kế hoạch là bản chiếu của phong bao. Hạn mức danh mục vẫn nằm ở '
             'phần Ngân sách.',
-            style: TextStyle(
-              fontSize: 11,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
               height: 1.5,
             ),
           ),
         ],
       ),
     );
+  }
+
+  /// Open the calendar on today, or on the plan's first day when today is
+  /// outside it, whenever another plan is shown.
+  void _syncCalendar(BudgetPlan plan) {
+    if (_planId == plan.id && _month != null) return;
+    _planId = plan.id;
+    final first = plan.startDate;
+    final start = first == null
+        ? _today
+        : DateTime(first.year, first.month, first.day);
+    final end = start.add(Duration(days: plan.durationDays - 1));
+    final focus = _today.isBefore(start) || _today.isAfter(end)
+        ? start
+        : _today;
+    _selected = focus;
+    _month = DateTime(focus.year, focus.month);
+  }
+
+  DateTime _firstMonth(BudgetPlan plan) {
+    final start = plan.startDate ?? _today;
+    return DateTime(start.year, start.month);
+  }
+
+  DateTime _lastMonth(BudgetPlan plan) {
+    final end = (plan.startDate ?? _today).add(
+      Duration(days: plan.durationDays - 1),
+    );
+    return DateTime(end.year, end.month);
   }
 
   Widget _buildPlanPicker(BuildContext context, PlanState state) {
@@ -193,6 +225,7 @@ class _PlanScreenState extends State<PlanScreen> {
     required String title,
     required String message,
     required String actionLabel,
+    required IconData actionIcon,
     required VoidCallback onAction,
   }) {
     final theme = Theme.of(context);
@@ -226,7 +259,7 @@ class _PlanScreenState extends State<PlanScreen> {
               const SizedBox(height: 14),
               FilledButton.icon(
                 onPressed: onAction,
-                icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                icon: Icon(actionIcon, size: 18),
                 label: Text(actionLabel),
               ),
             ],
@@ -234,43 +267,5 @@ class _PlanScreenState extends State<PlanScreen> {
         ),
       ],
     );
-  }
-
-  /// The daily limit and the recorded spending of every pillar.
-  ///
-  /// The limit comes from the plan's groups; the spending comes from the
-  /// allocation rows of the current day, so both numbers are the engine's.
-  Map<EnvelopePillar, (num, num)> _pillarTotals(
-    BudgetPlan plan,
-    List<DailyAllocation> allocations,
-  ) {
-    final limits = <EnvelopePillar, num>{};
-    final spent = <EnvelopePillar, num>{};
-    for (final group in plan.groups) {
-      final pillar = planPillarOf(group.groupKey);
-      limits[pillar] = (limits[pillar] ?? 0) + group.dailyAmount;
-    }
-    final today = _currentDay(plan);
-    for (final item in allocations) {
-      if (item.dayIndex != today) continue;
-      final pillar = planPillarOf(item.groupKey);
-      spent[pillar] = (spent[pillar] ?? 0) + item.actualSpent;
-    }
-    return {
-      for (final pillar in limits.keys)
-        pillar: (limits[pillar] ?? 0, spent[pillar] ?? 0),
-    };
-  }
-
-  /// The day of the plan that is running now.
-  int _currentDay(BudgetPlan plan) {
-    final start = plan.startDate;
-    if (start == null) return 1;
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final first = DateTime(start.year, start.month, start.day);
-    final index = today.difference(first).inDays + 1;
-    if (index < 1 || index > plan.durationDays) return 1;
-    return index;
   }
 }

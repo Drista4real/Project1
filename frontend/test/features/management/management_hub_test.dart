@@ -17,7 +17,10 @@ void main() {
         MaterialApp(home: ManagementScreen(repository: repository)),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Thêm ví'), findsOneWidget);
+      // A single balance: no wallet module and no "add wallet" action.
+      expect(find.text('Thêm ví'), findsNothing);
+      expect(find.text('Ví và tài khoản'), findsNothing);
+      expect(find.text('Giao dịch định kỳ'), findsOneWidget);
       expect(find.text('Dự báo dòng tiền'), findsNothing);
       await tester.enterText(find.byType(TextField), 'tien nha');
       await tester.pumpAndSettle();
@@ -32,7 +35,8 @@ void main() {
       expect(find.text('Không tìm thấy mục phù hợp.'), findsOneWidget);
       await tester.tap(find.text('Xem tất cả mục'));
       await tester.pumpAndSettle();
-      expect(find.text('Ví và tài khoản'), findsOneWidget);
+      expect(find.text('Giao dịch định kỳ'), findsOneWidget);
+      expect(find.text('Ví và tài khoản'), findsNothing);
     },
   );
 }

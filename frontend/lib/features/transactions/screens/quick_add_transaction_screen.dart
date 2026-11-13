@@ -157,7 +157,7 @@ class _QuickAddTransactionScreenState extends State<QuickAddTransactionScreen> {
                     if (_loading) const LinearProgressIndicator(),
                     if (_loadError != null)
                       FinanceFormSection(
-                        title: 'Chưa tải được ví và danh mục',
+                        title: 'Chưa tải được dữ liệu',
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -244,51 +244,50 @@ class _QuickAddTransactionScreenState extends State<QuickAddTransactionScreen> {
                     FinanceFormSection(
                       title: _type == 'transfer'
                           ? 'Ví chuyển và ví nhận'
-                          : 'Ví và thời gian',
+                          : 'Thời gian',
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          DropdownButtonFormField<int>(
-                            key: ValueKey('account:$_accountId:$_loading'),
-                            initialValue:
-                                _accounts.any((a) => a.id == _accountId)
-                                ? _accountId
-                                : null,
-                            isExpanded: true,
-                            decoration: financeInputDecoration(
-                              _type == 'transfer'
-                                  ? 'Ví chuyển *'
-                                  : 'Ví / Tài khoản *',
-                              icon: Icons.account_balance_wallet_outlined,
-                            ),
-                            items: _accounts
-                                .map(
-                                  (a) => DropdownMenuItem(
-                                    value: a.id,
-                                    child: Text(
-                                      a.name,
-                                      overflow: TextOverflow.ellipsis,
+                          // A single balance: income and expenses go to the
+                          // primary wallet; only a legacy transfer names one.
+                          if (_type == 'transfer')
+                            DropdownButtonFormField<int>(
+                              key: ValueKey('account:$_accountId:$_loading'),
+                              initialValue:
+                                  _accounts.any((a) => a.id == _accountId)
+                                  ? _accountId
+                                  : null,
+                              isExpanded: true,
+                              decoration: financeInputDecoration(
+                                _type == 'transfer'
+                                    ? 'Ví chuyển *'
+                                    : 'Ví / Tài khoản *',
+                                icon: Icons.account_balance_wallet_outlined,
+                              ),
+                              items: _accounts
+                                  .map(
+                                    (a) => DropdownMenuItem(
+                                      value: a.id,
+                                      child: Text(
+                                        a.name,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
-                                  ),
-                                )
-                                .toList(),
-                            onChanged: disabled
-                                ? null
-                                : (value) => _cubit.selectAccount(value),
-                            validator: (value) =>
-                                value == null ? 'Vui lòng chọn ví' : null,
-                          ),
+                                  )
+                                  .toList(),
+                              onChanged: disabled
+                                  ? null
+                                  : (value) => _cubit.selectAccount(value),
+                              validator: (value) =>
+                                  value == null ? 'Vui lòng chọn ví' : null,
+                            ),
                           if (!_loading &&
                               _loadError == null &&
                               _accounts.isEmpty) ...[
                             const SizedBox(height: 8),
-                            const Text('Tạo ví đầu tiên để bắt đầu ghi chép.'),
-                            TextButton.icon(
-                              onPressed: _saving
-                                  ? null
-                                  : () => _manage('accounts', create: true),
-                              icon: const Icon(Icons.add),
-                              label: const Text('Tạo ví'),
+                            const Text(
+                              'Chưa có số dư để ghi chép. Hãy đặt số dư ở '
+                              'Thiết lập kế hoạch tháng trên Trang chủ.',
                             ),
                           ],
                           if (_type == 'transfer') ...[
