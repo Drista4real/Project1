@@ -107,6 +107,25 @@ void main() {
     expect(find.text('BƯỚC 1/6'), findsOneWidget);
   });
 
+  testWidgets('a fixed expense added from the dialog joins the list', (
+    tester,
+  ) async {
+    await _pumpSetup(tester, FakeSetupRepository());
+    await _next(tester);
+    await _next(tester);
+    expect(find.text('BƯỚC 3/6'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Thêm khoản khác'));
+    await tester.tap(find.text('Thêm khoản khác'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).last, 'Gửi xe');
+    await tester.tap(find.widgetWithText(FilledButton, 'Thêm'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Gửi xe'), findsOneWidget);
+  });
+
   testWidgets('skipping leaves the setup without saving anything', (
     tester,
   ) async {

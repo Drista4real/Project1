@@ -122,25 +122,39 @@ Future<void> _pumpPlan(
 }
 
 void main() {
-  testWidgets('the calendar shows what was spent on every day', (tester) async {
+  testWidgets('the calendar shows what is left of every day', (tester) async {
     await _pumpPlan(tester, FakeBudgetPlanRepository(activePlan: _plan()));
 
     expect(find.text('Tháng 11, 2026'), findsOneWidget);
-    expect(find.text('152k'), findsOneWidget);
-    expect(find.text('210k'), findsOneWidget);
-    expect(find.text('45k'), findsOneWidget);
-    // A day still ahead shows the planned limit.
+    // 178.261 limit: 152k spent leaves 26k, 210k leaves -32k, 45k leaves 133k.
+    expect(find.text('26k'), findsOneWidget);
+    expect(find.text('-32k'), findsOneWidget);
+    expect(find.text('133k'), findsOneWidget);
+    // A day still ahead with nothing spent shows the planned limit.
     expect(find.text('178k'), findsWidgets);
     expect(
-      find.bySemanticsLabel(RegExp(r'Ngày 13/11, đã chi 210\.000 ₫')),
+      find.bySemanticsLabel(
+        RegExp(r'Ngày 13/11, đã chi 210\.000 ₫, còn -31\.739 ₫'),
+      ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('a day turns amber under half its limit and red below zero', (
+    tester,
+  ) async {
+    await _pumpPlan(tester, FakeBudgetPlanRepository(activePlan: _plan()));
+
+    Color? colorOf(String text) => tester.widget<Text>(find.text(text)).style?.color;
+    expect(colorOf('133k'), planHealthyGreen);
+    expect(colorOf('26k'), planLowAmber);
+    expect(colorOf('-32k'), planOverRed);
   });
 
   testWidgets('a future day already spent shows the spending', (tester) async {
     await _pumpPlan(tester, FakeBudgetPlanRepository(activePlan: _plan()));
 
-    expect(find.text('50k'), findsOneWidget);
+    expect(find.text('128k'), findsOneWidget);
     expect(
       find.bySemanticsLabel(RegExp(r'Ngày 15/11, đã chi 50\.000 ₫')),
       findsOneWidget,
@@ -164,8 +178,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Thứ Sáu, 13/11'), findsOneWidget);
-    expect(find.text('210.000 ₫ / 178.261 ₫'), findsOneWidget);
-    expect(find.text('150.000 ₫ / 106.957 ₫'), findsOneWidget);
+    expect(find.text('Còn -31.739 ₫ / 178.261 ₫'), findsOneWidget);
+    expect(find.text('Còn -43.043 ₫ / 106.957 ₫'), findsOneWidget);
   });
 
   testWidgets('the group limits stay below the calendar', (tester) async {
@@ -231,7 +245,16 @@ void main() {
     });
   });
 
+  test('a remaining amount gets the tone of how much is left', () {
+    expect(planTone(100, 100), PlanTone.healthy);
+    expect(planTone(50, 100), PlanTone.healthy);
+    expect(planTone(49, 100), PlanTone.low);
+    expect(planTone(0, 100), PlanTone.low);
+    expect(planTone(-1, 100), PlanTone.over);
+  });
+
   test('formatCompactVnd keeps a cell short', () {
+    expect(formatCompactVnd(-31739), '-32k');
     expect(formatCompactVnd(0), '0đ');
     expect(formatCompactVnd(500), '500đ');
     expect(formatCompactVnd(152000), '152k');
