@@ -53,6 +53,20 @@ class SupabasePlanBalanceSource(RemainingBalanceSource):
         )
         return bool(result.data)
 
+    def expenses_between(self, start: date, end: date) -> list[dict]:
+        """The owner's ledger expenses from ``start`` up to ``end``."""
+        result = (
+            self.client.table("transactions")
+            .select("amount, transaction_date, categories(name)")
+            .eq("user_id", self.user_id)
+            .eq("transaction_type", "expense")
+            .gte("transaction_date", start.isoformat())
+            .lt("transaction_date", end.isoformat())
+            .order("transaction_date")
+            .execute()
+        )
+        return result.data or []
+
     def _spent_between(self, start: date, end: date) -> Decimal:
         """Sum the confirmed expenses recorded inside the window."""
         result = (

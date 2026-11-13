@@ -39,7 +39,8 @@ router = APIRouter(prefix="/api/v1/budget-plans", tags=["Budget plans"])
 def get_budget_plan_service(context: UserDependency) -> BudgetPlanService:
     """Build the plan service for the authenticated owner."""
     repository = SupabaseBudgetPlanRepository(context.client, context.user_id)
-    return BudgetPlanService(repository)
+    spending = SupabasePlanBalanceSource(context.client, context.user_id)
+    return BudgetPlanService(repository, spending_source=spending)
 
 
 def get_setup_defaults_service(context: UserDependency) -> SetupDefaultsService:

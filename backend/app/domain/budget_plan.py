@@ -9,10 +9,12 @@ allocations, while `public.budgets` stays the only source of truth about
 envelope limits.
 """
 
-from datetime import date, timedelta
+import re
+from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal, Protocol
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -322,9 +324,7 @@ def compute_plan_totals(
     """Derive the spendable budget, daily allowance and group split."""
     spendable = total_income - fixed_expenses - savings_target
     if spendable <= 0:
-        raise ValueError(
-            "Total income must exceed fixed expenses plus savings target"
-        )
+        raise ValueError("Total income must exceed fixed expenses plus savings target")
     daily_allowance = quantize_money(spendable / duration_days)
     survival_floor = (
         quantize_money(survival_floor_override)
@@ -356,6 +356,62 @@ def compute_plan_totals(
     )
 
 
+#: The day of a ledger expense is the user's local day (the app is Vietnamese).
+LOCAL_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
+
+
+def group_for_category(name: str | None) -> GroupKey:
+    """The planning group an expense category spends from."""
+    words = set(re.findall(r"\w+", (name or "").lower()))
+    if words & {"ăn", "uống", "chợ", "cơm"}:
+        return "food"
+    if words & {"xăng", "xe", "giao", "taxi", "grab"}:
+        return "transport"
+    return "lifestyle"
+
+
+def spending_by_day_and_group(rows: list[dict]) -> dict[tuple[date, str], Decimal]:
+    """Sum ledger expenses by the user's local day and planning group."""
+    totals: dict[tuple[date, str], Decimal] = {}
+    for row in rows:
+        moment = datetime.fromisoformat(str(row["transaction_date"]))
+        if moment.tzinfo is None:
+            moment = moment.replace(tzinfo=UTC)
+        day = moment.astimezone(LOCAL_TIMEZONE).date()
+        category = row.get("categories") or {}
+        key = (day, group_for_category(category.get("name")))
+        totals[key] = totals.get(key, Decimal("0")) + Decimal(str(row["amount"]))
+    return totals
+
+
+def with_recorded_spending(
+    allocations: list[DailyAllocation],
+    spending: dict[tuple[date, str], Decimal],
+) -> list[DailyAllocation]:
+    """Replace each row's spending with what the ledger recorded.
+
+    The ledger already holds a confirmed chat purchase, so the stored
+    ``actual_spent`` is replaced, not added to. Spending in a group a day has
+    no row for falls on that day's last row so no expense is lost.
+    """
+    spent = {
+        key: Decimal("0") for key in ((a.alloc_date, a.group_key) for a in allocations)
+    }
+    last_of_day = {a.alloc_date: (a.alloc_date, a.group_key) for a in allocations}
+    for (day, group), amount in spending.items():
+        key = (day, group) if (day, group) in spent else last_of_day.get(day)
+        if key is not None:
+            spent[key] += amount
+    return [
+        allocation.model_copy(
+            update={
+                "actual_spent": spent[(allocation.alloc_date, allocation.group_key)]
+            }
+        )
+        for allocation in allocations
+    ]
+
+
 class SetupFixedExpense(BaseModel):
     """A recurring expense due before the next income."""
 
@@ -378,6 +434,12 @@ class SetupDefaults(BaseModel):
     fixed_expenses: list[SetupFixedExpense]
     monthly_savings_target: Decimal
     has_plans: bool
+
+
+class PlanSpendingSource(Protocol):
+    """The owner's ledger expenses inside a window."""
+
+    def expenses_between(self, start: date, end: date) -> list[dict]: ...
 
 
 class SetupDefaultsSource(Protocol):
@@ -543,9 +605,7 @@ def propose_rebalance(
     current_total = sum(current.values(), Decimal("0"))
     available = remaining_budget - purchase_amount
     if available < 0:
-        raise RebalanceInfeasible(
-            "Purchase exceeds the remaining budget of the plan"
-        )
+        raise RebalanceInfeasible("Purchase exceeds the remaining budget of the plan")
     target_daily = quantize_money(available / remaining_days)
 
     floors = _pillar_floors(capacity, duration_days)
@@ -623,9 +683,7 @@ def propose_rebalance(
     return RebalanceProposal(
         allocations=allocations,
         daily_allowance_before=quantize_money(current_total),
-        daily_allowance_after=quantize_money(
-            sum(proposed.values(), Decimal("0"))
-        ),
+        daily_allowance_after=quantize_money(sum(proposed.values(), Decimal("0"))),
         remaining_days=remaining_days,
         warnings=tuple(warnings),
     )

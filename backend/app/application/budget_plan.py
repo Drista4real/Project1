@@ -15,6 +15,7 @@ from app.domain.budget_plan import (
     BudgetPlanCreateInput,
     BudgetPlanRepository,
     DailyAllocation,
+    PlanSpendingSource,
     PlanTotals,
     PurchaseImpactRequest,
     PurchaseImpactResult,
@@ -29,6 +30,8 @@ from app.domain.budget_plan import (
     evaluate_purchase_impact,
     next_income_date,
     propose_rebalance,
+    spending_by_day_and_group,
+    with_recorded_spending,
 )
 from app.domain.transactions import TransactionError
 
@@ -74,9 +77,11 @@ class BudgetPlanService:
         self,
         repository: BudgetPlanRepository,
         balance_source: RemainingBalanceSource | None = None,
+        spending_source: PlanSpendingSource | None = None,
     ) -> None:
         self.repository = repository
         self.balance_source = balance_source
+        self.spending_source = spending_source
 
     def create(self, data: BudgetPlanCreateInput) -> BudgetPlan:
         """Build the allocation from validated inputs and persist it."""
@@ -138,9 +143,20 @@ class BudgetPlanService:
         return self.repository.list_plans(active_only, limit, offset)
 
     def allocations(self, plan_id: int) -> list[DailyAllocation]:
-        """Return the daily projection of a plan."""
-        self.repository.get(plan_id)
-        return self.repository.allocations(plan_id)
+        """Return the daily projection of a plan with its recorded spending.
+
+        The spending of each day is read from the ledger expenses, so an
+        expense recorded anywhere in the app is taken off the plan.
+        """
+        plan = self.repository.get(plan_id)
+        rows = self.repository.allocations(plan_id)
+        if self.spending_source is None:
+            return rows
+        # A day of margin on each side covers the shift to the local day.
+        start = plan.start_date - timedelta(days=1)
+        end = plan.start_date + timedelta(days=plan.duration_days + 1)
+        expenses = self.spending_source.expenses_between(start, end)
+        return with_recorded_spending(rows, spending_by_day_and_group(expenses))
 
     def events(self, plan_id: int):
         """Return the audit trail of a plan."""
