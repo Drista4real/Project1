@@ -220,3 +220,40 @@ Bạn duyệt thiết kế xong mới sang giai đoạn 2.
 2. Tỉ lệ 3 kiểu chi tiêu ở bước 5.
 3. Quy tắc "≤ 3 ngày thì lấy kỳ sau" ở mục 4.
 4. Lưu cờ tự mở trên máy (không migration) hay thêm cột `profiles.setup_prompted_at`.
+
+## 12. Kết quả backend (TDD, 2026-11-13)
+
+Quyết định đã chốt theo đề xuất ở mục 11:
+- Thu nhập còn ≤ 3 ngày thì lấy kỳ sau (`MIN_PLAN_DAYS = 4`).
+- Chưa lưu `monthly_savings_target` về hồ sơ.
+- Cờ "đã tự mở" lưu trên máy.
+
+| Bước | Commit | Bằng chứng |
+|---|---|---|
+| RED | `5da6c38` | `pytest tests/unit/test_monthly_setup.py`: lỗi khi nạp test vì `ImportError: cannot import name 'get_setup_defaults_service'` |
+| GREEN | `60d7d83` | 29 test mới qua; 496 test unit qua; `ruff` sạch |
+
+| # | Điều được đảm bảo | Test |
+|---|---|---|
+| 1 | Thu nhập định kỳ gần nhất (từ 4 ngày trở đi) thắng ngày lương trong hồ sơ | `TestNextIncomeDate` |
+| 2 | Ngày lương 31 trong tháng ngắn thì lấy ngày cuối tháng; qua năm mới vẫn đúng | `TestNextIncomeDate` |
+| 3 | Xem trước trả số của engine và không ghi gì | `TestPreview`, `test_the_preview_answers_with_the_engine_figures` |
+| 4 | Không đủ tiền thì trả 422 với câu tiếng Việt | `test_an_unfunded_preview_explains_why_in_vietnamese` |
+| 5 | Khoản chi cố định chỉ đọc tới ngày thu nhập (không có ngày thì đọc 30 ngày) | `TestSetupDefaults` |
+| 6 | Mọi truy vấn đều lọc theo người đăng nhập | `TestSetupDefaultsSource` |
+| 7 | `/setup-defaults` không bị khớp vào `/{plan_id}`; thiếu token thì 401; ngày lệch quá 1 ngày thì 422 | `TestMonthlySetupEndpoints` |
+
+**Độ phủ** (`pytest --cov`, các test kế hoạch):
+- `setup_defaults.py`: 95%
+- endpoint: 91%
+- domain: 96%
+- Code mới được phủ hết. Các dòng chưa phủ ở tầng application là code cũ (`create`, `propose`).
+
+**Chạy thật** (máy ảo Android, backend local, tài khoản thử):
+- Gọi lần lượt `setup-defaults` 200, `preview` 200, `POST /budget-plans` 201 (kế hoạch số 8).
+- Màn lịch hiện 22 ngày, 204.545 ₫/ngày.
+
+**Khoảng trống đã biết:**
+- `test_advisor::test_validates_trajectory_date_validity` hỏng sẵn từ trước, do Python 3.14 đổi câu báo lỗi ngày.
+- Hai module test AI không chạy trong venv này vì thiếu `numpy` và `torch`.
+- Khoản chi định kỳ hằng ngày/tuần chỉ được tính một lần.

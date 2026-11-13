@@ -121,8 +121,10 @@ class BackendBudgetPlanRepository implements BudgetPlanRepository {
 
   @override
   Future<SetupDefaults> setupDefaults() async {
+    // The server clock runs on UTC; the plan starts on the user's own day.
+    final today = isoDate(DateTime.now());
     final response =
-        await client.request('GET', '/budget-plans/setup-defaults')
+        await client.request('GET', '/budget-plans/setup-defaults?today=$today')
             as Map<String, dynamic>;
     return SetupDefaults.fromJson(response);
   }
