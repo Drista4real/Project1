@@ -128,8 +128,8 @@ class TestPreview:
         service = BudgetPlanService(_NoWriteRepository())
         with pytest.raises(TransactionError) as caught:
             service.preview(_input(total_income=Decimal("3000000")))
-        assert caught.value.status_code == 422
-        assert caught.value.detail == PLAN_NOT_FUNDED_MESSAGE
+        assert caught.value.status == 422
+        assert caught.value.message == PLAN_NOT_FUNDED_MESSAGE
 
 
 class _FakeSource:
@@ -338,7 +338,11 @@ def client():
     soon = (date.today() + timedelta(days=5)).isoformat()
     source = _FakeSource(
         expenses=[
-            {"description": "Tiền nhà", "amount": "2500000.00", "next_execution_date": soon}
+            {
+                "description": "Tiền nhà",
+                "amount": "2500000.00",
+                "next_execution_date": soon,
+            }
         ]
     )
     app.dependency_overrides[get_setup_defaults_service] = lambda: (

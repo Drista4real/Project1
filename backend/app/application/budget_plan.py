@@ -5,6 +5,7 @@ They never compute money with a language model and never trust a client
 supplied user id.
 """
 
+from datetime import date, timedelta
 from decimal import Decimal
 
 from pydantic import ValidationError
@@ -20,12 +21,24 @@ from app.domain.budget_plan import (
     RebalanceRequest,
     RebalanceResult,
     RemainingBalanceSource,
+    SetupDefaults,
+    SetupDefaultsSource,
+    SetupFixedExpense,
     build_daily_allocations,
     compute_plan_totals,
     evaluate_purchase_impact,
+    next_income_date,
     propose_rebalance,
 )
 from app.domain.transactions import TransactionError
+
+#: Why the monthly setup cannot make a plan from the user's answers.
+PLAN_NOT_FUNDED_MESSAGE = (
+    "Số tiền hiện có phải nhiều hơn chi cố định và tiền để dành."
+)
+
+#: How far ahead fixed costs are read when no income date is known.
+DEFAULT_SETUP_DAYS = 30
 
 
 def plan_totals(plan: BudgetPlan) -> PlanTotals:
@@ -102,6 +115,20 @@ class BudgetPlanService:
         )
         return self.repository.create(plan, allocations)
 
+    def preview(self, data: BudgetPlanCreateInput) -> PlanTotals:
+        """Run the engine on the setup answers without saving a plan."""
+        try:
+            return compute_plan_totals(
+                total_income=data.total_income,
+                fixed_expenses=data.fixed_expenses,
+                savings_target=data.savings_target,
+                duration_days=data.duration_days,
+                group_ratios=data.group_ratios,
+                survival_floor_override=data.survival_floor_override,
+            )
+        except ValueError as error:
+            raise TransactionError(422, PLAN_NOT_FUNDED_MESSAGE) from error
+
     def get(self, plan_id: int) -> BudgetPlan:
         """Return one plan owned by the authenticated user."""
         return self.repository.get(plan_id)
@@ -143,6 +170,51 @@ class BudgetPlanService:
             )
         except ValueError as error:
             raise TransactionError(422, str(error)) from error
+
+
+class SetupDefaultsService:
+    """Prefill the monthly setup from the owner's wallets, schedule and profile."""
+
+    def __init__(self, source: SetupDefaultsSource) -> None:
+        self.source = source
+
+    def load(self, today: date) -> SetupDefaults:
+        """Read what the setup can prefill for a plan that starts ``today``."""
+        profile = self.source.profile() or {}
+        income = next_income_date(
+            today,
+            [
+                (
+                    date.fromisoformat(str(row["next_execution_date"])),
+                    row["description"],
+                )
+                for row in self.source.recurring_income(today)
+            ],
+            profile.get("payroll_day"),
+        )
+        end = income.date or today + timedelta(days=DEFAULT_SETUP_DAYS)
+        expenses = sorted(
+            (
+                SetupFixedExpense(
+                    description=row["description"],
+                    amount=Decimal(str(row["amount"])),
+                    next_date=row.get("next_execution_date"),
+                )
+                for row in self.source.recurring_expenses(today, end)
+            ),
+            key=lambda item: (item.next_date or end, item.description),
+        )
+        return SetupDefaults(
+            available_balance=Decimal(self.source.available_balance()),
+            next_income_date=income.date,
+            next_income_source=income.source,
+            next_income_label=income.label,
+            fixed_expenses=expenses,
+            monthly_savings_target=Decimal(
+                str(profile.get("monthly_savings_target") or 0)
+            ),
+            has_plans=self.source.has_plans(),
+        )
 
 
 class PurchaseImpactService:

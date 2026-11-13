@@ -9,7 +9,7 @@ allocations, while `public.budgets` stays the only source of truth about
 envelope limits.
 """
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal, Protocol
 from uuid import UUID
@@ -354,6 +354,94 @@ def compute_plan_totals(
         survival_floor=survival_floor,
         groups=groups,
     )
+
+
+class SetupFixedExpense(BaseModel):
+    """A recurring expense due before the next income."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    description: str
+    amount: Decimal
+    next_date: date | None = None
+
+
+class SetupDefaults(BaseModel):
+    """What the server already knows that prefills the monthly setup."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    available_balance: Decimal
+    next_income_date: date | None
+    next_income_source: Literal["recurring", "payroll_day", "none"]
+    next_income_label: str | None
+    fixed_expenses: list[SetupFixedExpense]
+    monthly_savings_target: Decimal
+    has_plans: bool
+
+
+class SetupDefaultsSource(Protocol):
+    """The reads the monthly setup needs, scoped to one owner."""
+
+    def available_balance(self) -> str: ...
+
+    def recurring_income(self, after: date) -> list[dict]: ...
+
+    def recurring_expenses(self, start: date, end: date) -> list[dict]: ...
+
+    def profile(self) -> dict: ...
+
+    def has_plans(self) -> bool: ...
+
+
+#: An income closer than this many days is too near to plan for; the setup
+#: plans until the cycle after it instead (docs/monthly-setup/PLAN.md §4).
+MIN_PLAN_DAYS = 4
+
+
+class NextIncome(BaseModel):
+    """The day the next fixed income arrives and where that day comes from."""
+
+    model_config = ConfigDict(frozen=True)
+
+    date: date | None
+    source: Literal["recurring", "payroll_day", "none"]
+    label: str | None = None
+
+
+def _payroll_dates(after: date, payroll_day: int):
+    """Yield the payroll days after ``after``, clamped to short months."""
+    year, month = after.year, after.month
+    while True:
+        first_of_next = date(year + month // 12, month % 12 + 1, 1)
+        last = (first_of_next - timedelta(days=1)).day
+        candidate = date(year, month, min(payroll_day, last))
+        if candidate > after:
+            yield candidate
+        year, month = first_of_next.year, first_of_next.month
+
+
+def next_income_date(
+    today: date,
+    recurring_income: list[tuple[date, str]],
+    payroll_day: int | None,
+) -> NextIncome:
+    """Return the next fixed income at least ``MIN_PLAN_DAYS`` away.
+
+    A recurring income wins over the profile's payroll day; an income due
+    sooner than ``MIN_PLAN_DAYS`` gives way to the next one.
+    """
+    earliest = today + timedelta(days=MIN_PLAN_DAYS)
+    recurring = sorted(
+        (day, label) for day, label in recurring_income if day >= earliest
+    )
+    if recurring:
+        day, label = recurring[0]
+        return NextIncome(date=day, source="recurring", label=label)
+    if payroll_day is not None and 1 <= payroll_day <= 31:
+        day = next(d for d in _payroll_dates(today, payroll_day) if d >= earliest)
+        return NextIncome(date=day, source="payroll_day")
+    return NextIncome(date=None, source="none")
 
 
 def daily_group_amounts(total_amount: Decimal, duration_days: int) -> list[Decimal]:
