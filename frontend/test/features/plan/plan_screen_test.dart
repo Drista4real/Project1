@@ -36,7 +36,7 @@ class FakeBudgetPlanRepository implements BudgetPlanRepository {
         groupKey: 'food',
         pillar: 'needs',
         amount: 106957,
-        actualSpent: const {1: 100000, 2: 150000, 3: 45000}[day] ?? 0,
+        actualSpent: const {1: 100000, 2: 150000, 3: 45000, 4: 50000}[day] ?? 0,
       ),
       DailyAllocation(
         dayIndex: day,
@@ -133,6 +133,16 @@ void main() {
     expect(find.text('178k'), findsWidgets);
     expect(
       find.bySemanticsLabel(RegExp(r'Ngày 13/11, đã chi 210\.000 ₫')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a future day already spent shows the spending', (tester) async {
+    await _pumpPlan(tester, FakeBudgetPlanRepository(activePlan: _plan()));
+
+    expect(find.text('50k'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp(r'Ngày 15/11, đã chi 50\.000 ₫')),
       findsOneWidget,
     );
   });

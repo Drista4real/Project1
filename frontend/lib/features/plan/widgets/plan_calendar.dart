@@ -391,7 +391,8 @@ class PlanCalendar extends StatelessWidget {
       );
     }
 
-    final recorded = isPast || isToday;
+    // A day with spending shows it, even ahead of today.
+    final recorded = isPast || isToday || day.spent > 0;
     final Color fill;
     final Color amountColor;
     if (isToday) {
@@ -484,7 +485,7 @@ class PlanDayDetail extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final isToday = day.date == _dateOnly(today);
-    final future = day.date.isAfter(_dateOnly(today));
+    final future = day.date.isAfter(_dateOnly(today)) && day.spent <= 0;
     final title =
         '${_weekdays[day.date.weekday - 1]}, ${_dayMonth(day.date)}'
         '${isToday ? ' · Hôm nay' : ''}';
