@@ -72,6 +72,13 @@ and in a deployment without a Places key.
 The home screen becomes the conversational canvas. The ledger moves to its own
 route and keeps its own navigation entry, so no existing capability is lost.
 
+The 2026-11-15 UI refinement ([#103](https://github.com/Drista4real/Project1/issues/103))
+keeps only the message field and send action in the chat composer. Microphone and
+image shortcuts previously opened the same AI entry screen without starting the
+named operation. Transaction entry now uses the central + menu, with AI input
+(text, voice or receipt) and manual form options. This changes navigation only;
+chat messages and draft transactions still use their separate existing flows.
+
 The canvas talks to five endpoints: `GET /api/v1/chat/tools`,
 `POST /api/v1/chat/sessions`, `GET /api/v1/chat/sessions/{id}`,
 `GET /api/v1/chat/sessions/{id}/messages` and `POST /api/v1/chat/turn`. The

@@ -19,7 +19,7 @@ các mô hình dự báo dòng tiền, nhận dạng giọng nói, đọc hóa �
 | Kế hoạch chi tiêu động | Backend tính kế hoạch, hạn mức/ngày, sàn sống, mức cảnh báo khoản mua và đề xuất điều chỉnh bằng code tất định; LLM không tự tính tiền. Ghi điều chỉnh qua một RPC PostgreSQL. |
 | Trang chủ hội thoại | Trang chủ (`/`) là canvas hội thoại: gọi chào, gợi ý câu hỏi nhanh, khung chat và ô soạn thảo. Backend giữ phiên, slot và trace tool; LLM chỉ trích xuất slot và đề xuất tool. Sổ thu chi chuyển sang route `/ledger`. |
 | Cài đặt thiết bị | Giao diện sáng/tối, khóa ứng dụng bằng xác thực thiết bị và nhắc nhập liệu hằng ngày. Tùy chọn lưu cục bộ theo UID; nhắc hằng ngày hỗ trợ Android/iOS/macOS. |
-| Nhập nhanh AI | Flutter gọi `POST /api/v1/ingestion/text` để tạo một hoặc nhiều nháp; người dùng kiểm tra, sửa và xác nhận trước khi lưu. Có phiên âm PhoWhisper trên Android sau khi chuẩn bị assets. |
+| Nhập nhanh AI | Văn bản và bản phiên âm PhoWhisper trên Android đi qua Model 1 để tạo nháp; nút Hóa đơn chọn ảnh để Model 4 đọc tổng tiền/ngày qua `/api/v1/ingestion/receipt`. Người dùng kiểm tra, sửa và xác nhận trước khi lưu. |
 | Dự báo trong Flutter | Đọc dự báo, cảnh báo và tư vấn đã lưu; cập nhật trạng thái đã đọc/đã xử lý của cảnh báo. Chưa có luồng tự chạy Model 2 từ màn hình dự báo. |
 | Demo AI | Streamlit nạp trực tiếp adapter Model 1–4 để thử phân loại, phiên âm, đọc hóa đơn, dự báo và Advisor; có thử nghiệm fallback Gemini cho text/audio/ảnh. |
 
@@ -55,7 +55,7 @@ Bốn mô hình bên dưới là các phân hệ logic, không phải bốn tầ
 | Model 1 | Phân loại giao dịch tiếng Việt | PhoBERT + LightGBM là cấu hình mặc định; có backend PhoBERT + LoRA tùy chọn. API nhập nhanh và demo có thể dùng classifier này. |
 | Model 2 | Dự báo và chỉ số tài chính | LightGBM cho nhóm thu nhập cố định, EWMA cho nhóm linh hoạt; chạy trong demo/use case. Gemini Advisor diễn giải chỉ số đã tính. |
 | Model 3 | Phiên âm tiếng nói | PhoWhisper-tiny INT8 qua sherpa-onnx; Android chạy trên thiết bị, Python có adapter riêng cho demo. Transcript dùng được chuyển sang luồng phân loại. |
-| Model 4 | Trích xuất hóa đơn | Qwen Document VLM đọc ảnh thành dữ liệu có cấu trúc trong demo/adapter. FastAPI chưa đăng ký endpoint tải hóa đơn. |
+| Model 4 | Trích xuất hóa đơn | Qwen Document VLM đọc ảnh JPEG/PNG/WebP tối đa 8 MB qua API có xác thực; trả một nháp theo tổng tiền hóa đơn, giữ ngày và cảnh báo cần kiểm tra. |
 
 API nhập văn bản có fallback Gemini cho phân loại khi classifier thiếu tự tin
 hoặc không khả dụng; trích xuất số tiền dùng quy tắc cục bộ. Demo Streamlit có

@@ -46,11 +46,11 @@
   or an original receipt image (Model 4). Classification fallback cannot recover
   transcription or document extraction errors. Cloud-processing permissions are
   established before using the feature, not requested for each fallback.
-- **Receipt scan**: image-based receipt extraction through Model 4. ADR 0008 adds
-  no receipt upload HTTP route, so the app's "Hóa đơn" button reports that
-  receipt scanning is unavailable in this release and points to typed text or
-  speech. Opening an upload route requires a separate ticket and an ADR 0008
-  update.
+- **Receipt scan**: image-based receipt extraction through Model 4. The app's
+  "Hóa đơn" button selects a JPEG/PNG/WebP image for the authenticated
+  `/api/v1/ingestion/receipt` route (ADR 0008, #102). One receipt produces one
+  editable expense draft using the printed VND total and date; its items never
+  become additional expenses. The user reviews and confirms before saving.
 - **Transaction draft**: an unpersisted proposed transaction that the user can
   review and edit. AI job completion does not mean a ledger transaction exists;
   user confirmation and a successful save are required.
