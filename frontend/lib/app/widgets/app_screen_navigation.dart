@@ -5,12 +5,13 @@ import 'package:project_one/app/app_routes.dart';
 import 'package:project_one/core/theme/app_theme.dart';
 
 class AppScreenNavigation extends StatelessWidget {
-  final int selectedIndex;
+  /// Null on screens reached outside the tabs, such as settings.
+  final int? selectedIndex;
   final Future<void> Function()? onTransactionAdded;
   final VoidCallback? onSelectedTab;
 
   const AppScreenNavigation({
-    required this.selectedIndex,
+    this.selectedIndex,
     this.onTransactionAdded,
     this.onSelectedTab,
     super.key,
@@ -80,13 +81,6 @@ class AppScreenNavigation extends StatelessWidget {
       label: 'Ngân sách',
       identifier: 'nav-budget',
     ),
-    NavDestination(
-      route: AppRoutes.settings,
-      outline: Icons.tune_outlined,
-      filled: Icons.tune,
-      label: 'Cài đặt',
-      identifier: 'nav-settings',
-    ),
   ];
 
   @override
@@ -104,7 +98,6 @@ class AppScreenNavigation extends StatelessWidget {
             Expanded(child: _buildAddButton(context)),
             Expanded(child: _buildItem(context, 2)),
             Expanded(child: _buildItem(context, 3)),
-            Expanded(child: _buildItem(context, 4)),
           ],
         ),
       ),

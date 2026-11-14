@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:project_one/app/widgets/app_profile_button.dart';
 import 'package:go_router/go_router.dart';
 import 'package:project_one/app/app_dependencies.dart';
 import 'package:project_one/app/app_routes.dart';
@@ -531,15 +532,7 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
             ),
           ],
         ),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.only(right: 18),
-            child: CircleAvatar(
-              backgroundColor: Color(0xFFE7EDE7),
-              child: Icon(Icons.person_outline),
-            ),
-          ),
-        ],
+        actions: const [AppProfileButton()],
       ),
       bottomNavigationBar: IgnorePointer(
         ignoring: _saving,

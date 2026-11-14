@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:project_one/features/ledger/cubit/ledger_cubit.dart';
 import 'package:flutter/material.dart';
+import 'package:project_one/app/widgets/app_profile_button.dart';
 import 'package:project_one/app/app_dependencies.dart';
 import 'package:project_one/core/theme/app_theme.dart';
 import 'package:project_one/features/finance/domain/entities/financial_overview.dart';
@@ -141,20 +142,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
           ),
         ],
       ),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.only(right: 16.0, left: 4.0),
-          child: CircleAvatar(
-            radius: 18,
-            backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-            child: Icon(
-              Icons.person,
-              color: Theme.of(context).colorScheme.primary,
-              size: 22,
-            ),
-          ),
-        ),
-      ],
+      actions: const [AppProfileButton()],
     );
   }
 }

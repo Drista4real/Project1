@@ -787,7 +787,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
       bottomNavigationBar: AppScreenNavigation(
-        selectedIndex: 4,
         onTransactionAdded: _loadSettings,
       ),
     );

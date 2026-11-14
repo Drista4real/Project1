@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:project_one/app/widgets/app_profile_button.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:project_one/app/app_routes.dart';
@@ -79,7 +80,7 @@ class _PlanScreenState extends State<PlanScreen> {
             onPressed: state.loading ? null : _cubit.load,
             icon: const Icon(Icons.refresh_rounded),
           ),
-          const SizedBox(width: 8),
+          const AppProfileButton(),
         ],
       ),
       body: state.loading && state.plans.isEmpty
