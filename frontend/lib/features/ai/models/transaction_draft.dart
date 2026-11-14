@@ -11,6 +11,7 @@ class TransactionDraft {
     required this.confidence,
     required this.source,
     this.warnings = const [],
+    this.occurredOn,
   });
 
   final String text, normalizedText, type, source;
@@ -18,6 +19,7 @@ class TransactionDraft {
   final int? amount;
   final double confidence;
   final List<String> warnings;
+  final DateTime? occurredOn;
 
   factory TransactionDraft.fromJson(Map<String, dynamic> json) =>
       TransactionDraft(
@@ -29,6 +31,7 @@ class TransactionDraft {
         confidence: (json['confidence'] as num).toDouble(),
         source: json['source'] as String,
         warnings: (json['warnings'] as List).cast<String>(),
+        occurredOn: DateTime.tryParse(json['occurred_on'] as String? ?? ''),
       );
 }
 
@@ -78,9 +81,9 @@ class ReviewTransaction {
         )
         .toList();
     final now = DateTime.now();
-    var date = now;
+    var date = draft.occurredOn ?? now;
     final time = RegExp(r'\b(\d{1,2})(?:h|:)(\d{2})\b').firstMatch(draft.text);
-    if (time != null) {
+    if (time != null && draft.occurredOn == null) {
       final hour = int.parse(time[1]!);
       final minute = int.parse(time[2]!);
       if (hour < 24 && minute < 60) {

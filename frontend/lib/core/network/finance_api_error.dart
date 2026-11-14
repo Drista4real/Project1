@@ -1,4 +1,11 @@
 String financeApiErrorMessage(int status, String path, Object? detail) {
+  if (path.startsWith('/ingestion/') &&
+      {400, 413, 415, 422, 429, 503}.contains(status) &&
+      detail is String &&
+      detail.trim().isNotEmpty &&
+      detail.length <= 2000) {
+    return detail;
+  }
   final walletIncome = RegExp(
     r'^/manage/accounts/[^/]+/initial-income$',
   ).hasMatch(path);
@@ -39,8 +46,7 @@ String financeApiErrorMessage(int status, String path, Object? detail) {
     409 =>
       'Dữ liệu đang được sử dụng, bị trùng hoặc đã thay đổi. Vui lòng kiểm tra lại.',
     422 => 'Kiểm tra giá trị và dữ liệu liên quan trong biểu mẫu.',
-    429 =>
-      'Bạn đã gọi quá nhiều lần. Vui lòng chờ một lúc rồi thử lại.',
+    429 => 'Bạn đã gọi quá nhiều lần. Vui lòng chờ một lúc rồi thử lại.',
     503 => 'Máy chủ chưa sẵn sàng. Vui lòng thử lại sau.',
     _ => 'Không thể xử lý yêu cầu. Vui lòng thử lại.',
   };

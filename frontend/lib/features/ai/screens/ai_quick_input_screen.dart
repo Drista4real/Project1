@@ -1,13 +1,11 @@
+import 'package:project_one/app/widgets/app_exit_button.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:project_one/app/widgets/app_profile_button.dart';
 import 'package:go_router/go_router.dart';
 import 'package:project_one/app/app_dependencies.dart';
 import 'package:project_one/app/app_routes.dart';
-import 'package:project_one/app/widgets/app_screen_navigation.dart';
 import 'package:project_one/core/config/supabase_config.dart';
-import 'package:project_one/core/theme/app_theme.dart';
 import 'package:project_one/features/finance/domain/entities/account.dart';
 import 'package:project_one/features/finance/domain/entities/category.dart';
 import 'package:project_one/features/finance/domain/repositories/finance_repository.dart';
@@ -19,6 +17,7 @@ import '../services/input_preferences.dart';
 import '../services/voice_input.dart';
 import '../services/voice_activity.dart';
 import '../services/voice_input_factory.dart';
+import '../services/receipt_input.dart';
 import '../widgets/draft_edit_sheet.dart';
 import '../widgets/input_budget_impact.dart';
 import '../widgets/natural_input_card.dart';
@@ -31,6 +30,7 @@ class AiQuickInputScreen extends StatefulWidget {
     this.financeRepository,
     this.insights,
     this.voiceInput,
+    this.receiptInput,
     this.preferences,
     this.initialPrompt,
   });
@@ -38,6 +38,7 @@ class AiQuickInputScreen extends StatefulWidget {
   final FinanceRepository? financeRepository;
   final FinanceInsights? insights;
   final VoiceInput? voiceInput;
+  final ReceiptInput? receiptInput;
   final InputPreferences? preferences;
 
   /// A hint shown when the screen is opened from the conversational canvas.
@@ -50,6 +51,7 @@ class AiQuickInputScreen extends StatefulWidget {
 class _AiQuickInputScreenState extends State<AiQuickInputScreen>
     with WidgetsBindingObserver {
   final _text = TextEditingController();
+  final _reviewAnchor = GlobalKey();
   late final _api =
       widget.inputRepository ??
       BackendAiInputRepository(categories: () => _categories);
@@ -57,6 +59,7 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
       widget.financeRepository ?? AppDependencies.financeRepository;
   late final _insights = widget.insights ?? AppDependencies.financeInsights;
   late final _voice = widget.voiceInput ?? createVoiceInput();
+  late final _receipt = widget.receiptInput ?? FileReceiptInput();
   late final _preferences =
       widget.preferences ??
       LocalInputPreferences(
@@ -75,6 +78,8 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
   StreamSubscription<VoiceActivity>? _voiceActivity;
   double _voiceLevel = 0;
   bool _heardSpeech = false, _transcribing = false;
+  bool _receiptBusy = false, _analyzingReceipt = false;
+  bool _reviewOpen = false;
 
   @override
   void initState() {
@@ -151,17 +156,18 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
     }
   }
 
-  Future<void> _analyze() async {
+  Future<void> _analyze({ReceiptImage? receipt}) async {
     if (_analyzing ||
         _saving ||
         _loading ||
         _recording ||
         _voiceBusy ||
+        _receiptBusy ||
         _uncertainSave) {
       return;
     }
     final text = _text.text.trim();
-    if (text.isEmpty) {
+    if (text.isEmpty && receipt == null) {
       setState(() => _error = 'Hãy nhập hoặc nói nội dung giao dịch.');
       return;
     }
@@ -169,11 +175,14 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
     final generation = ++_generation;
     setState(() {
       _analyzing = true;
+      _analyzingReceipt = receipt != null;
       _error = null;
       _drafts = [];
     });
     try {
-      final drafts = await _api.analyze(text);
+      final drafts = receipt == null
+          ? await _api.analyze(text)
+          : await _api.analyzeReceipt(receipt);
       final reviewed = <ReviewTransaction>[];
       for (final draft in drafts) {
         var item = ReviewTransaction.fromDraft(
@@ -216,14 +225,43 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
     } finally {
       if (mounted) setState(() => _analyzing = false);
     }
+    await _presentReview(generation);
+  }
+
+  Future<void> _presentReview(int generation) async {
+    if (!mounted || generation != _generation || _drafts.isEmpty) return;
+    // Wait for the new cards to be laid out before opening or scrolling.
+    await WidgetsBinding.instance.endOfFrame;
+    bool isCurrent() =>
+        mounted &&
+        generation == _generation &&
+        _drafts.isNotEmpty &&
+        ModalRoute.of(context)?.isCurrent == true;
+    if (!isCurrent()) return;
+    if (_drafts.length == 1) {
+      await _edit(_drafts.single);
+      if (!isCurrent()) return;
+      await WidgetsBinding.instance.endOfFrame;
+    }
+    if (!isCurrent()) return;
+    final target = _reviewAnchor.currentContext;
+    if (target != null && target.mounted) {
+      await Scrollable.ensureVisible(
+        target,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   Future<void> _toggleVoice() async {
-    if (_saving || _analyzing || _voiceBusy || _uncertainSave) return;
+    if (_saving || _analyzing || _voiceBusy || _receiptBusy || _uncertainSave) {
+      return;
+    }
     if (!_voice.supported) {
       setState(
         () => _error =
-            'Nhập giọng nói offline hỗ trợ Android. Bạn có thể nhập văn bản ở đây.',
+            'Ghi âm hiện chỉ dùng được trên Android. Bạn có thể gõ nội dung vào ô bên dưới.',
       );
       return;
     }
@@ -258,6 +296,7 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
   Future<void> _finishVoice() async {
     if (!_recording || _voiceBusy) return;
     final generation = _voiceGeneration;
+    var analyzeTranscript = false;
     _recordingLimit?.cancel();
     setState(() {
       _recording = false;
@@ -269,6 +308,7 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
       if (!mounted || generation != _voiceGeneration) return;
       if (transcript.isNotEmpty) {
         _text.text = transcript.substring(0, transcript.length.clamp(0, 2000));
+        analyzeTranscript = true;
       } else {
         setState(
           () =>
@@ -283,6 +323,9 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
       if (mounted && generation == _voiceGeneration) {
         setState(() => _voiceBusy = false);
       }
+    }
+    if (analyzeTranscript && mounted && generation == _voiceGeneration) {
+      await _analyze();
     }
   }
 
@@ -300,65 +343,97 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
           _recording = false;
           _voiceBusy = false;
           _error =
-              'Đã dừng ghi âm khi rời ứng dụng. Nhấn Nói nhanh để thử lại.';
+              'Đã dừng ghi âm khi bạn rời ứng dụng. Nhấn Ghi âm để thử lại.';
         });
       }
     }
   }
 
-  /// Explains that receipt scanning is not available in this release.
-  ///
-  /// ADR 0008 keeps the receipt adapter behind a backend hook and adds no
-  /// upload route, so the button reports the situation instead of failing
-  /// silently.
-  void _showReceiptUnavailable() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text(receiptUnavailableMessage)));
+  Future<void> _pickReceipt() async {
+    if (_receiptBusy ||
+        _loading ||
+        _saving ||
+        _analyzing ||
+        _recording ||
+        _voiceBusy ||
+        _uncertainSave) {
+      return;
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      _receiptBusy = true;
+      _error = null;
+    });
+    ReceiptImage? image;
+    try {
+      image = await _receipt.pick();
+    } catch (error) {
+      if (mounted) setState(() => _error = '$error');
+    } finally {
+      if (mounted) setState(() => _receiptBusy = false);
+    }
+    if (mounted && image != null) await _analyze(receipt: image);
   }
 
   Future<void> _edit(ReviewTransaction item) async {
-    if (item.type == 'transfer') {
-      await showDialog<void>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Chuyển giữa các ví'),
-          content: const Text(
-            'Màn hình này ghi các khoản thu và chi. '
-            'Chuyển tiền giữa các ví cần cả ví nguồn và ví nhận, nên khoản này chưa được lưu tại đây.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Đã hiểu'),
+    if (_reviewOpen || _saving) return;
+    _reviewOpen = true;
+    try {
+      if (item.type == 'transfer') {
+        await showDialog<void>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('Chuyển giữa các ví'),
+            content: const Text(
+              'Màn hình này ghi các khoản thu và chi. '
+              'Chuyển tiền giữa các ví cần cả ví nguồn và ví nhận, nên khoản này chưa được lưu tại đây.',
             ),
-          ],
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Đã hiểu'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+      final edited = await showModalBottomSheet<ReviewTransaction>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (_) => Theme(
+          data: _inputTheme(context),
+          child: DraftEditSheet(
+            item: item,
+            accounts: _accounts,
+            categories: _categories,
+          ),
         ),
       );
-      return;
-    }
-    final edited = await showModalBottomSheet<ReviewTransaction>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (_) => DraftEditSheet(
-        item: item,
-        accounts: _accounts,
-        categories: _categories,
-      ),
-    );
-    if (edited != null && mounted) {
-      setState(() {
-        _drafts = [
-          for (final draft in _drafts)
-            if (draft.id == edited.id) edited else draft,
-        ];
-      });
+      if (edited != null && mounted) {
+        setState(() {
+          _drafts = [
+            for (final draft in _drafts)
+              if (draft.id == edited.id) edited else draft,
+          ];
+        });
+      }
+    } finally {
+      _reviewOpen = false;
     }
   }
 
   Future<void> _save() async {
-    if (_saving || _drafts.isEmpty || _uncertainSave) return;
+    if (_saving ||
+        _receiptBusy ||
+        _recording ||
+        _voiceBusy ||
+        _analyzing ||
+        _drafts.isEmpty ||
+        _uncertainSave) {
+      return;
+    }
     if (_drafts.any((draft) => !draft.canSave)) {
       setState(
         () => _error =
@@ -408,7 +483,7 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
           _uncertainSave = true;
           _error =
               'Đã xác nhận lưu $_savedCount giao dịch. Yêu cầu vừa gửi chưa xác nhận được kết quả. '
-              'Hãy kiểm tra Trang Chủ trước khi nhập lại để tránh lưu trùng.';
+              'Hãy kiểm tra Sổ thu chi trước khi nhập lại để tránh lưu trùng.';
         });
       }
     } finally {
@@ -475,24 +550,44 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
+  ThemeData _inputTheme(BuildContext context) {
     final theme = Theme.of(context);
-    return Theme(
-      data: theme.copyWith(
-        textTheme: theme.textTheme.apply(fontFamily: 'BeVietnamPro'),
-        primaryTextTheme: theme.primaryTextTheme.apply(
+    return theme.copyWith(
+      textTheme: theme.textTheme.apply(fontFamily: 'BeVietnamPro'),
+      primaryTextTheme: theme.primaryTextTheme.apply(
+        fontFamily: 'BeVietnamPro',
+      ),
+      appBarTheme: theme.appBarTheme.copyWith(
+        titleTextStyle: theme.appBarTheme.titleTextStyle?.copyWith(
           fontFamily: 'BeVietnamPro',
         ),
-        appBarTheme: theme.appBarTheme.copyWith(
-          titleTextStyle: theme.appBarTheme.titleTextStyle?.copyWith(
-            fontFamily: 'BeVietnamPro',
-          ),
-        ),
       ),
-      child: _buildContent(context),
     );
   }
+
+  @override
+  Widget build(BuildContext context) => Theme(
+    data: _inputTheme(context),
+    child: Builder(builder: _buildContent),
+  );
+
+  void _showHelp() => showDialog<void>(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('Cách nhập nhanh'),
+      content: const Text(
+        'Gõ một câu như “Ăn trưa 65k tiền mặt”. Với nhiều khoản, dùng dấu phẩy hoặc xuống dòng.\n\n'
+        'Bạn cũng có thể ghi âm hoặc chọn ảnh hóa đơn. Ảnh cần rõ nét, định dạng JPEG, PNG hoặc WebP và không quá 8 MB.\n\n'
+        'Kiểm tra lại số tiền, ngày và danh mục. Giao dịch chỉ được lưu khi bạn nhấn Lưu.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Đã hiểu'),
+        ),
+      ],
+    ),
+  );
 
   Widget _buildContent(BuildContext context) => PopScope<bool>(
     canPop: false,
@@ -500,281 +595,249 @@ class _AiQuickInputScreenState extends State<AiQuickInputScreen>
       if (!didPop && !_saving) _close();
     },
     child: Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
       appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: Row(
-          children: [
-            Icon(
-              Icons.spa_outlined,
-              color: Theme.of(context).colorScheme.primary,
-              size: 29,
-            ),
-            SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Kakeibo Zen',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
-                  ),
-                  Text(
-                    'Trang Chủ',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400),
-                  ),
-                ],
-              ),
-            ),
-          ],
+        leading: AppExitButton(
+          close: true,
+          enabled: !_saving,
+          onPressed: _close,
         ),
-        actions: const [AppProfileButton()],
+        title: const Text(
+          'Nhập nhanh AI',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+        ),
+        actions: [
+          IconButton(
+            tooltip: 'Hướng dẫn',
+            onPressed: _showHelp,
+            icon: const Icon(Icons.help_outline_rounded),
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
-      bottomNavigationBar: IgnorePointer(
-        ignoring: _saving,
-        child: const AppScreenNavigation(selectedIndex: 0),
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
-            children: [
-              Row(
+      body: SafeArea(
+        top: false,
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: SingleChildScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  IconButton(
-                    tooltip: 'Đóng',
-                    onPressed: _saving ? null : _close,
-                    icon: const Icon(Icons.close),
-                  ),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(
-                          'Nhập Nhanh AI',
-                          style: TextStyle(
-                            fontSize: 23,
-                            fontWeight: FontWeight.w700,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Tự động nhận diện & gán phong bao',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ],
+                  Text(
+                    'Gõ một câu, ghi âm hoặc chọn ảnh hóa đơn.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      height: 1.6,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Hướng dẫn',
-                    onPressed: () => showDialog<void>(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        title: const Text('Nhập thu chi bằng lời nói'),
-                        content: const Text(
-                          'Nhập hoặc nói một khoản thu chi, ví dụ: “ăn trưa 65k tiền mặt”. '
-                          'Dùng dấu phẩy hoặc xuống dòng để tách nhiều khoản. '
-                          'Kiểm tra số tiền, ngày và danh mục trước khi xác nhận. Giọng nói chạy offline trên Android.',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Đã hiểu'),
+                  const SizedBox(height: 20),
+                  NaturalInputCard(
+                    controller: _text,
+                    isAnalyzing: _analyzing,
+                    onAnalyze: () => _analyze(),
+                    onVoice: _toggleVoice,
+                    onReceipt: _pickReceipt,
+                    analyzingReceipt: _analyzingReceipt,
+                    recording: _recording,
+                    voiceBusy: _voiceBusy,
+                    transcribing: _transcribing,
+                    voiceLevel: _voiceLevel,
+                    heardSpeech: _heardSpeech,
+                    disabled:
+                        _saving || _loading || _uncertainSave || _receiptBusy,
+                  ),
+                  if (_loading)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 16),
+                      child: LinearProgressIndicator(),
+                    ),
+                  if (_error != null)
+                    Container(
+                      margin: const EdgeInsets.only(top: 16),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _error!,
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onErrorContainer,
+                              fontSize: 13,
+                              height: 1.5,
+                            ),
                           ),
+                          if (_accounts.isEmpty)
+                            TextButton(
+                              onPressed: _loading ? null : _loadReferences,
+                              child: const Text('Thử tải lại'),
+                            ),
+                          if (_uncertainSave)
+                            TextButton(
+                              onPressed: _close,
+                              child: const Text('Đóng để kiểm tra'),
+                            ),
                         ],
                       ),
                     ),
-                    icon: const Icon(Icons.help_outline),
-                  ),
+                  if (_drafts.isEmpty && !_analyzing) ...[
+                    const SizedBox(height: 18),
+                    TextButton(
+                      onPressed:
+                          _saving || _recording || _voiceBusy || _receiptBusy
+                          ? null
+                          : _manual,
+                      child: const Text('Chuyển sang biểu mẫu'),
+                    ),
+                  ],
+                  if (_drafts.isNotEmpty) ...[
+                    const SizedBox(height: 28),
+                    Row(
+                      key: _reviewAnchor,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${_drafts.length} giao dịch',
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHigh,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Chưa lưu',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Kiểm tra số tiền và danh mục trước khi lưu.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.5,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    for (final item in _drafts)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: TransactionReviewCard(
+                          item: item,
+                          accountName: _accountName(item),
+                          categoryName: _categoryName(item),
+                          pillar: _pillar(item),
+                          enabled:
+                              !_saving &&
+                              !_uncertainSave &&
+                              !_receiptBusy &&
+                              !_recording &&
+                              !_voiceBusy,
+                          onEdit: () => _edit(item),
+                          onDismissed: () => setState(
+                            () => _drafts.removeWhere((d) => d.id == item.id),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 4),
+                    InputBudgetImpact(
+                      drafts: _drafts,
+                      data: _budget,
+                      loadFailed: _budgetFailed,
+                    ),
+                    const SizedBox(height: 12),
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: _remember,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      onChanged: _saving
+                          ? null
+                          : (value) =>
+                                setState(() => _remember = value ?? false),
+                      title: const Text(
+                        'Nhớ danh mục cho lần sau',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      key: const ValueKey('confirmAiTransactions'),
+                      onPressed:
+                          _saving ||
+                              _uncertainSave ||
+                              _receiptBusy ||
+                              _recording ||
+                              _voiceBusy
+                          ? null
+                          : _save,
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.check_rounded, size: 20),
+                      label: Text(
+                        _saving
+                            ? 'Đang lưu…'
+                            : 'Lưu ${_drafts.length} giao dịch',
+                      ),
+                      style: FilledButton.styleFrom(
+                        textStyle: const TextStyle(
+                          fontFamily: 'BeVietnamPro',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        minimumSize: const Size.fromHeight(52),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Vuốt sang trái để bỏ một khoản.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ],
               ),
-              const SizedBox(height: 18),
-              NaturalInputCard(
-                controller: _text,
-                isAnalyzing: _analyzing,
-                onAnalyze: _analyze,
-                onVoice: _toggleVoice,
-                onReceipt: _showReceiptUnavailable,
-                recording: _recording,
-                voiceBusy: _voiceBusy,
-                transcribing: _transcribing,
-                voiceLevel: _voiceLevel,
-                heardSpeech: _heardSpeech,
-                disabled: _saving || _loading || _uncertainSave,
-              ),
-              if (_loading)
-                const Padding(
-                  padding: EdgeInsets.all(16),
-                  child: LinearProgressIndicator(),
-                ),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _error!,
-                        style: const TextStyle(
-                          color: AppTheme.expenseCoral,
-                          height: 1.5,
-                        ),
-                      ),
-                      if (_accounts.isEmpty)
-                        TextButton(
-                          onPressed: _loading ? null : _loadReferences,
-                          child: const Text('Tải lại dữ liệu'),
-                        ),
-                      if (_uncertainSave)
-                        TextButton(
-                          onPressed: _close,
-                          child: const Text('Về Trang Chủ'),
-                        ),
-                    ],
-                  ),
-                ),
-              if (_drafts.isEmpty && !_analyzing) ...[
-                const SizedBox(height: 20),
-                Text(
-                  'Nhập câu tự nhiên, sau đó nhấn Phân tích để kiểm tra từng giao dịch.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    fontSize: 13,
-                    height: 1.5,
-                  ),
-                ),
-                TextButton(
-                  onPressed: _saving || _recording || _voiceBusy
-                      ? null
-                      : _manual,
-                  child: const Text('Nhập thủ công'),
-                ),
-              ],
-              if (_drafts.isNotEmpty) ...[
-                const SizedBox(height: 22),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.chevron_left,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Đã tách ${_drafts.length} giao dịch',
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    if (_drafts.every(
-                      (item) =>
-                          item.draft.confidence > 0 &&
-                          item.draft.source != 'RULES',
-                    ))
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 9,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          '${(_drafts.map((item) => item.draft.confidence).reduce((a, b) => a < b ? a : b) * 100).round()}%',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                for (final item in _drafts)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: TransactionReviewCard(
-                      item: item,
-                      accountName: _accountName(item),
-                      categoryName: _categoryName(item),
-                      pillar: _pillar(item),
-                      enabled: !_saving && !_uncertainSave,
-                      onEdit: () => _edit(item),
-                      onDismissed: () => setState(
-                        () => _drafts.removeWhere((d) => d.id == item.id),
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 8),
-                InputBudgetImpact(
-                  drafts: _drafts,
-                  data: _budget,
-                  loadFailed: _budgetFailed,
-                ),
-                const SizedBox(height: 14),
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: _remember,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  onChanged: _saving
-                      ? null
-                      : (value) => setState(() => _remember = value ?? false),
-                  title: const Text(
-                    'Ghi nhớ danh mục cho các lần nhập tương tự',
-                    style: TextStyle(fontSize: 13),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                FilledButton.icon(
-                  key: const ValueKey('confirmAiTransactions'),
-                  onPressed: _saving || _uncertainSave ? null : _save,
-                  icon: _saving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.check_circle_outline),
-                  label: Text(
-                    _saving ? 'Đang lưu…' : 'Xác nhận & Lưu vào Trang Chủ',
-                  ),
-                  style: FilledButton.styleFrom(
-                    textStyle: const TextStyle(
-                      fontFamily: 'BeVietnamPro',
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    minimumSize: const Size.fromHeight(54),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Mẹo: Vuốt sang trái để bỏ một giao dịch trước khi lưu.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ],
+            ),
           ),
         ),
       ),

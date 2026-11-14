@@ -7,6 +7,8 @@ import 'package:project_one/features/onboarding/data/monthly_setup_gate.dart';
 import 'package:project_one/features/chat/data/chat_repository.dart';
 import 'package:project_one/features/chat/models/chat_models.dart';
 import 'package:project_one/features/chat/screens/chat_home_screen.dart';
+import 'package:project_one/features/plan/screens/plan_screen.dart';
+import '../onboarding/fake_setup_repository.dart';
 
 /// Tap a chip that may sit below the fold of the conversation.
 ///
@@ -54,13 +56,19 @@ class FakeChatRepository implements ChatRepository {
   ];
 
   @override
-  Future<ChatSession> createSession({String title = 'Cuộc trò chuyện tư vấn'}) async {
+  Future<ChatSession> createSession({
+    String title = 'Cuộc trò chuyện tư vấn',
+  }) async {
     return ChatSession(id: 1, title: title, slots: const BudgetSlots());
   }
 
   @override
   Future<ChatSession> session(int sessionId) async {
-    return ChatSession(id: sessionId, title: 'Cuộc trò chuyện', slots: const BudgetSlots());
+    return ChatSession(
+      id: sessionId,
+      title: 'Cuộc trò chuyện',
+      slots: const BudgetSlots(),
+    );
   }
 
   @override
@@ -72,7 +80,10 @@ class FakeChatRepository implements ChatRepository {
   }
 
   @override
-  Future<ChatTurn> send({required int sessionId, required String message}) async {
+  Future<ChatTurn> send({
+    required int sessionId,
+    required String message,
+  }) async {
     sent.add(message);
     if (message == 'Bắt đầu') {
       return ChatTurn(
@@ -97,7 +108,10 @@ class FakeChatRepository implements ChatRepository {
             options: [
               ChatQuestionOption(label: 'Ăn uống'),
               ChatQuestionOption(label: 'Xăng xe'),
-              ChatQuestionOption(label: 'Không có khoản cố định', exclusive: true),
+              ChatQuestionOption(
+                label: 'Không có khoản cố định',
+                exclusive: true,
+              ),
             ],
           ),
           ChatQuestion(
@@ -176,6 +190,18 @@ Future<void> _pumpHomeWithRouter(
         path: AppRoutes.monthlySetup,
         builder: (_, _) => const Scaffold(body: Text('SETUP')),
       ),
+      GoRoute(
+        path: AppRoutes.plan,
+        builder: (_, _) => PlanScreen(repository: FakeSetupRepository()),
+      ),
+      GoRoute(
+        path: AppRoutes.aiQuickInput,
+        builder: (_, _) => const Scaffold(body: Text('AI INPUT')),
+      ),
+      GoRoute(
+        path: AppRoutes.addTransaction,
+        builder: (_, _) => const Scaffold(body: Text('MANUAL INPUT')),
+      ),
     ],
   );
   addTearDown(router.dispose);
@@ -184,6 +210,25 @@ Future<void> _pumpHomeWithRouter(
 }
 
 void main() {
+  testWidgets('opening the plan and going back preserves the home input', (
+    tester,
+  ) async {
+    await _pumpHomeWithRouter(tester, _FakeSetupGate(open: false));
+    await tester.enterText(
+      find.byKey(const ValueKey('chatMessageField')),
+      'Câu hỏi chưa gửi',
+    );
+    await scrollCanvasTo(tester, 'Xem kế hoạch chi tiêu');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Xem kế hoạch chi tiêu'));
+    await tester.pumpAndSettle();
+    expect(find.byType(PlanScreen), findsOneWidget);
+    await tester.tap(find.byTooltip('Quay lại'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ChatHomeScreen), findsOneWidget);
+    expect(find.text('Câu hỏi chưa gửi'), findsOneWidget);
+    expect(find.byTooltip('Quay lại'), findsNothing);
+  });
   testWidgets('empty conversation shows the greeting and the suggestions', (
     tester,
   ) async {
@@ -196,21 +241,43 @@ void main() {
     expect(find.text('GỢI Ý CÂU HỎI NHANH'), findsOneWidget);
     expect(find.text('Phân bổ ngân sách tháng'), findsOneWidget);
     expect(find.byKey(const ValueKey('chatMessageField')), findsOneWidget);
+    expect(find.byIcon(Icons.mic_none_rounded), findsNothing);
+    expect(find.byIcon(Icons.image_outlined), findsNothing);
   });
 
-  testWidgets('the home screen offers the monthly setup next to the suggestions', (
+  testWidgets('the central plus opens both transaction entry modes', (
     tester,
   ) async {
     await _pumpHomeWithRouter(tester, _FakeSetupGate(open: false));
-
-    expect(find.text('Thiết lập kế hoạch tháng'), findsOneWidget);
-    expect(find.text('Tiết kiệm tiền như thế nào?'), findsOneWidget);
-    expect(find.text('Kiểm tra số dư hiện tại'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('monthly-setup-entry')));
+    await tester.tap(find.byType(FloatingActionButton));
     await tester.pumpAndSettle();
-    expect(find.text('SETUP'), findsOneWidget);
+    expect(find.text('Gõ, nói hoặc chọn ảnh hóa đơn'), findsOneWidget);
+    await tester.tap(find.text('Nhập nhanh AI'));
+    await tester.pumpAndSettle();
+    expect(find.text('AI INPUT'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(FloatingActionButton));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Nhập thủ công'));
+    await tester.pumpAndSettle();
+    expect(find.text('MANUAL INPUT'), findsOneWidget);
   });
+
+  testWidgets(
+    'the home screen offers the monthly setup next to the suggestions',
+    (tester) async {
+      await _pumpHomeWithRouter(tester, _FakeSetupGate(open: false));
+
+      expect(find.text('Thiết lập kế hoạch tháng'), findsOneWidget);
+      expect(find.text('Tiết kiệm tiền như thế nào?'), findsOneWidget);
+      expect(find.text('Kiểm tra số dư hiện tại'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('monthly-setup-entry')));
+      await tester.pumpAndSettle();
+      expect(find.text('SETUP'), findsOneWidget);
+    },
+  );
 
   testWidgets('a first sign-in opens the monthly setup once', (tester) async {
     final gate = _FakeSetupGate(open: true);
@@ -410,7 +477,10 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('chatSendAnswersButton')));
     await tester.pumpAndSettle();
 
-    expect(repository.sent.last, 'Trả lời:\n1. Ăn uống | Xăng xe\n2. 250000.00');
+    expect(
+      repository.sent.last,
+      'Trả lời:\n1. Ăn uống | Xăng xe\n2. 250000.00',
+    );
   });
 
   testWidgets('an exclusive option clears the other options', (tester) async {
@@ -441,9 +511,7 @@ void main() {
     );
   });
 
-  testWidgets('an answered batch shows only the picked chips', (
-    tester,
-  ) async {
+  testWidgets('an answered batch shows only the picked chips', (tester) async {
     final repository = FakeChatRepository();
     await tester.pumpWidget(
       MaterialApp(home: ChatHomeScreen(repository: repository)),
@@ -470,44 +538,46 @@ void main() {
     expect(find.byKey(const ValueKey('chatSendAnswersButton')), findsNothing);
   });
 
-  testWidgets('a model option named "Khác" does not double the free-text entry', (
-    tester,
-  ) async {
-    final repository = FakeChatRepository();
-    await tester.pumpWidget(
-      MaterialApp(home: ChatHomeScreen(repository: repository)),
-    );
-    await tester.pumpAndSettle();
+  testWidgets(
+    'a model option named "Khác" does not double the free-text entry',
+    (tester) async {
+      final repository = FakeChatRepository();
+      await tester.pumpWidget(
+        MaterialApp(home: ChatHomeScreen(repository: repository)),
+      );
+      await tester.pumpAndSettle();
 
-    await tester.enterText(
-      find.byKey(const ValueKey('chatMessageField')),
-      'Lô nhiều lựa chọn',
-    );
-    await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
-    await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('chatMessageField')),
+        'Lô nhiều lựa chọn',
+      );
+      await tester.tap(find.byIcon(Icons.arrow_upward_rounded));
+      await tester.pumpAndSettle();
 
-    // The client offers its own "Khác" that opens the input field, so the
-    // one the model wrote is not shown a second time.
-    expect(find.text('Khác'), findsOneWidget);
-    expect(find.text('Ăn uống'), findsOneWidget);
-    expect(find.text('Du lịch'), findsOneWidget);
+      // The client offers its own "Khác" that opens the input field, so the
+      // one the model wrote is not shown a second time.
+      expect(find.text('Khác'), findsOneWidget);
+      expect(find.text('Ăn uống'), findsOneWidget);
+      expect(find.text('Du lịch'), findsOneWidget);
 
-    // The letters keep their order without a gap: the five real choices are
-    // A to E and the free-text entry follows them as F.
-    expect(find.text('A.'), findsOneWidget);
-    expect(find.text('E.'), findsOneWidget);
-    expect(find.text('F.'), findsOneWidget);
+      // The letters keep their order without a gap: the five real choices are
+      // A to E and the free-text entry follows them as F.
+      expect(find.text('A.'), findsOneWidget);
+      expect(find.text('E.'), findsOneWidget);
+      expect(find.text('F.'), findsOneWidget);
 
-    // The free-text entry still opens the input field.
-    await tapOption(tester, 'Khác');
-    expect(find.byKey(const ValueKey('chatCustomOptionField')), findsOneWidget);
-  });
+      // The free-text entry still opens the input field.
+      await tapOption(tester, 'Khác');
+      expect(
+        find.byKey(const ValueKey('chatCustomOptionField')),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('an unavailable assistant offers a retry', (tester) async {
     await tester.pumpWidget(
-      MaterialApp(
-        home: ChatHomeScreen(repository: _BrokenChatRepository()),
-      ),
+      MaterialApp(home: ChatHomeScreen(repository: _BrokenChatRepository())),
     );
     await tester.pumpAndSettle();
 
@@ -544,7 +614,10 @@ void main() {
 
 class _FailingTurnChatRepository extends FakeChatRepository {
   @override
-  Future<ChatTurn> send({required int sessionId, required String message}) async {
+  Future<ChatTurn> send({
+    required int sessionId,
+    required String message,
+  }) async {
     throw const FinanceApiException('Không gửi được tin nhắn.');
   }
 }
@@ -556,20 +629,29 @@ class _BrokenChatRepository implements ChatRepository {
   }
 
   @override
-  Future<ChatSession> createSession({String title = 'Cuộc trò chuyện tư vấn'}) async {
+  Future<ChatSession> createSession({
+    String title = 'Cuộc trò chuyện tư vấn',
+  }) async {
     return ChatSession(id: 1, title: title, slots: const BudgetSlots());
   }
 
   @override
   Future<ChatSession> session(int sessionId) async {
-    return ChatSession(id: sessionId, title: 'Cuộc trò chuyện', slots: const BudgetSlots());
+    return ChatSession(
+      id: sessionId,
+      title: 'Cuộc trò chuyện',
+      slots: const BudgetSlots(),
+    );
   }
 
   @override
   Future<List<ChatMessage>> messages(int sessionId) async => const [];
 
   @override
-  Future<ChatTurn> send({required int sessionId, required String message}) async {
+  Future<ChatTurn> send({
+    required int sessionId,
+    required String message,
+  }) async {
     return ChatTurn(
       sessionId: sessionId,
       reply: '',
