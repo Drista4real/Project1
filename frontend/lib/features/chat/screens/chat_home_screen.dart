@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:project_one/app/widgets/app_profile_button.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:project_one/app/app_routes.dart';
@@ -108,8 +109,7 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
       if (answers.isEmpty) continue;
       return {
         for (var question = 0; question < answers.length; question++)
-          if (answers[question].isNotEmpty)
-            question: [answers[question]],
+          if (answers[question].isNotEmpty) question: [answers[question]],
       };
     }
     return const {};
@@ -209,6 +209,7 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
           tooltip: 'Cuộc trò chuyện mới',
           icon: const Icon(Icons.add_comment_outlined),
         ),
+        const AppProfileButton(),
       ],
     );
   }
@@ -219,7 +220,9 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
         child: CircularProgressIndicator(color: AppTheme.primaryForestGreen),
       );
     }
-    if (state.error != null && state.messages.isEmpty && state.sessionId == null) {
+    if (state.error != null &&
+        state.messages.isEmpty &&
+        state.sessionId == null) {
       return _buildUnavailable(context, state);
     }
     return ListView(

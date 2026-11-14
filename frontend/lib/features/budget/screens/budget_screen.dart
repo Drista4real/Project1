@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/material.dart';
+import 'package:project_one/app/widgets/app_profile_button.dart';
 import 'package:go_router/go_router.dart';
 import 'package:project_one/app/app_dependencies.dart';
 import 'package:project_one/app/app_routes.dart';
@@ -155,7 +156,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
             ),
             icon: const Icon(Icons.category_outlined, size: 21),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 4),
+          const AppProfileButton(),
         ],
       ),
       body: FinanceDataView<BudgetData>(
@@ -182,8 +184,8 @@ class _BudgetScreenState extends State<BudgetScreen> {
         },
       ),
       bottomNavigationBar: AppScreenNavigation(
-      selectedIndex: 3,
-      onTransactionAdded: _dataController.refresh,
+        selectedIndex: 3,
+        onTransactionAdded: _dataController.refresh,
       ),
     ),
   );

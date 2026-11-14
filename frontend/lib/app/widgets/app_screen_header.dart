@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:project_one/app/widgets/app_profile_button.dart';
 import 'package:project_one/shared/widgets/kakeibo_logo.dart';
 
 class AppScreenHeader extends StatelessWidget implements PreferredSizeWidget {
@@ -52,19 +53,6 @@ class AppScreenHeader extends StatelessWidget implements PreferredSizeWidget {
         ),
       ],
     ),
-    actions: [
-      Padding(
-        padding: EdgeInsets.only(right: 16),
-        child: CircleAvatar(
-          radius: 16,
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          child: Icon(
-            Icons.person,
-            color: Theme.of(context).colorScheme.primary,
-            size: 19,
-          ),
-        ),
-      ),
-    ],
+    actions: const [AppProfileButton()],
   );
 }

@@ -71,7 +71,7 @@ void main() {
       await tester.pumpWidget(MaterialApp.router(routerConfig: router));
       router.go(route);
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(seconds: 1));
 
       expect(find.byTooltip('Cài đặt'), findsOneWidget);
       router.dispose();

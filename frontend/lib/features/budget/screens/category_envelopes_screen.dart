@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:project_one/features/budget/cubit/category_envelopes_cubit.dart';
 import 'package:project_one/shared/state/async_data_cubit.dart';
 import 'package:flutter/material.dart';
+import 'package:project_one/app/widgets/app_profile_button.dart';
 import 'package:go_router/go_router.dart';
 import 'package:project_one/app/app_dependencies.dart';
 import 'package:project_one/app/app_routes.dart';
@@ -207,7 +208,8 @@ class _CategoryEnvelopesScreenState extends State<CategoryEnvelopesScreen> {
             ),
             icon: const Icon(Icons.add, size: 22),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 4),
+          const AppProfileButton(),
         ],
       ),
       body: Builder(
@@ -254,8 +256,8 @@ class _CategoryEnvelopesScreenState extends State<CategoryEnvelopesScreen> {
         },
       ),
       bottomNavigationBar: AppScreenNavigation(
-      selectedIndex: 3,
-      onSelectedTab: () {
+        selectedIndex: 3,
+        onSelectedTab: () {
           final router = GoRouter.of(context);
           Navigator.pop(context);
           router.go(AppRoutes.budget);
