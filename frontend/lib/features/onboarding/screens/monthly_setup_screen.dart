@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:project_one/app/app_routes.dart';
+import 'package:project_one/app/widgets/app_exit_button.dart';
 import 'package:project_one/features/onboarding/cubit/monthly_setup_cubit.dart';
 import 'package:project_one/features/onboarding/widgets/setup_steps.dart';
 import 'package:project_one/features/plan/data/budget_plan_repository.dart';
@@ -44,10 +45,16 @@ class _MonthlySetupScreenState extends State<MonthlySetupScreen> {
   }
 
   void _leave() {
-    if (context.canPop()) {
-      context.pop();
+    if (_cubit.state.submitting) return;
+    popOrGo(context);
+  }
+
+  void _back() {
+    if (_cubit.state.submitting) return;
+    if (_cubit.state.step == 0) {
+      _leave();
     } else {
-      context.go(AppRoutes.home);
+      _cubit.back();
     }
   }
 
@@ -73,29 +80,33 @@ class _MonthlySetupScreenState extends State<MonthlySetupScreen> {
           context.go(AppRoutes.plan);
         },
         builder: (context, state) => PopScope(
-          canPop: state.step == 0,
+          canPop: false,
           onPopInvokedWithResult: (didPop, _) {
-            if (!didPop) _cubit.back();
+            if (!didPop) _back();
           },
           child: Scaffold(
             body: SafeArea(
-              child: state.loadingDefaults
-                  ? const Center(child: CircularProgressIndicator())
-                  : Column(
-                      children: [
-                        _SetupTopBar(
-                          step: state.step,
-                          onBack: state.step == 0 ? _leave : _cubit.back,
-                          onSkip: _leave,
-                        ),
-                        Expanded(child: _buildStep(context, state)),
-                        _SetupFooter(
-                          state: state,
-                          onBack: _cubit.back,
-                          onNext: _cubit.next,
-                        ),
-                      ],
+              child: Column(
+                children: [
+                  _SetupTopBar(
+                    step: state.step,
+                    busy: state.submitting,
+                    onBack: _back,
+                    onSkip: _leave,
+                  ),
+                  Expanded(
+                    child: state.loadingDefaults
+                        ? const Center(child: CircularProgressIndicator())
+                        : _buildStep(context, state),
+                  ),
+                  if (!state.loadingDefaults)
+                    _SetupFooter(
+                      state: state,
+                      onBack: _cubit.back,
+                      onNext: _cubit.next,
                     ),
+                ],
+              ),
             ),
           ),
         ),
@@ -150,11 +161,13 @@ class _MonthlySetupScreenState extends State<MonthlySetupScreen> {
 class _SetupTopBar extends StatelessWidget {
   const _SetupTopBar({
     required this.step,
+    required this.busy,
     required this.onBack,
     required this.onSkip,
   });
 
   final int step;
+  final bool busy;
   final VoidCallback onBack;
   final VoidCallback onSkip;
 
@@ -165,11 +178,7 @@ class _SetupTopBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(4, 4, 8, 4),
       child: Row(
         children: [
-          IconButton(
-            tooltip: step == 0 ? 'Đóng' : 'Quay lại',
-            onPressed: onBack,
-            icon: Icon(step == 0 ? Icons.close : Icons.arrow_back),
-          ),
+          AppExitButton(close: step == 0, enabled: !busy, onPressed: onBack),
           Expanded(
             child: Semantics(
               label: 'Bước ${step + 1} trên $monthlySetupSteps',
@@ -194,7 +203,10 @@ class _SetupTopBar extends StatelessWidget {
               ),
             ),
           ),
-          TextButton(onPressed: onSkip, child: const Text('Bỏ qua')),
+          TextButton(
+            onPressed: busy ? null : onSkip,
+            child: const Text('Bỏ qua'),
+          ),
         ],
       ),
     );
@@ -223,7 +235,10 @@ class _SetupFooter extends StatelessWidget {
       child: Row(
         children: [
           if (state.step > 0) ...[
-            OutlinedButton(onPressed: onBack, child: const Text('Quay lại')),
+            OutlinedButton(
+              onPressed: state.submitting ? null : onBack,
+              child: const Text('Quay lại'),
+            ),
             const SizedBox(width: 12),
           ],
           Expanded(

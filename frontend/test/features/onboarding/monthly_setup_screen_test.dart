@@ -1,18 +1,37 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:project_one/app/app_routes.dart';
 import 'package:project_one/features/onboarding/screens/monthly_setup_screen.dart';
+import 'package:project_one/features/plan/models/budget_plan_models.dart';
 
 import 'fake_setup_repository.dart';
 
 final _today = DateTime(2026, 11, 12);
 final syncedBalances = <num>[];
 
+class PendingDefaultsRepository extends FakeSetupRepository {
+  final pending = Completer<SetupDefaults>();
+  @override
+  Future<SetupDefaults> setupDefaults() => pending.future;
+}
+
+class PendingCreateRepository extends FakeSetupRepository {
+  final pending = Completer<void>();
+  @override
+  Future<BudgetPlan> create(PlanDraft draft) async {
+    await pending.future;
+    return super.create(draft);
+  }
+}
+
 Future<void> _pumpSetup(
   WidgetTester tester,
-  FakeSetupRepository repository,
-) async {
+  FakeSetupRepository repository, {
+  bool settle = true,
+}) async {
   tester.view.physicalSize = const Size(412, 915);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -33,7 +52,11 @@ Future<void> _pumpSetup(
   );
   addTearDown(router.dispose);
   await tester.pumpWidget(MaterialApp.router(routerConfig: router));
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
 }
 
 Future<void> _next(WidgetTester tester) async {
@@ -42,6 +65,79 @@ Future<void> _next(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('Android Back reverses a step, then exits direct setup to home', (
+    tester,
+  ) async {
+    final repository = FakeSetupRepository();
+    await _pumpSetup(tester, repository);
+    expect(find.byTooltip('Đóng'), findsOneWidget);
+    await _next(tester);
+    expect(find.byTooltip('Quay lại'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('BƯỚC 1/6'), findsOneWidget);
+    expect(find.text('8.000.000'), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('HOME'), findsOneWidget);
+    expect(repository.created, isEmpty);
+  });
+
+  testWidgets(
+    'setup can close while defaults are loading and ignores a late response',
+    (tester) async {
+      final repository = PendingDefaultsRepository();
+      await _pumpSetup(tester, repository, settle: false);
+      await tester.tap(find.byTooltip('Đóng'));
+      await tester.pumpAndSettle();
+      expect(find.text('HOME'), findsOneWidget);
+      repository.pending.complete(await FakeSetupRepository().setupDefaults());
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(repository.created, isEmpty);
+    },
+  );
+
+  testWidgets('setup cannot exit or go backwards while submitting', (
+    tester,
+  ) async {
+    final repository = PendingCreateRepository();
+    await _pumpSetup(tester, repository);
+    for (var step = 0; step < 5; step++) {
+      await _next(tester);
+    }
+    await tester.tap(find.byKey(const ValueKey('setup-next')));
+    await tester.pump();
+    expect(
+      tester
+          .widget<IconButton>(
+            find.widgetWithIcon(IconButton, Icons.arrow_back_rounded),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<TextButton>(find.widgetWithText(TextButton, 'Bỏ qua'))
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.widgetWithText(OutlinedButton, 'Quay lại'),
+          )
+          .onPressed,
+      isNull,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    expect(find.text('BƯỚC 6/6'), findsOneWidget);
+    repository.pending.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('PLAN'), findsOneWidget);
+    expect(repository.created, hasLength(1));
+  });
   testWidgets('the six steps lead to a saved plan', (tester) async {
     final repository = FakeSetupRepository();
     await _pumpSetup(tester, repository);

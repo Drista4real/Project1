@@ -1,3 +1,4 @@
+import 'package:project_one/app/widgets/app_exit_button.dart';
 import 'dart:convert';
 import 'package:project_one/shared/state/async_data_cubit.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -796,10 +797,10 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
                 ? 'Thêm'
                 : 'Sửa'} ${widget.resource['title']}',
           ),
-          leading: IconButton(
-            tooltip: 'Quay lại',
-            icon: const Icon(Icons.arrow_back),
-            onPressed: _busy ? null : _leave,
+          leading: AppExitButton(
+            close: !_readOnly,
+            enabled: !_busy,
+            onPressed: _leave,
           ),
         ),
         bottomNavigationBar: _readOnly

@@ -1,3 +1,4 @@
+import 'package:project_one/app/widgets/app_exit_button.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -157,8 +158,11 @@ class _AuthScreenState extends State<AuthScreen> {
         child: Scaffold(
           appBar: AppBar(
             automaticallyImplyLeading: false,
-            leading: Navigator.of(context).canPop() || !credentials
-                ? BackButton(onPressed: state.busy ? null : _back)
+            leading:
+                Navigator.of(context).canPop() ||
+                    !credentials ||
+                    state.mode != AuthMode.login
+                ? AppExitButton(enabled: !state.busy, onPressed: _back)
                 : null,
             title: const Text('Kakeibo Zen'),
           ),

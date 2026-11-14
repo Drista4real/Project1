@@ -15,6 +15,24 @@ void main() {
   setUp(() => harness = AuthHarness());
   tearDown(() => harness.auth.dispose());
 
+  for (final mode in [AuthMode.register, AuthMode.otp, AuthMode.recovery]) {
+    testWidgets('$mode has a return to root login without making a request', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AuthScreen(auth: harness.auth, initialMode: mode),
+        ),
+      );
+      await tester.tap(find.byTooltip('Quay lại'));
+      await tester.pumpAndSettle();
+      expect(find.text('Chào mừng trở lại'), findsOneWidget);
+      expect(find.byTooltip('Quay lại'), findsNothing);
+      expect(harness.requests, isEmpty);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   testWidgets(
     'registration validates password confirmation without a request',
     (tester) async {

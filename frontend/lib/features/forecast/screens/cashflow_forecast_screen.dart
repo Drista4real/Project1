@@ -1,3 +1,6 @@
+import 'package:go_router/go_router.dart';
+import 'package:project_one/app/app_routes.dart';
+import 'package:project_one/app/widgets/app_exit_button.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:project_one/features/forecast/cubit/forecast_cubit.dart';
 import 'package:flutter/material.dart';
@@ -38,12 +41,19 @@ class ForecastPage extends StatefulWidget {
 class _ForecastPageState extends State<ForecastPage> {
   final _controller = FinanceDataController();
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: const AppScreenHeader(subtitle: 'Dự Báo'),
-    body: CashflowForecastScreen(controller: _controller),
-    bottomNavigationBar: AppScreenNavigation(
-      selectedIndex: 2,
-      onTransactionAdded: _controller.refresh,
+  Widget build(BuildContext context) => AppBackScope(
+    fallbackRoute: AppRoutes.reports,
+    child: Scaffold(
+      appBar: const AppScreenHeader(
+        subtitle: 'Dự Báo',
+        leading: AppExitButton(fallbackRoute: AppRoutes.reports),
+      ),
+      body: CashflowForecastScreen(controller: _controller),
+      bottomNavigationBar: AppScreenNavigation(
+        selectedIndex: 2,
+        onSelectedTab: () => context.go(AppRoutes.reports),
+        onTransactionAdded: _controller.refresh,
+      ),
     ),
   );
 }

@@ -1,3 +1,4 @@
+import 'package:project_one/app/widgets/app_exit_button.dart';
 import 'package:flutter/material.dart';
 import 'package:project_one/app/widgets/app_profile_button.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -58,35 +59,41 @@ class _PlanScreenState extends State<PlanScreen> {
   }
 
   Widget _buildContent(BuildContext context, PlanState state) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Kế hoạch chi tiêu',
-          style: TextStyle(
-            fontFamily: 'BeVietnamPro',
-            fontSize: 17,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.primary,
+    return AppBackScope(
+      child: Scaffold(
+        appBar: AppBar(
+          leading: const AppExitButton(),
+          title: Text(
+            'Kế hoạch chi tiêu',
+            style: TextStyle(
+              fontFamily: 'BeVietnamPro',
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.primary,
+            ),
           ),
+          actions: [
+            IconButton(
+              tooltip: 'Thiết lập kế hoạch tháng',
+              onPressed: () => context.push(AppRoutes.monthlySetup),
+              icon: const Icon(Icons.tune),
+            ),
+            IconButton(
+              tooltip: 'Tải lại',
+              onPressed: state.loading ? null : _cubit.load,
+              icon: const Icon(Icons.refresh_rounded),
+            ),
+            const AppProfileButton(),
+          ],
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Thiết lập kế hoạch tháng',
-            onPressed: () => context.push(AppRoutes.monthlySetup),
-            icon: const Icon(Icons.tune),
-          ),
-          IconButton(
-            tooltip: 'Tải lại',
-            onPressed: state.loading ? null : _cubit.load,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-          const AppProfileButton(),
-        ],
+        body: state.loading && state.plans.isEmpty
+            ? const Center(child: CircularProgressIndicator())
+            : _buildBody(context, state),
+        bottomNavigationBar: AppScreenNavigation(
+          selectedIndex: 3,
+          onSelectedTab: () => context.go(AppRoutes.budget),
+        ),
       ),
-      body: state.loading && state.plans.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : _buildBody(context, state),
-      bottomNavigationBar: const AppScreenNavigation(selectedIndex: 3),
     );
   }
 
