@@ -73,15 +73,6 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
     await _cubit.send(message);
   }
 
-  /// Hand the turn over to the multimodal ingestion route.
-  Future<void> _openIngestion(
-    BuildContext context,
-    String route,
-    String prompt,
-  ) async {
-    await context.push(route, extra: prompt);
-  }
-
   String _displayName() {
     try {
       final metadata = SupabaseConfig.client.auth.currentUser?.userMetadata;
@@ -137,16 +128,6 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
               onSend: () => _send(_controller.text),
               enabled: state.sessionId != null,
               busy: state.sending,
-              onVoice: () => _openIngestion(
-                context,
-                AppRoutes.aiQuickInput,
-                'Nói để mình nhập giao dịch',
-              ),
-              onImage: () => _openIngestion(
-                context,
-                AppRoutes.aiQuickInput,
-                'Chụp ảnh hóa đơn để mình đọc giúp',
-              ),
             ),
           ],
         ),
@@ -158,6 +139,7 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
   PreferredSizeWidget _buildAppBar(BuildContext context, ChatState state) {
     final theme = Theme.of(context);
     return AppBar(
+      automaticallyImplyLeading: false,
       title: Row(
         children: [
           Container(
@@ -235,7 +217,7 @@ class _ChatHomeScreenState extends State<ChatHomeScreen> {
           ChatQuickSuggestions(onTap: _send),
           const SizedBox(height: 18),
           OutlinedButton.icon(
-            onPressed: () => context.go(AppRoutes.plan),
+            onPressed: () => context.push(AppRoutes.plan),
             icon: const Icon(Icons.route_outlined, size: 18),
             label: const Text('Xem kế hoạch chi tiêu'),
           ),

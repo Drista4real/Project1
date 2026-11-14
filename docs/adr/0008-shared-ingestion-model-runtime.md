@@ -3,6 +3,56 @@
 Date: 2026-10-29. Status: accepted, backend and Streamlit only.
 Implementation: [#85](https://github.com/Drista4real/Project1/issues/85).
 
+## Android quick input integration — 2026-11-15
+
+The user's request in [#102](https://github.com/Drista4real/Project1/issues/102)
+supersedes the receipt-upload exclusion below. The earlier runtime decisions
+remain valid; the historical paragraphs describe the boundary before this update.
+
+Flutter sends typed input to Model 1 through `/api/v1/ingestion/text`.
+Model 3 remains on-device PhoWhisper INT8/sherpa-onnx: after transcription,
+the screen automatically calls that same text endpoint. No audio upload route
+is introduced. Empty/failed transcription remains an actionable error.
+
+The Hóa đơn button uses the system file picker for JPEG, PNG or WebP images.
+`POST /api/v1/ingestion/receipt` requires the user's bearer token and accepts
+raw image bytes with the corresponding Content-Type. The API caps both declared
+and streamed bodies at 8 MiB, validates actual image format, decoding, a single
+frame and at most 20 megapixels before calling the application-owned Model 4
+adapter. It rejects missing/mock provider configuration rather than returning
+sample data. Provider errors are mapped to safe user-facing messages.
+
+One receipt produces one unpersisted expense draft using the printed VND total
+and receipt date, with merchant/items as description. Line items are not added
+as further expenses. Invalid/foreign-currency totals are refused. Arithmetic
+mismatches keep the printed total and require review; the arithmetic signal is
+not presented as a classification probability. Missing dates use today's date
+with an explicit warning. Category ambiguity remains editable in review.
+
+The existing Qwen contract produces a receipt-level category, so no redundant
+Model 1 call is made for a valid receipt. Text keeps its existing automatic
+classification fallback. Original-image/audio Gemini fallback remains a target
+of ADR 0004, not part of this integration; failed receipt extraction shows an
+error with retry/manual-input guidance and never fabricates a draft.
+
+The app explains that selected receipt images are sent for AI processing. The
+picker reads the original file without creating an app copy. The API holds bytes
+only for the request and forwards them to the configured Qwen provider; it does
+not save files or log image bodies. Provider-side retention follows the configured
+provider's policy. Authentication, media limits and explicit review apply to this
+route; only the existing confirmation/save action writes ledger transactions.
+Canceling the picker leaves existing input intact. Closing the screen discards
+late results. Rolling back means removing the receipt route and reverting the
+button to its prior unavailable state; no database migration is needed.
+
+The follow-up UI change in [#103](https://github.com/Drista4real/Project1/issues/103)
+automatically opens the existing edit/review sheet for a single draft, regardless
+of input modality. Multiple drafts scroll into view as a review list. Dismissing
+the sheet retains the draft; applying edits updates only that draft. Saving still
+requires the separate confirmation action. Presentation runs once after a valid
+analysis completes, never on a rebuild or after leaving the route. The manual
+fallback link is named "Chuyển sang biểu mẫu" and retains the typed description.
+
 Models 1 and 3 form one transaction-input capability. Retain separate ASR and
 classifier adapters: audio becomes text, then uses the same deterministic money
 normalizer and category classifier as typed input. `ParseTransaction.execute_audio`

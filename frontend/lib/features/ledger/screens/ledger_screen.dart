@@ -102,6 +102,7 @@ class _LedgerScreenState extends State<LedgerScreen> {
 
   PreferredSizeWidget _buildKakeiboAppBar() {
     return AppBar(
+      automaticallyImplyLeading: false,
       title: Row(
         children: [
           // Logo Kakeibo Zen

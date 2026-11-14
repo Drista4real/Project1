@@ -73,13 +73,13 @@ void main() {
         find.byKey(const ValueKey('name')),
         'Chuyến đi mùa hè',
       );
-      await tester.tap(find.byTooltip('Quay lại'));
+      await tester.tap(find.byTooltip('Đóng'));
       await tester.pumpAndSettle();
       expect(find.text('Bỏ thay đổi chưa lưu?'), findsOneWidget);
       await tester.tap(find.text('Tiếp tục chỉnh sửa'));
       await tester.pumpAndSettle();
       expect(find.text('Chuyến đi mùa hè'), findsOneWidget);
-      await tester.tap(find.byTooltip('Quay lại'));
+      await tester.tap(find.byTooltip('Đóng'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Bỏ thay đổi'));
       await tester.pumpAndSettle();

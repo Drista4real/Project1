@@ -1,3 +1,5 @@
+import 'package:project_one/app/app_routes.dart';
+import 'package:project_one/app/widgets/app_exit_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:project_one/app/app_dependencies.dart';
@@ -38,7 +40,10 @@ class _ManagementScreenState extends State<ManagementScreen> {
   @override
   Widget build(BuildContext context) => ManagementTheme(
     builder: (context) => Scaffold(
-      appBar: AppBar(title: const Text('Quản lý tài chính')),
+      appBar: AppBar(
+        leading: const AppExitButton(fallbackRoute: AppRoutes.settings),
+        title: const Text('Quản lý tài chính'),
+      ),
       body:
           BlocBuilder<
             AsyncDataCubit<List<Map<String, dynamic>>>,

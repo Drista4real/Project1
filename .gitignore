@@ -26,12 +26,16 @@ __pycache__/
 # Local IDE state
 .idea/
 *.iml
+*.ipr
+*.iws
+.vs/
 
 # Coverage and Python packaging outputs
 .coverage
 .coverage.*
 htmlcov/
 coverage.xml
+lcov.info
 # Local inference benchmark reports and Python profiler dumps
 /benchmark-results/
 *.prof
@@ -48,6 +52,16 @@ coverage.xml
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Local Dart/Flutter tooling and Android signing credentials
+.dart_tool/
+.pub-cache/
+.pub/
+.flutter-plugins
+.flutter-plugins-dependencies
+**/android/key.properties
+*.jks
+*.keystore
 
 # Downloaded model caches and exported ASR binaries
 weights/cache/

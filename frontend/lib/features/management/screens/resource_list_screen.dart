@@ -1,3 +1,5 @@
+import 'package:project_one/app/app_routes.dart';
+import 'package:project_one/app/widgets/app_exit_button.dart';
 import 'package:project_one/shared/state/async_data_cubit.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:project_one/features/management/cubit/resource_list_cubit.dart';
@@ -238,6 +240,7 @@ class _ResourceListScreenState extends State<ResourceListScreen> {
     ResourceListState state,
   ) => Scaffold(
     appBar: AppBar(
+      leading: const AppExitButton(fallbackRoute: AppRoutes.settings),
       title: Text(widget.resource['title'] as String),
       actions: [
         if (_opening)

@@ -279,6 +279,7 @@ class MonthlySetupCubit extends Cubit<MonthlySetupState> {
   Future<void> start() async {
     try {
       final defaults = await repository.setupDefaults();
+      if (isClosed) return;
       final recurring = [
         for (final item in defaults.fixedExpenses)
           FixedExpenseDraft(
@@ -307,6 +308,7 @@ class MonthlySetupCubit extends Cubit<MonthlySetupState> {
         ),
       );
     } catch (_) {
+      if (isClosed) return;
       emit(
         state.copyWith(
           loadingDefaults: false,
@@ -397,8 +399,10 @@ class MonthlySetupCubit extends Cubit<MonthlySetupState> {
     emit(state.copyWith(previewLoading: true, clearPreview: true));
     try {
       final preview = await repository.preview(state.draft());
+      if (isClosed) return;
       emit(state.copyWith(preview: preview, previewLoading: false));
     } catch (error) {
+      if (isClosed) return;
       emit(
         state.copyWith(
           previewLoading: false,

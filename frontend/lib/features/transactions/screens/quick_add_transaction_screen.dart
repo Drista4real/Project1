@@ -1,3 +1,5 @@
+import 'package:project_one/app/app_routes.dart';
+import 'package:project_one/app/widgets/app_exit_button.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:project_one/features/transactions/cubit/transaction_form_cubit.dart';
 import 'package:flutter/material.dart';
@@ -101,13 +103,16 @@ class _QuickAddTransactionScreenState extends State<QuickAddTransactionScreen> {
     await _cubit.save(value, _note.text);
   }
 
+  void _close([bool? saved]) =>
+      popOrGo<bool>(context, fallbackRoute: AppRoutes.ledger, result: saved);
+
   @override
   Widget build(BuildContext context) =>
       BlocConsumer<TransactionFormCubit, TransactionFormState>(
         bloc: _cubit,
         listenWhen: (previous, current) => previous.saving && !current.saving,
         listener: (context, state) {
-          if (state.saved) Navigator.of(context).pop(true);
+          if (state.saved) _close(true);
           if (state.saveError != null) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -123,17 +128,20 @@ class _QuickAddTransactionScreenState extends State<QuickAddTransactionScreen> {
     final income = _type == 'income';
     final disabled = _saving || _loading || _loadError != null;
     final categories = _categories.where((c) => c.isIncome == income).toList();
-    return PopScope(
-      canPop: !_saving,
+    return PopScope<bool>(
+      canPop: !_saving && Navigator.of(context).canPop(),
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && !_saving) _close();
+      },
       child: Scaffold(
         appBar: AppBar(
           title: Text(
             widget.transaction == null ? 'Thêm giao dịch' : 'Sửa giao dịch',
           ),
-          leading: IconButton(
-            tooltip: 'Đóng',
-            onPressed: _saving ? null : () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close),
+          leading: AppExitButton(
+            close: true,
+            enabled: !_saving,
+            onPressed: _close,
           ),
         ),
         bottomNavigationBar: FinanceSaveBar(

@@ -76,8 +76,6 @@ class ChatComposer extends StatelessWidget {
     required this.onSend,
     required this.enabled,
     required this.busy,
-    this.onVoice,
-    this.onImage,
     super.key,
   });
 
@@ -85,8 +83,6 @@ class ChatComposer extends StatelessWidget {
   final VoidCallback onSend;
   final bool enabled;
   final bool busy;
-  final VoidCallback? onVoice;
-  final VoidCallback? onImage;
 
   @override
   Widget build(BuildContext context) {
@@ -95,21 +91,13 @@ class ChatComposer extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
+        border: Border(
+          top: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Semantics(
-            container: true,
-            identifier: 'chat-voice',
-            button: true,
-            child: IconButton(
-              onPressed: enabled && !busy ? onVoice : null,
-              tooltip: 'Nói thay bằng giọng',
-              icon: const Icon(Icons.mic_none_rounded),
-            ),
-          ),
           Expanded(
             child: Semantics(
               container: true,
@@ -142,18 +130,7 @@ class ChatComposer extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 6),
-          Semantics(
-            container: true,
-            identifier: 'chat-image',
-            button: true,
-            child: IconButton(
-              onPressed: enabled && !busy ? onImage : null,
-              tooltip: 'Gửi ảnh hóa đơn',
-              icon: const Icon(Icons.image_outlined),
-            ),
-          ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 10),
           Semantics(
             container: true,
             identifier: 'chat-send',

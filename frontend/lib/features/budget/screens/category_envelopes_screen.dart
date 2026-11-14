@@ -1,3 +1,4 @@
+import 'package:project_one/app/widgets/app_exit_button.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:project_one/features/budget/cubit/category_envelopes_cubit.dart';
 import 'package:project_one/shared/state/async_data_cubit.dart';
@@ -174,11 +175,7 @@ class _CategoryEnvelopesScreenState extends State<CategoryEnvelopesScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        leading: IconButton(
-          tooltip: 'Quay lại',
-          onPressed: () => Navigator.maybePop(context),
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-        ),
+        leading: const AppExitButton(fallbackRoute: AppRoutes.budget),
         titleSpacing: 0,
         title: Text(
           'Quản lý danh mục & phong bao',

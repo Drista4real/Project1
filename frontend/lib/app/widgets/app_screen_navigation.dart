@@ -32,7 +32,7 @@ class AppScreenNavigation extends StatelessWidget {
                 color: Theme.of(context).colorScheme.primary,
               ),
               title: const Text('Nhập nhanh AI'),
-              subtitle: const Text('Gõ hoặc nói nội dung thu chi'),
+              subtitle: const Text('Gõ, nói hoặc chọn ảnh hóa đơn'),
               onTap: () => Navigator.pop(sheetContext, AppRoutes.aiQuickInput),
             ),
             ListTile(

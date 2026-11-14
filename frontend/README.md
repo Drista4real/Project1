@@ -167,8 +167,29 @@ Các màn có trạng thái tải, lỗi/thử lại và dữ liệu rỗng; kh�
 khi API gặp lỗi. Kéo xuống để tải lại báo cáo, ngân sách và dự báo. Sau khi thêm
 giao dịch qua nút điều hướng, màn hiện tại cũng tải lại.
 
-Backend hiện cung cấp CRUD dữ liệu AI đã lưu, chưa có endpoint tự động phân
-tích văn bản hoặc chạy mô hình dự báo. Màn Nhập Nhanh AI cho phép chuyển nội
-dung người dùng sang form giao dịch thủ công và lưu qua API; không tạo giao
-dịch mẫu hoặc hiển thị kết quả AI giả. Các chức năng gửi thông báo, sao lưu
-Google Drive và xuất Excel/PDF chưa được triển khai.
+Màn **Nhập Nhanh AI** nối ba cách nhập vào nháp giao dịch:
+
+- **Xem giao dịch:** gửi văn bản qua `/api/v1/ingestion/text` để Model 1 phân loại.
+- **Ghi âm:** Model 3 PhoWhisper trên Android phiên âm rồi tự gửi bản chép
+  lời sang cùng API phân tích. Có thể sửa chữ và phân tích lại. Assets tiếng Việt
+  phải được chuẩn bị trước khi build theo hướng dẫn ở README gốc.
+- **Hóa đơn:** chọn ảnh JPEG/PNG/WebP tối đa 8 MB; backend gọi Model 4 và trả một
+  nháp theo tổng tiền VND, giữ ngày hóa đơn nếu đọc được. Ảnh được gửi đến dịch vụ
+  AI; lỗi dịch vụ được hiển thị để thử lại hoặc nhập thủ công.
+
+Mở nhập giao dịch qua dấu **+**; ô chat trên Trang chủ chỉ dành cho tin nhắn.
+Khi AI trả một giao dịch, bảng **Kiểm tra giao dịch** tự mở; nếu có nhiều giao
+dịch, màn hình cuộn đến danh sách nháp. Đóng bảng vẫn giữ nháp; **Áp dụng thay đổi**
+chỉ sửa nháp, còn **Lưu giao dịch** mới ghi giao dịch. **Chuyển sang biểu mẫu**
+mở form thủ công và giữ nội dung đã gõ.
+
+Mọi cách nhập đều cho kiểm tra, sửa số tiền/ngày/danh mục trước khi xác nhận lưu;
+không tự tạo giao dịch khi phân tích. Giả lập cần bật **Extended Controls →
+Microphone → Virtual microphone uses host audio input** để nhận tiếng từ máy
+tính. Chỉ bật quyền micro trong Android chưa bảo đảm giả lập có âm thanh đầu vào.
+Chi tiết API và phạm vi fallback ở [ADR 0008](../docs/adr/0008-shared-ingestion-model-runtime.md).
+
+Giao diện Nhập nhanh AI (#104) dùng một thanh tiêu đề, ô nội dung và hai nút
+Ghi âm / Ảnh hóa đơn cùng kích thước. Nút Xem giao dịch nằm riêng bên dưới.
+Màn nhập không có thanh tab để tránh mở thêm luồng nhập; nút Đóng trở về màn
+trước. Các trạng thái xử lý dùng lời ngắn gọn; kết quả vẫn cần kiểm tra và lưu.

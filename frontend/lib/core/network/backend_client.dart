@@ -27,6 +27,8 @@ class BackendClient {
     String method,
     String path, {
     Map<String, dynamic>? body,
+    List<int>? bytes,
+    String contentType = 'application/json',
   }) async {
     var session = SupabaseConfig.client.auth.currentSession;
     if (session == null) {
@@ -52,9 +54,10 @@ class BackendClient {
       final request = http.Request(method, Uri.parse('$baseUrl/api/v1$path'));
       request.headers.addAll({
         'Authorization': 'Bearer ${session.accessToken}',
-        'Content-Type': 'application/json',
+        'Content-Type': contentType,
       });
       if (body != null) request.body = jsonEncode(body);
+      if (bytes != null) request.bodyBytes = bytes;
       final response = await http.Response.fromStream(
         await client.send(request).timeout(timeout),
       ).timeout(timeout);

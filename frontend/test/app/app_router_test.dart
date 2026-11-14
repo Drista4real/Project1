@@ -5,6 +5,7 @@ import 'package:project_one/app/app_router.dart';
 import 'package:project_one/features/chat/screens/chat_home_screen.dart';
 import 'package:project_one/features/ledger/screens/ledger_screen.dart';
 import 'package:project_one/features/settings/screens/settings_screen.dart';
+import 'package:project_one/app/widgets/app_exit_button.dart';
 
 import '../helpers/supabase_test_setup.dart';
 
@@ -56,6 +57,78 @@ void main() {
     expect(find.byType(SettingsScreen), findsOneWidget);
     router.dispose();
   });
+
+  testWidgets('settings back returns to the tab that opened it', (
+    tester,
+  ) async {
+    final router = createAppRouter();
+    addTearDown(router.dispose);
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    router.go(AppRoutes.reports);
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.byType(AppExitButton),
+      ),
+      findsNothing,
+    );
+    await tester.tap(find.byTooltip('Cài đặt'));
+    await tester.pumpAndSettle();
+    expect(router.state.matchedLocation, AppRoutes.settings);
+    await tester.tap(find.byTooltip('Quay lại'));
+    await tester.pumpAndSettle();
+    expect(router.state.matchedLocation, AppRoutes.reports);
+    expect(router.canPop(), isFalse);
+  });
+
+  for (final entry in {
+    AppRoutes.settings: AppRoutes.home,
+    AppRoutes.plan: AppRoutes.home,
+    AppRoutes.forecast: AppRoutes.reports,
+    AppRoutes.addTransaction: AppRoutes.ledger,
+    AppRoutes.aiQuickInput: AppRoutes.home,
+  }.entries) {
+    for (final systemBack in [false, true]) {
+      testWidgets(
+        'direct ${entry.key} exits to ${entry.value}, Android Back: $systemBack',
+        (tester) async {
+          final router = createAppRouter();
+          addTearDown(router.dispose);
+          await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+          router.go(entry.key);
+          await tester.pumpAndSettle();
+          expect(router.canPop(), isFalse);
+          if (systemBack) {
+            await tester.binding.handlePopRoute();
+          } else {
+            await tester.tap(find.byType(AppExitButton));
+          }
+          await tester.pumpAndSettle();
+          expect(router.state.matchedLocation, entry.value);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  for (final entry in {
+    AppRoutes.plan: ('Ngân sách', AppRoutes.budget),
+    AppRoutes.forecast: ('Báo cáo', AppRoutes.reports),
+  }.entries) {
+    testWidgets('${entry.key} allows returning through its highlighted tab', (
+      tester,
+    ) async {
+      final router = createAppRouter();
+      addTearDown(router.dispose);
+      await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+      router.go(entry.key);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(entry.value.$1));
+      await tester.pumpAndSettle();
+      expect(router.state.matchedLocation, entry.value.$2);
+    });
+  }
 
   for (final route in [
     AppRoutes.home,

@@ -26,6 +26,18 @@ Models 1 and 3 share one text/voice ingestion capability while retaining separat
 ASR and classifier adapters. Model 4 remains independent. See
 [ADR 0008](../docs/adr/0008-shared-ingestion-model-runtime.md) for lifecycle and scope.
 
+Android quick input also exposes `POST /api/v1/ingestion/receipt` (see #102).
+Send the user's bearer token and raw JPEG/PNG/WebP bytes with matching
+`Content-Type`; maximum 8 MiB / 20 megapixels / one frame. Configure the existing
+Qwen provider and key in `backend/.env`. Missing configuration returns 503,
+invalid images 422, unsupported formats 415 and oversized bodies 413. The
+response uses the text endpoint's `drafts` shape with `source: "QWEN"` and
+optional `occurred_on` (YYYY-MM-DD). One receipt is one expense draft using its
+printed VND total. This endpoint never writes transactions or stores uploaded
+images. Flutter uses on-device ASR for voice, then automatically sends the
+transcript through the text endpoint; audio is not uploaded. Model 3/4 media
+fallback remains outside this integration.
+
 The API warms its local classifier before serving by default. Inspect
 `GET /ready/ai` for startup warm-up status and timings; `/health` remains liveness.
 Missing optional model dependencies keep CRUD running and report AI readiness 503.
