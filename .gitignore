@@ -60,8 +60,8 @@ Desktop.ini
 .flutter-plugins
 .flutter-plugins-dependencies
 # Machine-local Flutter SDK links and Pub credentials
-.fvm/flutter_sdk
-.fvm/versions/
+**/.fvm/flutter_sdk
+**/.fvm/versions/
 .pub-credentials.json
 **/android/key.properties
 *.jks
