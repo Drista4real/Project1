@@ -305,6 +305,11 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   Future<void> continueAsGuest() => _run(() async {
+    // An expired session is still non-null in the SDK. Clear it first so a
+    // guest retry actually obtains a fresh access/refresh-token pair.
+    if (auth.currentSession?.isExpired == true) {
+      await auth.signOut(scope: SignOutScope.local);
+    }
     if (auth.currentSession == null) await auth.signInAnonymously();
     if (!isClosed) {
       emit(state.copyWith(authenticated: auth.currentSession != null));
