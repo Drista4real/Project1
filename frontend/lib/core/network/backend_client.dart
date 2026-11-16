@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:project_one/core/config/supabase_config.dart';
 import 'finance_api_error.dart';
@@ -40,6 +41,9 @@ class BackendClient {
       try {
         session = (await SupabaseConfig.client.auth.refreshSession()).session;
       } catch (_) {
+        // Make AuthGate leave the signed-in shell when the refresh token is
+        // invalid or revoked, instead of leaving a dead session on screen.
+        await SupabaseConfig.client.auth.signOut(scope: SignOutScope.local);
         throw const FinanceApiException(
           'Phiên đã hết hạn. Vui lòng đăng nhập lại.',
         );
