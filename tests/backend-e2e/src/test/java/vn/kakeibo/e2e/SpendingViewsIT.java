@@ -1,6 +1,8 @@
 package vn.kakeibo.e2e;
 
 import io.restassured.response.Response;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -15,9 +17,20 @@ class SpendingViewsIT {
         "v_kakeibo_monthly_summary",
         "v_monthly_budget_progress");
 
+    /** A category, its budget for this month and an expense in it, so every view has a row. */
     private static void spend(Api user) {
         long wallet = user.account("Chi tiêu", "100");
-        user.transaction(Map.of("account_id", wallet, "amount", "5", "transaction_type", "expense"));
+        long category = user.create("categories", Map.of("name", "Ăn uống B14", "pillar", "needs"));
+        // The views compare against the database's current month, which runs in UTC.
+        String month = LocalDate.now(ZoneOffset.UTC).withDayOfMonth(1).toString();
+        user.create("budgets", Map.of("month_year", month, "limit_amount", "500", "category_id", category));
+        user.transaction(Map.of("account_id", wallet, "amount", "5", "transaction_type", "expense",
+            "category_id", category));
+    }
+
+    private static List<String> owners(Api user, String view) {
+        return expect(user.databaseApi().get("/rest/v1/" + view + "?select=user_id"), 200)
+            .jsonPath().getList("user_id");
     }
 
     @Test
@@ -37,13 +50,32 @@ class SpendingViewsIT {
         Api other = Api.newUser();
         spend(owner);
         spend(other);
+        // assertAll reports every view, not only the first one that leaks.
+        assertAll(VIEWS.stream().map(view -> () -> {
+            List<String> rows = owners(owner, view);
+            assertFalse(rows.isEmpty(), () -> view + " returns no row for its own user");
+            assertFalse(rows.contains(other.userId), () -> view + " leaks the other user's rows: " + rows);
+            assertTrue(rows.stream().allMatch(owner.userId::equals), () -> view + " leaks rows: " + rows);
+        }));
+    }
+
+    @Test
+    void aSignedInUserCannotWriteThroughTheViews() {
+        Api owner = Api.newUser();
+        spend(owner);
+        String mine = "?user_id=eq." + owner.userId;
         for (String view : VIEWS) {
-            List<String> owners = expect(owner.databaseApi().get("/rest/v1/" + view + "?select=user_id"), 200)
-                .jsonPath().getList("user_id");
-            assertTrue(owners.stream().allMatch(owner.userId::equals), () -> view + " leaks rows: " + owners);
+            String path = "/rest/v1/" + view;
+            List<String> before = owners(owner, view);
+            for (Response response : List.of(
+                    owner.databaseApi().body(Map.of("user_id", owner.userId)).post(path),
+                    owner.databaseApi().body(Map.of("user_id", owner.userId)).patch(path + mine),
+                    owner.databaseApi().delete(path + mine))) {
+                assertTrue(response.statusCode() >= 400, () -> view + " accepted a write: " + response.asString());
+                // Postgres refuses writes into these aggregate views (object_not_in_prerequisite_state).
+                assertEquals("55000", response.jsonPath().getString("code"), view);
+            }
+            assertEquals(before, owners(owner, view), view);
         }
-        List<String> summary = expect(owner.databaseApi().get("/rest/v1/v_kakeibo_monthly_summary?select=user_id"), 200)
-            .jsonPath().getList("user_id");
-        assertEquals(List.of(owner.userId), summary);
     }
 }
