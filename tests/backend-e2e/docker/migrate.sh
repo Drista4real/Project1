@@ -5,3 +5,8 @@ for migration in /migrations/*.sql; do
   echo "Applying $migration"
   psql -v ON_ERROR_STOP=1 -f "$migration"
 done
+# Catalog checks (grants, default ACLs, view options) that HTTP tests cannot see.
+for check in /sql-tests/*.sql; do
+  echo "Checking $check"
+  psql -v ON_ERROR_STOP=1 -f "$check"
+done

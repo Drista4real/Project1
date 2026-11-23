@@ -90,6 +90,7 @@ services:
     volumes:
       - ../../frontend/supabase/schema.sql:/schema.sql:ro
       - ../../backend/supabase/migrations:/migrations:ro
+      - ./sql:/sql-tests:ro
       - ./docker/migrate.sh:/migrate.sh:ro
     entrypoint: [sh, /migrate.sh]
 
