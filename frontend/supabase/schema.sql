@@ -330,10 +330,10 @@ CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON public.ai_chat_messages(
 CREATE OR REPLACE FUNCTION public.handle_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
-  NEW.updated_at = NOW();
+  NEW.updated_at = pg_catalog.now();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = '';
 
 CREATE OR REPLACE TRIGGER trg_profiles_updated_at
   BEFORE UPDATE ON public.profiles
@@ -370,7 +370,7 @@ BEGIN
   VALUES (
     NEW.id,
     NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
+    COALESCE(NEW.raw_user_meta_data->>'full_name', pg_catalog.split_part(NEW.email, '@', 1)),
     NEW.raw_user_meta_data->>'avatar_url',
     0.00
   )
@@ -391,7 +391,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
@@ -489,7 +489,7 @@ BEGIN
   -- Đồng bộ lại tổng số dư khả dụng vào bảng profiles
   UPDATE public.profiles
   SET current_balance = COALESCE((
-    SELECT SUM(balance)
+    SELECT pg_catalog.sum(balance)
     FROM public.accounts
     WHERE user_id = v_user_id AND is_included_in_total = true
   ), 0.00)
@@ -497,7 +497,7 @@ BEGIN
 
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 CREATE OR REPLACE TRIGGER trg_sync_transaction_balance
   AFTER INSERT OR UPDATE OR DELETE ON public.transactions
