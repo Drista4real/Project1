@@ -4,6 +4,7 @@ DO $$
 DECLARE
   v_failures text[] := '{}';
   v_view text;
+  v_privilege text;
 BEGIN
   FOREACH v_view IN ARRAY ARRAY[
     'public.v_current_month_spending_by_category',
@@ -23,6 +24,12 @@ BEGIN
     IF NOT has_table_privilege('authenticated', v_view, 'SELECT') THEN
       v_failures := v_failures || ('authenticated lost select on ' || v_view);
     END IF;
+    -- Read-only for signed-in users, in case a view is ever rewritten into an updatable one.
+    FOREACH v_privilege IN ARRAY ARRAY['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'] LOOP
+      IF has_table_privilege('authenticated', v_view, v_privilege) THEN
+        v_failures := v_failures || ('authenticated has ' || v_privilege || ' on ' || v_view);
+      END IF;
+    END LOOP;
   END LOOP;
 
   IF cardinality(v_failures) > 0 THEN

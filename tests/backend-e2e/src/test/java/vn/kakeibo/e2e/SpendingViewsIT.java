@@ -71,9 +71,11 @@ class SpendingViewsIT {
                     owner.databaseApi().body(Map.of("user_id", owner.userId)).post(path),
                     owner.databaseApi().body(Map.of("user_id", owner.userId)).patch(path + mine),
                     owner.databaseApi().delete(path + mine))) {
-                assertTrue(response.statusCode() >= 400, () -> view + " accepted a write: " + response.asString());
-                // Postgres refuses writes into these aggregate views (object_not_in_prerequisite_state).
-                assertEquals("55000", response.jsonPath().getString("code"), view);
+                // Postgres refuses a write into an aggregate view while rewriting the query, before it
+                // checks privileges, so PostgREST answers 500 with 55000 even though authenticated only
+                // holds SELECT. Any other 500 is a real failure.
+                expect(response, 500);
+                assertEquals("55000", response.jsonPath().getString("code"), () -> view + ": " + response.asString());
             }
             assertEquals(before, owners(owner, view), view);
         }
