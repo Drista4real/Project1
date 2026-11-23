@@ -742,3 +742,14 @@ REVOKE ALL ON
   public.v_kakeibo_monthly_summary,
   public.v_monthly_budget_progress
 FROM anon;
+
+REVOKE ALL ON
+  public.v_current_month_spending_by_category,
+  public.v_kakeibo_monthly_summary,
+  public.v_monthly_budget_progress
+FROM authenticated;
+GRANT SELECT ON
+  public.v_current_month_spending_by_category,
+  public.v_kakeibo_monthly_summary,
+  public.v_monthly_budget_progress
+TO authenticated;
