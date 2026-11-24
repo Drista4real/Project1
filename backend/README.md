@@ -111,8 +111,10 @@ budget engine and the chat agent:
 - `supabase/migrations/202611010002_chat_agent_slots.sql` — the server-side
   slots and the tool-call trace (ADR 0010).
 
-Paste them into the Supabase SQL editor and run them in order, or apply them
-from the repository with a direct PostgreSQL connection. Put the connection
+Apply them from the repository with a direct PostgreSQL connection, not from
+the SQL editor: the editor records no migration history, so the database
+drifts from the files without anyone noticing (see the next section). Put the
+connection
 string in `backend/.env` (Supabase Dashboard → Settings → Database →
 Connection string, session pooler):
 
@@ -133,6 +135,83 @@ python -m scripts.apply_migrations --only 202611010002_chat_agent_slots.sql
 
 Without the migrations the chat still answers, but the collected slots and
 the tool trace are dropped, and `/api/v1/budget-plans` answers 503.
+
+### Track migrations with the Supabase CLI
+
+Until 2026-11-24 every migration was pasted into the SQL editor, so
+`supabase_migrations.schema_migrations` did not exist and a migration edited
+after it ran (B15) or never run at all (B16) went unnoticed. The history is now
+kept by the Supabase CLI. The commands below were run with CLI 3.3.0 from the
+repository root. Two details of this version matter:
+
+- Every command targets the **local** database unless `--remote` is given.
+  `--linked` is deprecated and will be removed in v4.
+- The `supabase/` folder lives under `backend/`, hence `--workdir backend`.
+  The 12-digit version prefixes are accepted as they are.
+
+Link the project once per machine. It asks for the database password and
+writes `backend/supabase/.temp/`, which is ignored by git:
+
+```powershell
+npx --yes supabase@3.3.0 login
+npx --yes supabase@3.3.0 link --workdir backend --project-ref <project-ref>
+npx --yes supabase@3.3.0 migration list --workdir backend --remote
+```
+
+Apply a new migration with `apply_migrations`, then record it:
+
+```powershell
+cd backend
+python -m scripts.apply_migrations --only 202611240001_sync_rebalance_plan.sql
+cd ..
+npx --yes supabase@3.3.0 db push --workdir backend --remote --dry-run
+npx --yes supabase@3.3.0 migration repair --workdir backend --remote --status applied 202611240001 --yes
+```
+
+`db push` is used only with `--dry-run`, to list the versions still pending.
+The CLI connects through a temporary login role it creates for the run, while
+`apply_migrations` runs as the `DATABASE_URL` role (`postgres`). The loop in
+202611230001 changes the default privileges of each role the migrating user
+can act for, and new functions are owned by that user. A different role can
+therefore leave a different result. Mark a version as applied only after
+its objects are visible in the catalog. `--yes` is needed because the CLI
+does not prompt when stdout is not a terminal.
+
+`supabase db diff --remote` cannot detect drift here yet. Its shadow database
+is built from `supabase/migrations` alone, and the base schema lives in
+`frontend/supabase/schema.sql`. With CLI 3.3.0 it fails on the first file with
+`relation "public.transactions" does not exist`.
+
+Detect function drift with `scripts/check_function_drift.py` instead. It
+compares md5 and length of every `public` function body, SECURITY DEFINER,
+`proconfig` and EXECUTE for `anon`, `authenticated` and `service_role`
+between a reference database and the target (`DATABASE_URL` by default). Any
+difference exits 1. Build the reference from the e2e `migrate` stack, which
+applies `schema.sql`, every migration and the catalog checks in
+`tests/backend-e2e/sql/`. Publish its database port on loopback with an
+override file kept outside the repository:
+
+```yaml
+# ref-override.yaml
+services:
+  db:
+    ports:
+      - "127.0.0.1:54329:5432"
+```
+
+```powershell
+cd tests/backend-e2e
+python docker/generate_env.py
+docker compose --project-name project1-drift-ref --env-file .env.ci -f compose.yaml -f <path>/ref-override.yaml up --exit-code-from migrate migrate
+docker compose --project-name project1-drift-ref --env-file .env.ci -f compose.yaml -f <path>/ref-override.yaml up -d --wait db
+cd ../../backend
+python -m scripts.check_function_drift --reference-url "postgresql://supabase_admin:<TEST_DB_PASSWORD from .env.ci>@127.0.0.1:54329/postgres"
+```
+
+The SQL files are checked out with LF endings (`.gitattributes`). A checkout
+with CRLF would put a carriage return into every function body of the
+reference and report all of them as different. Remove the stack afterwards
+with `docker compose --project-name project1-drift-ref down --volumes`.
 
 ### API AI (Model 4)
 
