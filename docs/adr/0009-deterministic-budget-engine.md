@@ -108,3 +108,29 @@ path is untrusted input: the file is located by walking the real directory
 entries of the path, so a name that only traverses somewhere else never
 reaches the read, and the recording must be a regular file with a known audio
 extension and a size a benchmark could use.
+
+Correction on 2026-11-24: the comment in `202611010003` says the optimistic
+lock "raises the PostgREST error code PT409 from the start". That was not true
+of the live database until `202611240001`. `202611010001` had been pasted into
+the SQL editor in its first form, which raised `40001`, and was later edited in
+place to raise `PT409` and name its constants. Nothing re-ran it, so the live
+`rebalance_plan` kept the old body (md5 `f927dd…`, 6,519 characters, against
+`13c469…`, 7,261 characters, in the repository). `202611010003` itself had
+never run, so the two array CHECK constraints were missing. The same check
+showed that the B13 and B14 fixes (`202611230001`, `202611230002`) were
+merged but not live either: `anon` could execute every SECURITY DEFINER
+function, `validate_envelope_capacity` accepted any `p_user_id`, and the
+spending views ran with their owner's rights and were readable by `anon`.
+The four migrations were applied on 2026-11-24 with `apply_migrations` and
+recorded with `supabase migration repair`, so the CLI history now lists all
+eleven versions. Drift is detected by `backend/scripts/check_function_drift.py`.
+It compares md5 and length of every `public` function body, SECURITY DEFINER,
+`proconfig` and EXECUTE grants against a database built from the repository by
+the e2e `migrate` stack. After the apply it reported no difference for the 11
+functions. `tests/backend-e2e/sql/budget_plan_sync_test.sql` keeps a later
+migration from bringing the `40001` body back. One risk remains: the default
+privileges of `supabase_admin` in `public` still grant EXECUTE to `anon` on new
+functions, because the migrating role cannot change them. A function that
+`supabase_admin` creates there is executable by `anon` until a migration
+revokes it, and `security_definer_privileges_test.sql` reports any such
+SECURITY DEFINER function.
