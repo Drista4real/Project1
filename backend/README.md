@@ -126,8 +126,11 @@ URL-encode the special characters of the password (`!` becomes `%21`, for
 example). The script refuses to run while the template password is still in
 place, so a half-filled value fails fast instead of at the first query.
 
+`apply_migrations` and `check_function_drift` connect with psycopg, which is
+pinned in the dev requirements, not in `requirements.txt`:
+
 ```powershell
-pip install "psycopg[binary]"
+python -m pip install -r requirements-dev.txt
 python -m scripts.apply_migrations --check   # report what is missing
 python -m scripts.apply_migrations           # apply every migration in order
 python -m scripts.apply_migrations --only 202611010002_chat_agent_slots.sql
