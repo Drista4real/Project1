@@ -90,6 +90,74 @@ def test_a_stale_body_is_reported_with_both_values() -> None:
     assert "7261" in differences[0] and "6519" in differences[0]
 
 
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"body_length": 7260},
+        {"body_md5": "00000000000000000000000000000000"},
+    ],
+    ids=["length-only", "md5-only"],
+)
+def test_one_half_of_the_body_fingerprint_is_enough(changes: dict[str, object]) -> None:
+    """A body differs when only its length or only its md5 differs."""
+    differences = compare_functions([_row()], [_row(**changes)])
+
+    assert len(differences) == 1
+    assert differences[0].startswith(f"{REBALANCE}: body ")
+
+
+def _exit_status(code: int | str | None) -> int:
+    """Map a SystemExit code to the status the process exits with."""
+    if code is None:
+        return 0
+    return code if isinstance(code, int) else 1
+
+
+def test_main_exits_0_when_the_catalogs_match(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """No difference exits 0 and says so."""
+    code = _run_main(monkeypatch, [_row(), _row(VALIDATE)], [_row(), _row(VALIDATE)])
+
+    assert _exit_status(code) == 0
+    assert "No difference." in capsys.readouterr().out
+
+
+def test_main_exits_1_on_drift(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Any difference exits 1."""
+    code = _run_main(monkeypatch, [_row()], [_row(body_length=6519)])
+
+    assert _exit_status(code) == 1
+
+
+def test_main_exits_non_zero_when_a_database_cannot_be_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A connection failure exits non-zero instead of reporting a match."""
+
+    def refuse(conninfo: str, **_: object) -> None:
+        """Refuse every connection."""
+        raise OSError("connection refused")
+
+    monkeypatch.setitem(sys.modules, "psycopg", types.SimpleNamespace(connect=refuse))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "check_function_drift",
+            "--reference-url",
+            REFERENCE_URL,
+            "--database-url",
+            TARGET_URL,
+        ],
+    )
+
+    with pytest.raises(SystemExit) as raised:
+        main()
+
+    assert _exit_status(raised.value.code) != 0
+
+
 def test_a_function_missing_from_the_target_is_reported() -> None:
     """A function only the reference has is reported as missing."""
     differences = compare_functions([_row(), _row(VALIDATE)], [_row()])
