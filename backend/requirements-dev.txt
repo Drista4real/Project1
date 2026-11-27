@@ -60,6 +60,8 @@ postgrest==2.32.0
 prompt_toolkit==3.0.53
 propcache==0.5.4
 protobuf==7.36.2
+psycopg-binary==3.3.9
+psycopg==3.3.9
 pyasn1-modules==0.4.2
 pyasn1==0.6.4
 pycparser==3.0
