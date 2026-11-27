@@ -13,6 +13,7 @@ apply_migrations.py. The exit code is 1 on any difference.
 """
 
 import argparse
+import hashlib
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass, fields
@@ -90,10 +91,31 @@ def compare_functions(
             before = getattr(expected, field.name)
             after = getattr(actual, field.name)
             if before != after:
+                if field.name == "config":
+                    before, after = _redact(before), _redact(after)
                 differences.append(
                     f"{signature}: {field.name} reference={before!r} target={after!r}"
                 )
     return differences
+
+
+def _redact(config: tuple[str, ...] | None) -> tuple[str, ...] | None:
+    """Hide every setting value except search_path, which diagnosis needs.
+
+    A setting can hold a credential, so the report shows its key and the
+    first 8 hex characters of the sha256 of its value.
+    """
+    if config is None:
+        return None
+    shown: list[str] = []
+    for setting in config:
+        key, _, value = setting.partition("=")
+        if key == "search_path":
+            shown.append(setting)
+        else:
+            digest = hashlib.sha256(value.encode()).hexdigest()[:8]
+            shown.append(f"{key}=sha256:{digest}")
+    return tuple(shown)
 
 
 def _fetch(url: str, label: str) -> list[FunctionRow]:
