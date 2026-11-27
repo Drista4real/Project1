@@ -185,11 +185,14 @@ is built from `supabase/migrations` alone, and the base schema lives in
 `frontend/supabase/schema.sql`. With CLI 3.3.0 it fails on the first file with
 `relation "public.transactions" does not exist`.
 
-Detect function drift with `scripts/check_function_drift.py` instead. It
-compares md5 and length of every `public` function body, SECURITY DEFINER,
-`proconfig` and EXECUTE for `anon`, `authenticated` and `service_role`
-between a reference database and the target (`DATABASE_URL` by default). Any
-difference exits 1. Build the reference from the e2e `migrate` stack, which
+Detect function drift with `scripts/check_function_drift.py` instead. For
+every `public` function not owned by an extension, it compares md5 and length
+of the body, SECURITY DEFINER, `proconfig` and EXECUTE for `anon`,
+`authenticated` and `service_role` between a reference database and the target
+(`DATABASE_URL` by default). Functions owned by an extension come from the
+platform, so they are skipped and the report only prints how many there are.
+Function setting values other than `search_path` are shown as a sha256
+prefix. Any difference exits 1. Build the reference from the e2e `migrate` stack, which
 applies `schema.sql`, every migration and the catalog checks in
 `tests/backend-e2e/sql/`. Publish its database port on loopback with an
 override file kept outside the repository:

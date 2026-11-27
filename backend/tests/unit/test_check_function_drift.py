@@ -41,15 +41,23 @@ def _run_main(
     monkeypatch: pytest.MonkeyPatch,
     reference: list[FunctionRow],
     target: list[FunctionRow],
+    skipped: tuple[int, int] = (0, 0),
 ) -> int | str | None:
-    """Run main() against a fake psycopg and return its exit code."""
-    catalogs = {REFERENCE_URL: _catalog(reference), TARGET_URL: _catalog(target)}
+    """Run main() against a fake psycopg and return its exit code.
+
+    `skipped` is the number of extension functions in the reference and the
+    target.
+    """
+    catalogs = {
+        REFERENCE_URL: (_catalog(reference), skipped[0]),
+        TARGET_URL: (_catalog(target), skipped[1]),
+    }
 
     @contextmanager
     def connect(conninfo: str, **_: object) -> Iterator[types.SimpleNamespace]:
         """Serve the canned catalog of one database."""
-        rows = catalogs[conninfo]
-        result = types.SimpleNamespace(fetchall=lambda: rows, fetchone=lambda: (0,))
+        rows, count = catalogs[conninfo]
+        result = types.SimpleNamespace(fetchall=lambda: rows, fetchone=lambda: (count,))
         yield types.SimpleNamespace(execute=lambda _sql: result)
 
     monkeypatch.setitem(sys.modules, "psycopg", types.SimpleNamespace(connect=connect))
@@ -116,11 +124,15 @@ def _exit_status(code: int | str | None) -> int:
 def test_main_exits_0_when_the_catalogs_match(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """No difference exits 0 and says so."""
-    code = _run_main(monkeypatch, [_row(), _row(VALIDATE)], [_row(), _row(VALIDATE)])
+    """No difference exits 0, says so and counts the skipped functions."""
+    rows = [_row(), _row(VALIDATE)]
 
+    code = _run_main(monkeypatch, rows, list(rows), skipped=(3, 5))
+
+    out = capsys.readouterr().out
     assert _exit_status(code) == 0
-    assert "No difference." in capsys.readouterr().out
+    assert "No difference." in out
+    assert "Skipped as owned by an extension: 5 in target, 3 in reference" in out
 
 
 def test_main_exits_1_on_drift(monkeypatch: pytest.MonkeyPatch) -> None:

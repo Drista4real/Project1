@@ -1,9 +1,11 @@
-"""Compare every function in schema `public` between two databases.
+"""Compare every public function not owned by an extension between two databases.
 
 The reference is a throwaway PostgreSQL built from schema.sql plus every
 migration (the e2e `migrate` stack). The target is the database to check,
-usually the live project. Bodies are compared by md5(prosrc), so no SQL file
-is parsed. Connection strings are never printed.
+usually the live project. Functions an extension owns come from the platform,
+not the migrations, so they are skipped and only counted. Bodies are compared
+by md5(prosrc), so no SQL file is parsed. Connection strings and function
+setting values other than search_path are never printed.
 
     python -m scripts.check_function_drift --reference-url <url>
     python -m scripts.check_function_drift --reference-url <url> --database-url <url>
@@ -24,8 +26,18 @@ if str(Path(__file__).resolve().parents[1]) not in sys.path:
 
 from scripts.apply_migrations import _database_url, _placeholder_password  # noqa: E402
 
-# Functions owned by an extension come from the platform, not the migrations.
-FUNCTIONS_SQL = """
+PUBLIC_FUNCTION = "p.pronamespace = 'public'::regnamespace"
+EXTENSION_OWNED = """EXISTS (
+     SELECT 1 FROM pg_catalog.pg_depend d
+      WHERE d.classid = 'pg_catalog.pg_proc'::regclass
+        AND d.objid = p.oid
+        AND d.deptype = 'e'
+   )"""
+EXTENSION_FUNCTIONS_SQL = f"""
+SELECT count(*) FROM pg_catalog.pg_proc p
+ WHERE {PUBLIC_FUNCTION} AND {EXTENSION_OWNED}
+"""
+FUNCTIONS_SQL = f"""
 SELECT p.oid::regprocedure::text,
        md5(p.prosrc),
        length(p.prosrc),
@@ -35,13 +47,7 @@ SELECT p.oid::regprocedure::text,
        has_function_privilege('authenticated', p.oid, 'EXECUTE'),
        has_function_privilege('service_role', p.oid, 'EXECUTE')
   FROM pg_catalog.pg_proc p
- WHERE p.pronamespace = 'public'::regnamespace
-   AND NOT EXISTS (
-     SELECT 1 FROM pg_catalog.pg_depend d
-      WHERE d.classid = 'pg_catalog.pg_proc'::regclass
-        AND d.objid = p.oid
-        AND d.deptype = 'e'
-   )
+ WHERE {PUBLIC_FUNCTION} AND NOT {EXTENSION_OWNED}
  ORDER BY 1
 """
 
@@ -118,8 +124,8 @@ def _redact(config: tuple[str, ...] | None) -> tuple[str, ...] | None:
     return tuple(shown)
 
 
-def _fetch(url: str, label: str) -> list[FunctionRow]:
-    """Read the public functions of one database.
+def _fetch(url: str, label: str) -> tuple[list[FunctionRow], int]:
+    """Read the compared functions of one database and count the skipped ones.
 
     Errors name the database by label and exception type only: a driver
     message can quote the connection string.
@@ -135,12 +141,13 @@ def _fetch(url: str, label: str) -> list[FunctionRow]:
     try:
         with psycopg.connect(url, connect_timeout=15) as connection:
             rows = connection.execute(FUNCTIONS_SQL).fetchall()
+            skipped = connection.execute(EXTENSION_FUNCTIONS_SQL).fetchone()[0]
     except Exception as error:  # noqa: BLE001 - reported without its message
         raise SystemExit(
             f"Could not read functions from the {label} database "
             f"({type(error).__name__})."
         ) from None
-    return [
+    functions = [
         FunctionRow(
             signature=row[0],
             body_md5=row[1],
@@ -153,6 +160,7 @@ def _fetch(url: str, label: str) -> list[FunctionRow]:
         )
         for row in rows
     ]
+    return functions, skipped
 
 
 def main() -> None:
@@ -170,8 +178,8 @@ def main() -> None:
     if not target_url:
         raise SystemExit("No DATABASE_URL found. Pass --database-url or set it.")
 
-    reference = _fetch(args.reference_url, "reference")
-    target = _fetch(target_url, "target")
+    reference, reference_skipped = _fetch(args.reference_url, "reference")
+    target, target_skipped = _fetch(target_url, "target")
     differences = compare_functions(reference, target)
 
     for row in target:
@@ -182,6 +190,10 @@ def main() -> None:
         status = "DIFFERS" if flagged else "ok"
         print(f"{status:8} {row.body_md5[:6]} {row.body_length:6} {row.signature}")
     print(f"{len(target)} public functions in target, {len(reference)} in reference")
+    print(
+        f"Skipped as owned by an extension: {target_skipped} in target, "
+        f"{reference_skipped} in reference"
+    )
     for line in differences:
         print(f"- {line}")
     if differences:
