@@ -184,14 +184,46 @@ class TestPurchaseImpact:
         )
         assert result.level == "CRITICAL_DANGER"
 
-    def test_purchase_above_allowance_but_above_floor_warns(self):
+    # Pins the current engine, which follows the matrix in
+    # docs/DYNAMIC_BUDGET_SPEC.md §5.5: a purchase that leaves the daily
+    # allowance above the plan's is a warning, one that lowers it is safe.
+    # The spec's own examples in §5.3 and §6.3.2 classify D_new = 74.074 < D_i
+    # as WARNING_REBALANCE_NEEDED, the opposite. This records what the engine
+    # does today; it does not decide which reading is right.
+    @pytest.mark.parametrize(
+        ("amount", "level", "daily_after"),
+        [
+            (Decimal("100000"), "WARNING_REBALANCE_NEEDED", Decimal("103571.43")),
+            (Decimal("1000000"), "SAFE", Decimal("71428.57")),
+        ],
+        ids=["allowance-rises-warns", "allowance-falls-is-safe"],
+    )
+    def test_current_levels_are_inverted_against_the_spec_examples(
+        self, amount: Decimal, level: str, daily_after: Decimal
+    ):
+        # Nothing spent on days 1 and 2, so R = B_spendable and n = 30 - 3 + 1.
         result = evaluate_purchase_impact(
             plan=_plan(survival_floor=Decimal("70000")),
             current_day=3,
-            amount=Decimal("500000"),
-            remaining_balance=Decimal("3500000"),
+            amount=amount,
+            remaining_balance=Decimal("3000000"),
         )
-        assert result.level == "WARNING_REBALANCE_NEEDED"
+        assert result.remaining_days == 28
+        assert result.daily_allowance_after == daily_after
+        assert result.level == level
+
+    def test_large_purchase_example_falls_below_the_default_floor(self):
+        # Worked example in §3 of the large-purchase rebalance draft: 400.000
+        # spent in the first four days leaves R = 2.600.000 on day 5.
+        result = evaluate_purchase_impact(
+            plan=_plan(),
+            current_day=5,
+            amount=Decimal("1500000"),
+            remaining_balance=Decimal("2600000"),
+        )
+        assert result.remaining_days == 26
+        assert result.daily_allowance_after == Decimal("42307.69")
+        assert result.level == "CRITICAL_DANGER"
 
     def test_day_outside_plan_is_rejected(self):
         with pytest.raises(ValueError, match="inside the plan"):
