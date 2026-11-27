@@ -8,21 +8,27 @@
 DO $$
 DECLARE
   v_failures text[] := '{}';
+  -- to_regprocedure returns NULL instead of raising, so a missing function is
+  -- one failure and the CHECK constraints are still inspected.
   v_fn constant regprocedure :=
-    'public.rebalance_plan(bigint, int, jsonb, jsonb, uuid)'::regprocedure;
+    to_regprocedure('public.rebalance_plan(bigint, int, jsonb, jsonb, uuid)');
   v_body text;
   v_check text;
 BEGIN
-  SELECT prosrc INTO v_body FROM pg_proc WHERE oid = v_fn;
-  -- The body also says "not 40001" in a comment, so match the raise itself.
-  IF position('ERRCODE = ''PT409''' IN v_body) = 0 THEN
-    v_failures := v_failures || 'rebalance_plan does not raise PT409'::text;
-  END IF;
-  IF position('ERRCODE = ''40001''' IN v_body) > 0 THEN
-    v_failures := v_failures || 'rebalance_plan still raises 40001'::text;
-  END IF;
-  IF has_function_privilege('anon', v_fn, 'EXECUTE') THEN
-    v_failures := v_failures || ('anon can execute ' || v_fn::text);
+  IF v_fn IS NULL THEN
+    v_failures := v_failures || 'missing function public.rebalance_plan(bigint, int, jsonb, jsonb, uuid)'::text;
+  ELSE
+    SELECT prosrc INTO v_body FROM pg_proc WHERE oid = v_fn;
+    -- The body also says "not 40001" in a comment, so match the raise itself.
+    IF position('ERRCODE = ''PT409''' IN v_body) = 0 THEN
+      v_failures := v_failures || 'rebalance_plan does not raise PT409'::text;
+    END IF;
+    IF position('ERRCODE = ''40001''' IN v_body) > 0 THEN
+      v_failures := v_failures || 'rebalance_plan still raises 40001'::text;
+    END IF;
+    IF has_function_privilege('anon', v_fn, 'EXECUTE') THEN
+      v_failures := v_failures || ('anon can execute ' || v_fn::text);
+    END IF;
   END IF;
 
   FOREACH v_check IN ARRAY ARRAY[
@@ -31,7 +37,7 @@ BEGIN
   ] LOOP
     IF NOT EXISTS (
       SELECT 1 FROM pg_constraint
-       WHERE conrelid = 'public.budget_plan_events'::regclass
+       WHERE conrelid = to_regclass('public.budget_plan_events')
          AND contype = 'c'
          AND conname = v_check
     ) THEN
