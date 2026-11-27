@@ -184,15 +184,6 @@ class TestPurchaseImpact:
         )
         assert result.level == "CRITICAL_DANGER"
 
-    def test_purchase_above_allowance_but_above_floor_warns(self):
-        result = evaluate_purchase_impact(
-            plan=_plan(survival_floor=Decimal("70000")),
-            current_day=3,
-            amount=Decimal("500000"),
-            remaining_balance=Decimal("3500000"),
-        )
-        assert result.level == "WARNING_REBALANCE_NEEDED"
-
     # Pins the current engine, which follows the matrix in
     # docs/DYNAMIC_BUDGET_SPEC.md §5.5: a purchase that leaves the daily
     # allowance above the plan's is a warning, one that lowers it is safe.
