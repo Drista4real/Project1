@@ -221,6 +221,19 @@ class TestPurchaseImpact:
         assert result.daily_allowance_after == daily_after
         assert result.level == level
 
+    def test_large_purchase_example_falls_below_the_default_floor(self):
+        # Worked example in §3 of the large-purchase rebalance draft: 400.000
+        # spent in the first four days leaves R = 2.600.000 on day 5.
+        result = evaluate_purchase_impact(
+            plan=_plan(),
+            current_day=5,
+            amount=Decimal("1500000"),
+            remaining_balance=Decimal("2600000"),
+        )
+        assert result.remaining_days == 26
+        assert result.daily_allowance_after == Decimal("42307.69")
+        assert result.level == "CRITICAL_DANGER"
+
     def test_day_outside_plan_is_rejected(self):
         with pytest.raises(ValueError, match="inside the plan"):
             evaluate_purchase_impact(
