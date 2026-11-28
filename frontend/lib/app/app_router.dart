@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 import 'package:project_one/app/app_routes.dart';
 import 'package:project_one/features/ledger/screens/ledger_screen.dart';
 import 'package:project_one/features/chat/screens/chat_home_screen.dart';
+import 'package:project_one/features/community/screens/community_screen.dart';
 import 'package:project_one/features/reports/screens/reports_screen.dart';
 import 'package:project_one/features/budget/screens/budget_screen.dart';
 import 'package:project_one/features/plan/screens/plan_screen.dart';
@@ -22,6 +23,10 @@ GoRouter createAppRouter() => GoRouter(
     GoRoute(
       path: AppRoutes.ledger,
       builder: (context, state) => const LedgerScreen(),
+    ),
+    GoRoute(
+      path: AppRoutes.community,
+      builder: (context, state) => const CommunityScreen(),
     ),
     GoRoute(
       path: AppRoutes.reports,

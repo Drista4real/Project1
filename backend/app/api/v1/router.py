@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1.endpoints import (
     budget_plans,
     chat,
+    community,
     finance,
     health,
     management,
@@ -18,5 +19,6 @@ api_router.include_router(finance.router)
 api_router.include_router(management.router)
 api_router.include_router(ingestion_router)
 api_router.include_router(budget_plans.router)
+api_router.include_router(community.router)
 api_router.include_router(chat.router)
 api_router.include_router(forecast_router)

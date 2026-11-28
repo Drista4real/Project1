@@ -68,11 +68,11 @@ class AppScreenNavigation extends StatelessWidget {
       identifier: 'nav-ledger',
     ),
     NavDestination(
-      route: AppRoutes.reports,
-      outline: Icons.pie_chart_outline,
-      filled: Icons.pie_chart,
-      label: 'Báo cáo',
-      identifier: 'nav-reports',
+      route: AppRoutes.community,
+      outline: Icons.people_outline,
+      filled: Icons.people,
+      label: 'Cộng đồng',
+      identifier: 'nav-community',
     ),
     NavDestination(
       route: AppRoutes.budget,
