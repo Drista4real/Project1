@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from typing import get_args
 
 import httpx
 import pytest
@@ -12,7 +13,9 @@ from app.domain.budget_plan import (
     LOCAL_TIMEZONE,
     BudgetPlan,
     GroupRatios,
+    ImpactLevel,
     compute_plan_totals,
+    evaluate_purchase_impact,
 )
 from app.infrastructure.repositories.plan_balance import SupabasePlanBalanceSource
 
@@ -162,14 +165,41 @@ class TestPlanBalanceSource:
         assert source.remaining_balance(_plan(), 31) is None
         assert source.remaining_balance(_plan(), 0) is None
 
-    def test_spending_beyond_the_grant_never_goes_negative(self):
+    def test_spending_beyond_the_grant_is_kept_negative(self):
         source = _source(
             _client(
                 allocations=[{"day_index": 1}],
                 transactions=[{"amount": "9000000.00"}],
             )
         )
-        assert source.remaining_balance(_plan(), 3) == Decimal("0")
+        remaining = source.remaining_balance(_plan(), 3)
+        assert isinstance(remaining, Decimal)
+        assert remaining == Decimal("-6000000.00")
+
+    def test_a_negative_remaining_balance_is_critical_danger(self):
+        source = _source(
+            _client(
+                allocations=[{"day_index": 1}],
+                transactions=[{"amount": "9000000.00"}],
+            )
+        )
+        plan = _plan()
+        impact = evaluate_purchase_impact(
+            plan=plan,
+            current_day=10,
+            amount=Decimal("100000"),
+            remaining_balance=source.remaining_balance(plan, 10),
+        )
+        assert impact.level == "CRITICAL_DANGER"
+        assert impact.daily_allowance_after < 0
+
+    def test_the_impact_levels_are_unchanged(self):
+        assert set(get_args(ImpactLevel)) == {
+            "SAFE",
+            "WARNING_REBALANCE_NEEDED",
+            "CRITICAL_DANGER",
+            "INSUFFICIENT_DATA",
+        }
 
     def test_a_marked_fixed_expense_of_this_plan_is_exempted(self):
         source = _source(
