@@ -20,70 +20,73 @@ Future<void> openFinanceModule(
   ManagementRepository? repository,
 }) async {
   if (_openingFinanceModule) return;
-  _openingFinanceModule = true;
-  try {
-    final source = repository ?? AppDependencies.managementRepository;
-    if (create && generatedFinanceResources.contains(name)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Dữ liệu do hệ thống tạo, chỉ có thể xem.'),
-        ),
-      );
-      return;
-    }
-    if (name == 'profile') {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => EditProfileScreen(
-            repository: source,
-            initialProfile: record,
-          ),
-        ),
-      );
-      return;
-    }
-    if ((name == 'categories' || name == 'budgets') &&
-        !create &&
-        record == null) {
-      await Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (_) => CategoryEnvelopesScreen(
-            repository: source,
-            month: DateTime.tryParse('${defaults['month_year']}'),
-          ),
-        ),
-      );
-      return;
-    }
-    final resources = await source.resources();
-    final resource = resources.firstWhere((item) => item['name'] == name);
-    Map<String, dynamic>? fresh;
-    if (record != null || name == 'profile') {
-      fresh = await source.get(
-        name,
-        name == 'profile' ? 'me' : source.key(name, record!),
-      );
-    }
-    if (!context.mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => create || fresh != null
-            ? RecordFormScreen(
-                resource: resource,
-                repository: source,
-                record: fresh,
-                initialValues: defaults,
-              )
-            : ResourceListScreen(resource: resource, repository: source),
+  if (ModalRoute.of(context)?.isCurrent == false) return;
+
+  final source = repository ?? AppDependencies.managementRepository;
+  if (create && generatedFinanceResources.contains(name)) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Dữ liệu do hệ thống tạo, chỉ có thể xem.'),
       ),
     );
+    return;
+  }
+  if (name == 'profile') {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EditProfileScreen(
+          repository: source,
+          initialProfile: record,
+        ),
+      ),
+    );
+    return;
+  }
+  if ((name == 'categories' || name == 'budgets') &&
+      !create &&
+      record == null) {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CategoryEnvelopesScreen(
+          repository: source,
+          month: DateTime.tryParse('${defaults['month_year']}'),
+        ),
+      ),
+    );
+    return;
+  }
+
+  _openingFinanceModule = true;
+  late final Map<String, dynamic> resource;
+  Map<String, dynamic>? fresh;
+  try {
+    final resources = await source.resources();
+    resource = resources.firstWhere((item) => item['name'] == name);
+    if (record != null) {
+      fresh = await source.get(name, source.key(name, record));
+    }
   } catch (error) {
     if (context.mounted) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('$error')));
     }
+    return;
   } finally {
     _openingFinanceModule = false;
   }
+
+  if (!context.mounted) return;
+  await Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => create || fresh != null
+          ? RecordFormScreen(
+              resource: resource,
+              repository: source,
+              record: fresh,
+              initialValues: defaults,
+            )
+          : ResourceListScreen(resource: resource, repository: source),
+    ),
+  );
 }

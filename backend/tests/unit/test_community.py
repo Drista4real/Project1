@@ -257,6 +257,12 @@ class TestCommunityEndpoints:
 
 
 def test_author_display_name_fallbacks():
-    assert _author_display_name({"full_name": "Minh Anh", "email": "a@b.com"}) == "Minh Anh"
-    assert _author_display_name({"full_name": "  ", "email": "dat@example.com"}) == "dat"
+    assert (
+        _author_display_name({"full_name": "Minh Anh", "email": "a@b.com"})
+        == "Minh Anh"
+    )
+    assert (
+        _author_display_name({"full_name": "  ", "email": "dat@example.com"})
+        == "dat"
+    )
     assert _author_display_name(None) == "Người dùng Kakeibo"
