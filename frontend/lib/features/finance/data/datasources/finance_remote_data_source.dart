@@ -65,6 +65,7 @@ class FinanceRemoteDataSource {
     String? categoryName,
     int? accountId,
     DateTime? transactionDate,
+    int? fixedExpensePlanId,
   }) async {
     if (accountId == null) {
       final accounts = await getAccounts();
@@ -88,6 +89,7 @@ class FinanceRemoteDataSource {
         'transaction_date': (transactionDate ?? DateTime.now())
             .toUtc()
             .toIso8601String(),
+        'fixed_expense_plan_id': ?fixedExpensePlanId,
       },
     );
   }

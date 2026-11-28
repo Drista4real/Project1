@@ -16,6 +16,7 @@ class PendingSaveRepository extends FakeFinanceRepository {
     String? categoryName,
     int? accountId,
     DateTime? transactionDate,
+    int? fixedExpensePlanId,
   }) async {
     saves++;
     await saveRequest.future;

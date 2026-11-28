@@ -42,12 +42,14 @@ class FakeFinanceRepository implements FinanceRepository {
     String? categoryName,
     int? accountId,
     DateTime? transactionDate,
+    int? fixedExpensePlanId,
   }) async {
     added = {
       'amount': amount,
       'account_id': accountId,
       'transaction_type': transactionType,
       'description': description,
+      'fixed_expense_plan_id': fixedExpensePlanId,
     };
   }
 

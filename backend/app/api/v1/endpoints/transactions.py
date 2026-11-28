@@ -30,6 +30,8 @@ class UpdateTransaction(BaseModel):
     raw_description: str | None = Field(default=None, max_length=2000)
     clean_description: str | None = Field(default=None, max_length=2000)
     transaction_date: AwareDatetime | None = None
+    # Send null to clear the marker.
+    fixed_expense_plan_id: Identifier | None = None
 
     @model_validator(mode="after")
     def validate_patch(self):

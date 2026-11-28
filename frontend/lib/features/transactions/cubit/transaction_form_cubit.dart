@@ -3,6 +3,7 @@ import 'package:project_one/features/finance/domain/entities/account.dart';
 import 'package:project_one/features/finance/domain/entities/category.dart';
 import 'package:project_one/features/finance/domain/entities/transaction.dart';
 import 'package:project_one/features/finance/domain/repositories/finance_repository.dart';
+import 'package:project_one/features/plan/data/budget_plan_repository.dart';
 
 class TransactionFormState {
   TransactionFormState({
@@ -18,7 +19,11 @@ class TransactionFormState {
     this.loadError,
     this.saveError,
     this.saved = false,
-  }) : categories = List.unmodifiable(categories),
+    this.planId,
+    this.fixedExpense = false,
+    List<String> fixedExpenseNames = const [],
+  }) : fixedExpenseNames = List.unmodifiable(fixedExpenseNames),
+       categories = List.unmodifiable(categories),
        accounts = List.unmodifiable(accounts);
   final List<Category> categories;
   final List<Account> accounts;
@@ -32,6 +37,27 @@ class TransactionFormState {
   final String? loadError;
   final String? saveError;
   final bool saved;
+
+  /// The plan a fixed expense marker attaches to, or null when none.
+  final int? planId;
+
+  /// Set only by the user; a match is shown as a suggestion, never applied.
+  final bool fixedExpense;
+
+  /// Recurring fixed expenses that a category or note may match.
+  final List<String> fixedExpenseNames;
+
+  bool get canMarkFixedExpense => type == 'expense' && planId != null;
+
+  /// The recurring item the category or [note] matches, if any.
+  String? fixedExpenseSuggestion(String note) {
+    String key(String? text) => (text ?? '').trim().toLowerCase();
+    final candidates = {key(selected?.name), key(note)}..remove('');
+    for (final name in fixedExpenseNames) {
+      if (candidates.contains(key(name))) return name;
+    }
+    return null;
+  }
 
   TransactionFormState copyWith({
     List<Category>? categories,
@@ -49,6 +75,9 @@ class TransactionFormState {
     String? saveError,
     bool clearSaveError = false,
     bool? saved,
+    int? planId,
+    bool? fixedExpense,
+    List<String>? fixedExpenseNames,
   }) => TransactionFormState(
     categories: categories ?? this.categories,
     accounts: accounts ?? this.accounts,
@@ -62,21 +91,27 @@ class TransactionFormState {
     loadError: clearLoadError ? null : loadError ?? this.loadError,
     saveError: clearSaveError ? null : saveError ?? this.saveError,
     saved: saved ?? this.saved,
+    planId: planId ?? this.planId,
+    fixedExpense: fixedExpense ?? this.fixedExpense,
+    fixedExpenseNames: fixedExpenseNames ?? this.fixedExpenseNames,
   );
 }
 
 class TransactionFormCubit extends Cubit<TransactionFormState> {
-  TransactionFormCubit(this.repository, {this.transaction})
+  TransactionFormCubit(this.repository, {this.transaction, this.plans})
     : super(
         TransactionFormState(
           accountId: transaction?.accountId,
           toAccountId: transaction?.toAccountId,
           date: transaction?.transactionDate ?? DateTime.now(),
           type: transaction?.transactionType ?? 'expense',
+          planId: transaction?.fixedExpensePlanId,
+          fixedExpense: transaction?.fixedExpensePlanId != null,
         ),
       );
   final FinanceRepository repository;
   final Transaction? transaction;
+  final BudgetPlanRepository? plans;
   int _generation = 0;
   bool _referencesLoaded = false;
 
@@ -86,6 +121,8 @@ class TransactionFormCubit extends Cubit<TransactionFormState> {
   void selectToAccount(int? id) => emit(state.copyWith(toAccountId: id));
   void selectCategory(Category? category) =>
       emit(state.copyWith(selected: category, clearSelected: category == null));
+  void setFixedExpense(bool value) =>
+      emit(state.copyWith(fixedExpense: value));
   void selectDate(DateTime date) => emit(
     state.copyWith(
       date: DateTime(
@@ -129,10 +166,38 @@ class TransactionFormCubit extends Cubit<TransactionFormState> {
           clearSelected: selected == null,
         ),
       );
+      await _loadPlan(generation);
     } catch (error) {
       if (!isClosed && generation == _generation) {
         emit(state.copyWith(loading: false, loadError: '$error'));
       }
+    }
+  }
+
+  /// The active plan, as the plan screen picks it, and its recurring items.
+  ///
+  /// Both are optional: without them the marker or the suggestion is hidden,
+  /// and a marker already saved on the transaction is kept.
+  Future<void> _loadPlan(int generation) async {
+    final plans = this.plans;
+    if (plans == null) return;
+    try {
+      final active = await plans.plans(activeOnly: true);
+      if (isClosed || generation != _generation) return;
+      if (state.planId == null && active.isNotEmpty) {
+        emit(state.copyWith(planId: active.first.id));
+      }
+      final defaults = await plans.setupDefaults();
+      if (isClosed || generation != _generation) return;
+      emit(
+        state.copyWith(
+          fixedExpenseNames: [
+            for (final item in defaults.fixedExpenses) item.description,
+          ],
+        ),
+      );
+    } catch (_) {
+      // An unreadable plan only hides the marker; it never blocks saving.
     }
   }
 
@@ -145,6 +210,9 @@ class TransactionFormCubit extends Cubit<TransactionFormState> {
       return;
     }
     final form = state;
+    final fixedExpensePlanId = form.canMarkFixedExpense && form.fixedExpense
+        ? form.planId
+        : null;
     emit(state.copyWith(saving: true, clearSaveError: true));
     try {
       if (transaction != null) {
@@ -157,6 +225,7 @@ class TransactionFormCubit extends Cubit<TransactionFormState> {
           'account_id': form.accountId,
           'to_account_id': form.type == 'transfer' ? form.toAccountId : null,
           'transaction_date': form.date.toUtc().toIso8601String(),
+          'fixed_expense_plan_id': fixedExpensePlanId,
         });
       } else {
         await repository.addTransaction(
@@ -169,6 +238,7 @@ class TransactionFormCubit extends Cubit<TransactionFormState> {
           categoryName: form.selected?.name,
           accountId: form.accountId,
           transactionDate: form.date,
+          fixedExpensePlanId: fixedExpensePlanId,
         );
       }
       if (!isClosed) emit(state.copyWith(saving: false, saved: true));

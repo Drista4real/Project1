@@ -12,15 +12,18 @@ import 'package:project_one/features/finance/domain/entities/transaction.dart';
 import 'package:project_one/features/finance/domain/repositories/finance_repository.dart';
 import 'package:project_one/shared/widgets/finance_form.dart';
 import 'package:project_one/features/management/open_finance_module.dart';
+import 'package:project_one/features/plan/data/budget_plan_repository.dart';
 
 class QuickAddTransactionScreen extends StatefulWidget {
   final Transaction? transaction;
   final FinanceRepository? repository;
+  final BudgetPlanRepository? planRepository;
   final String? initialDescription;
   const QuickAddTransactionScreen({
     super.key,
     this.transaction,
     this.repository,
+    this.planRepository,
     this.initialDescription,
   });
   @override
@@ -37,6 +40,7 @@ class _QuickAddTransactionScreenState extends State<QuickAddTransactionScreen> {
   late final _cubit = TransactionFormCubit(
     _repository,
     transaction: widget.transaction,
+    plans: widget.planRepository ?? BackendBudgetPlanRepository(),
   );
   List<Category> get _categories => _cubit.state.categories;
   List<Account> get _accounts => _cubit.state.accounts;
@@ -406,6 +410,47 @@ class _QuickAddTransactionScreenState extends State<QuickAddTransactionScreen> {
                               label: const Text('Quản lý danh mục'),
                             ),
                           ],
+                        ),
+                      ),
+                    if (_cubit.state.canMarkFixedExpense)
+                      FinanceFormSection(
+                        title: 'Kế hoạch',
+                        child: ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: _note,
+                          builder: (context, note, _) {
+                            final state = _cubit.state;
+                            final match = state.fixedExpense
+                                ? null
+                                : state.fixedExpenseSuggestion(note.text);
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SwitchListTile(
+                                  key: const ValueKey('fixedExpenseMarker'),
+                                  contentPadding: EdgeInsets.zero,
+                                  title: const Text(
+                                    'Chi phí cố định của kế hoạch',
+                                  ),
+                                  subtitle: const Text(
+                                    'Khoản đã trừ khi lập kế hoạch, không tính '
+                                    'vào chi tiêu còn lại.',
+                                  ),
+                                  value: state.fixedExpense,
+                                  onChanged: disabled
+                                      ? null
+                                      : _cubit.setFixedExpense,
+                                ),
+                                if (match != null)
+                                  Text(
+                                    'Gợi ý: khớp với chi phí cố định '
+                                    '“$match”. Bật nếu đây là khoản đó.',
+                                    key: const ValueKey(
+                                      'fixedExpenseSuggestion',
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
                         ),
                       ),
                     FinanceFormSection(

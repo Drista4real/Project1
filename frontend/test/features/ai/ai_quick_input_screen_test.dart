@@ -123,6 +123,7 @@ class SavingRepository extends FakeFinanceRepository {
     String? categoryName,
     int? accountId,
     DateTime? transactionDate,
+    int? fixedExpensePlanId,
   }) async {
     if (pending != null) await pending!.future;
     if (failSecond && saved.isNotEmpty) throw StateError('offline');

@@ -16,7 +16,11 @@ from decimal import Decimal
 
 from supabase import Client
 
-from app.domain.budget_plan import BudgetPlan, RemainingBalanceSource
+from app.domain.budget_plan import (
+    BudgetPlan,
+    RemainingBalanceSource,
+    exempt_fixed_expenses,
+)
 
 
 class SupabasePlanBalanceSource(RemainingBalanceSource):
@@ -38,7 +42,7 @@ class SupabasePlanBalanceSource(RemainingBalanceSource):
         if not self._has_allocations(plan.id):
             return None
         window_end = plan.start_date + timedelta(days=day_index)
-        spent = self._spent_between(plan.start_date, window_end)
+        spent = self._spent_between(plan.start_date, window_end, plan)
         remaining = plan.spendable_budget - spent
         return remaining if remaining > 0 else Decimal("0")
 
@@ -67,18 +71,26 @@ class SupabasePlanBalanceSource(RemainingBalanceSource):
         )
         return result.data or []
 
-    def _spent_between(self, start: date, end: date) -> Decimal:
-        """Sum the confirmed expenses recorded inside the window."""
+    def _spent_between(self, start: date, end: date, plan: BudgetPlan) -> Decimal:
+        """Sum the expenses inside the window, less this plan's fixed ones."""
         result = (
             self.client.table("transactions")
-            .select("amount")
+            .select("amount, fixed_expense_plan_id")
             .eq("user_id", self.user_id)
             .eq("transaction_type", "expense")
             .gte("transaction_date", start.isoformat())
             .lt("transaction_date", end.isoformat())
             .execute()
         )
-        return sum(
-            (Decimal(str(row["amount"])) for row in (result.data or [])),
+        rows = result.data or []
+        total = sum((Decimal(str(row["amount"])) for row in rows), Decimal("0"))
+        # A marker for another plan is ordinary spending of this one.
+        marked = sum(
+            (
+                Decimal(str(row["amount"]))
+                for row in rows
+                if row.get("fixed_expense_plan_id") == plan.id
+            ),
             Decimal("0"),
         )
+        return exempt_fixed_expenses(total, marked, plan.fixed_expenses)

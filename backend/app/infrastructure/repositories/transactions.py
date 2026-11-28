@@ -108,3 +108,13 @@ class SupabaseTransactionRepository:
             .execute()
         )
         return result.data[0] if result.data else None
+
+    def plan(self, plan_id: int) -> dict | None:
+        result = (
+            self.client.table("budget_plans")
+            .select("id")
+            .eq("user_id", self.user_id)
+            .eq("id", plan_id)
+            .execute()
+        )
+        return result.data[0] if result.data else None

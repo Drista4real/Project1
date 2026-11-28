@@ -44,6 +44,7 @@ class SupabaseFinanceRepository implements FinanceRepository {
     String? categoryName,
     int? accountId,
     DateTime? transactionDate,
+    int? fixedExpensePlanId,
   }) {
     return remoteDataSource.addTransaction(
       amount: amount,
@@ -53,6 +54,7 @@ class SupabaseFinanceRepository implements FinanceRepository {
       categoryName: categoryName,
       accountId: accountId,
       transactionDate: transactionDate,
+      fixedExpensePlanId: fixedExpensePlanId,
     );
   }
 }

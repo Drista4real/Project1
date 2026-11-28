@@ -16,6 +16,7 @@ class TransactionModel extends Transaction {
     required super.transactionDate,
     required super.createdAt,
     super.categoryName,
+    super.fixedExpensePlanId,
   });
 
   factory TransactionModel.fromJson(Map<String, dynamic> json) {
@@ -35,6 +36,7 @@ class TransactionModel extends Transaction {
       transactionDate: DateTime.parse('${json['transaction_date']}').toLocal(),
       createdAt: DateTime.tryParse('${json['created_at']}') ?? DateTime.now(),
       categoryName: category?['name'] as String?,
+      fixedExpensePlanId: json['fixed_expense_plan_id'] as int?,
     );
   }
 }

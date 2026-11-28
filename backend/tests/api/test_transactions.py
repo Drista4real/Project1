@@ -91,6 +91,11 @@ def api(monkeypatch):
                     row for row in rows if request.url.params["id"] == f"eq.{row['id']}"
                 ]
             return httpx.Response(200, json=rows)
+        if path.endswith("/budget_plans"):
+            # RLS hides plan 9, which belongs to another user.
+            assert request.url.params["user_id"] == f"eq.{USER}"
+            plan = request.url.params["id"]
+            return httpx.Response(200, json=[{"id": 5}] if plan == "eq.5" else [])
         assert path.endswith("/transactions")
         if request.method == "POST":
             payload = json.loads(request.content)
@@ -377,6 +382,77 @@ def test_list_pagination_and_filters(api):
     assert page.status_code == 200, page.text
     assert page.json()["total"] == 2
     assert [row["id"] for row in page.json()["items"]] == [2]
+
+
+def test_fixed_expense_marker_is_created_changed_and_cleared(api):
+    client, records, _ = api
+    created = client.post(
+        "/api/v1/transactions", json=payload(fixed_expense_plan_id=5)
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["fixed_expense_plan_id"] == 5
+    assert records[1]["fixed_expense_plan_id"] == 5
+    assert client.get("/api/v1/transactions/1").json()["fixed_expense_plan_id"] == 5
+
+    kept = client.patch("/api/v1/transactions/1", json={"amount": "50000.00"})
+    assert kept.status_code == 200, kept.text
+    assert kept.json()["fixed_expense_plan_id"] == 5
+
+    cleared = client.patch(
+        "/api/v1/transactions/1", json={"fixed_expense_plan_id": None}
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["fixed_expense_plan_id"] is None
+    assert records[1]["fixed_expense_plan_id"] is None
+
+    marked = client.patch("/api/v1/transactions/1", json={"fixed_expense_plan_id": 5})
+    assert marked.status_code == 200, marked.text
+    assert marked.json()["fixed_expense_plan_id"] == 5
+
+
+def test_an_unmarked_transaction_reports_no_marker(api):
+    created = api[0].post("/api/v1/transactions", json=payload())
+    assert created.status_code == 201, created.text
+    assert created.json()["fixed_expense_plan_id"] is None
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"fixed_expense_plan_id": 9},
+        {"fixed_expense_plan_id": 0},
+        {"fixed_expense_plan_id": 5, "transaction_type": "income", "category_id": None},
+        {
+            "fixed_expense_plan_id": 5,
+            "transaction_type": "transfer",
+            "to_account_id": 2,
+            "category_id": None,
+        },
+    ],
+)
+def test_invalid_fixed_expense_marker_on_create(api, changes):
+    client, records, _ = api
+    response = client.post("/api/v1/transactions", json=payload(**changes))
+    assert response.status_code == 422
+    assert not records
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"fixed_expense_plan_id": 9},
+        {"transaction_type": "income", "category_id": None},
+    ],
+)
+def test_invalid_fixed_expense_marker_on_update(api, changes):
+    client, records, _ = api
+    created = client.post(
+        "/api/v1/transactions", json=payload(fixed_expense_plan_id=5)
+    )
+    assert created.status_code == 201, created.text
+    assert client.patch("/api/v1/transactions/1", json=changes).status_code == 422
+    assert records[1]["fixed_expense_plan_id"] == 5
+    assert records[1]["transaction_type"] == "expense"
 
 
 def test_concurrent_update_is_rejected(api, monkeypatch):

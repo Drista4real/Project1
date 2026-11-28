@@ -95,6 +95,79 @@ class TestPlanBalanceSource:
         )
         assert source.remaining_balance(_plan(), 3) == Decimal("0")
 
+    def test_a_marked_fixed_expense_of_this_plan_is_exempted(self):
+        source = SupabasePlanBalanceSource(
+            _client(
+                allocations=[{"day_index": 1}],
+                transactions=[
+                    {"amount": "400000.00", "fixed_expense_plan_id": None},
+                    {"amount": "2500000.00", "fixed_expense_plan_id": 42},
+                ],
+            ),
+            "owner",
+        )
+        assert source.remaining_balance(_plan(), 3) == Decimal("2600000.00")
+
+    def test_a_fixed_expense_marked_for_another_plan_still_counts(self):
+        source = SupabasePlanBalanceSource(
+            _client(
+                allocations=[{"day_index": 1}],
+                transactions=[
+                    {"amount": "400000.00", "fixed_expense_plan_id": None},
+                    {"amount": "2500000.00", "fixed_expense_plan_id": 7},
+                ],
+            ),
+            "owner",
+        )
+        assert source.remaining_balance(_plan(), 3) == Decimal("100000.00")
+
+    def test_a_marker_dated_before_the_plan_is_not_exempted(self):
+        inside = [
+            {
+                "amount": "400000.00",
+                "fixed_expense_plan_id": None,
+                "transaction_date": "2026-11-02T08:00:00+00:00",
+            },
+            {
+                "amount": "2500000.00",
+                "fixed_expense_plan_id": 42,
+                "transaction_date": "2026-11-02T09:00:00+00:00",
+            },
+        ]
+        before_start = {
+            "amount": "1000000.00",
+            "fixed_expense_plan_id": 42,
+            "transaction_date": "2026-10-31T09:00:00+00:00",
+        }
+
+        def window_client(rows: list[dict]):
+            # Filter the window the way PostgREST would, from the query params.
+            def handle(request):
+                if request.url.path.endswith("/daily_allocations"):
+                    return httpx.Response(200, json=[{"day_index": 1}])
+                bounds = request.url.params.get_list("transaction_date")
+                start = next(b[4:] for b in bounds if b.startswith("gte."))
+                end = next(b[3:] for b in bounds if b.startswith("lt."))
+                kept = [r for r in rows if start <= r["transaction_date"][:10] < end]
+                return httpx.Response(200, json=kept)
+
+            return create_client(
+                "https://example.supabase.co",
+                "sb_publishable_example",
+                options=ClientOptions(
+                    httpx_client=httpx.Client(transport=httpx.MockTransport(handle))
+                ),
+            )
+
+        without = SupabasePlanBalanceSource(window_client(inside), "owner")
+        with_marker = SupabasePlanBalanceSource(
+            window_client([*inside, before_start]), "owner"
+        )
+        # E = 2.9M - min(2.5M, 3M) = 400k; counting the earlier row would
+        # give 3.9M - min(3.5M, 3M) = 900k and a remainder of 2.1M.
+        assert without.remaining_balance(_plan(), 3) == Decimal("2600000.00")
+        assert with_marker.remaining_balance(_plan(), 3) == Decimal("2600000.00")
+
     def test_the_window_reads_only_expenses_of_the_owner(self):
         captured: dict[str, list[str]] = {}
 

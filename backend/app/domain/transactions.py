@@ -21,9 +21,14 @@ class TransactionData(BaseModel):
     raw_description: str | None = Field(default=None, max_length=2000)
     clean_description: str | None = Field(default=None, max_length=2000)
     transaction_date: AwareDatetime
+    # Set only by the user; a matching category or recurring item never sets it.
+    fixed_expense_plan_id: Identifier | None = None
 
     @model_validator(mode="after")
     def validate_transfer(self):
+        marked = self.fixed_expense_plan_id is not None
+        if marked and self.transaction_type != "expense":
+            raise ValueError("Only an expense can be a fixed expense")
         if self.transaction_type == "transfer":
             if not self.account_id or not self.to_account_id:
                 raise ValueError("Transfers require source and destination accounts")
@@ -63,3 +68,4 @@ class TransactionRepository(Protocol):
     def delete(self, transaction_id: int) -> None: ...
     def account(self, account_id: int) -> dict | None: ...
     def category(self, category_id: int) -> dict | None: ...
+    def plan(self, plan_id: int) -> dict | None: ...
