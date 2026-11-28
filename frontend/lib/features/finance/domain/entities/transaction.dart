@@ -13,6 +13,7 @@ class Transaction {
   final DateTime transactionDate;
   final DateTime createdAt;
   final String? categoryName;
+  final int? fixedExpensePlanId;
 
   const Transaction({
     required this.id,
@@ -29,6 +30,7 @@ class Transaction {
     required this.transactionDate,
     required this.createdAt,
     this.categoryName,
+    this.fixedExpensePlanId,
   });
 
   bool get isIncome => transactionType == 'income';

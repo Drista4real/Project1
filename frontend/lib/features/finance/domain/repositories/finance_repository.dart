@@ -19,5 +19,6 @@ abstract interface class FinanceRepository {
     String? categoryName,
     int? accountId,
     DateTime? transactionDate,
+    int? fixedExpensePlanId,
   });
 }
