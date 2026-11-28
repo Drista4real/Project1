@@ -267,6 +267,56 @@ class TestPlanWindowInHoChiMinhTime:
         remaining = _source(database.client()).remaining_balance(_plan(), 3)
         assert remaining == Decimal("2500000.00")
 
+    def test_the_start_is_inclusive_and_the_preview_is_exclusive_to_a_microsecond(
+        self,
+    ) -> None:
+        """Only a row inside the exact half-open window reduces the balance."""
+        database = UtcSessionPostgrest(
+            [
+                _expense("2026-10-31T16:59:59.999999+00:00", "100000.00"),
+                _expense("2026-10-31T17:00:00+00:00", "200000.00"),
+                _expense("2026-10-31T17:00:00.000001+00:00", "400000.00"),
+            ]
+        )
+        preview = datetime(2026, 11, 1, 0, 0, 0, 1, tzinfo=LOCAL_TIMEZONE)
+
+        remaining = _source(database.client(), lambda: preview).remaining_balance(
+            _plan(), 1
+        )
+
+        assert remaining == Decimal("2800000.00")
+        assert database.reads[0].get_list("transaction_date") == [
+            "gte.2026-10-31T17:00:00Z",
+            "lt.2026-10-31T17:00:00.000001Z",
+        ]
+
+    def test_fixed_expense_cap_uses_only_rows_inside_the_local_window(self) -> None:
+        """A marker outside the window cannot consume this plan's exemption."""
+        database = UtcSessionPostgrest(
+            [
+                {
+                    **_expense("2026-10-31T16:59:59+00:00", "2000000.00"),
+                    "fixed_expense_plan_id": 42,
+                },
+                {
+                    **_expense("2026-10-31T17:00:00+00:00", "3500000.00"),
+                    "fixed_expense_plan_id": 42,
+                },
+                {
+                    **_expense("2026-11-01T04:00:00+00:00", "200000.00"),
+                    "fixed_expense_plan_id": 7,
+                },
+                {
+                    **_expense("2026-11-10T05:00:00+00:00", "1000000.00"),
+                    "fixed_expense_plan_id": 42,
+                },
+            ]
+        )
+
+        remaining = _source(database.client()).remaining_balance(_plan(), 1)
+
+        assert remaining == Decimal("2300000.00")
+
     def test_an_expense_late_the_night_before_the_plan_does_not_count(self):
         # 2026-10-31 23:30 in Ho Chi Minh City, the day before the plan.
         database = UtcSessionPostgrest([_expense("2026-10-31T16:30:00+00:00")])
