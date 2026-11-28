@@ -312,6 +312,18 @@ class RemainingBalanceSource(Protocol):
     def remaining_balance(self, plan: BudgetPlan, day_index: int) -> Decimal | None: ...
 
 
+def exempt_fixed_expenses(
+    total_expense: Decimal, marked_fixed: Decimal, fixed_expenses: Decimal
+) -> Decimal:
+    """Return the plan spending E: E = total − min(M, fixed_expenses).
+
+    The plan already deducted its fixed expenses from the spendable budget,
+    so the expenses the user marked as those fixed expenses are not counted
+    again, but never more than the plan deducted: the excess is spending.
+    """
+    return total_expense - min(marked_fixed, fixed_expenses)
+
+
 def compute_plan_totals(
     *,
     total_income: Decimal,

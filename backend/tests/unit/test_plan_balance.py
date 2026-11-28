@@ -95,6 +95,32 @@ class TestPlanBalanceSource:
         )
         assert source.remaining_balance(_plan(), 3) == Decimal("0")
 
+    def test_a_marked_fixed_expense_of_this_plan_is_exempted(self):
+        source = SupabasePlanBalanceSource(
+            _client(
+                allocations=[{"day_index": 1}],
+                transactions=[
+                    {"amount": "400000.00", "fixed_expense_plan_id": None},
+                    {"amount": "2500000.00", "fixed_expense_plan_id": 42},
+                ],
+            ),
+            "owner",
+        )
+        assert source.remaining_balance(_plan(), 3) == Decimal("2600000.00")
+
+    def test_a_fixed_expense_marked_for_another_plan_still_counts(self):
+        source = SupabasePlanBalanceSource(
+            _client(
+                allocations=[{"day_index": 1}],
+                transactions=[
+                    {"amount": "400000.00", "fixed_expense_plan_id": None},
+                    {"amount": "2500000.00", "fixed_expense_plan_id": 7},
+                ],
+            ),
+            "owner",
+        )
+        assert source.remaining_balance(_plan(), 3) == Decimal("100000.00")
+
     def test_the_window_reads_only_expenses_of_the_owner(self):
         captured: dict[str, list[str]] = {}
 
