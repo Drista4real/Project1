@@ -1,6 +1,7 @@
 abstract final class AppRoutes {
   static const home = '/';
   static const ledger = '/ledger';
+  static const community = '/community';
   static const reports = '/reports';
   static const budget = '/budget';
   static const plan = '/plan';

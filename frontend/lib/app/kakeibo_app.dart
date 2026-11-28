@@ -29,8 +29,12 @@ class KakeiboZenApp extends StatelessWidget {
   Widget _buildAccount(AppPreferences source) {
     return ListenableBuilder(
       listenable: source,
-      builder: (context, _) =>
-          _AccountApp(key: ValueKey(source.userId), preferences: source),
+      builder: (context, _) {
+        if (preferences == null) {
+          AppDependencies.userProfile.syncForUser(source.userId);
+        }
+        return _AccountApp(key: ValueKey(source.userId), preferences: source);
+      },
     );
   }
 }

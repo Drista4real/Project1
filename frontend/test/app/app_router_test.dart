@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:project_one/app/app_routes.dart';
 import 'package:project_one/app/app_router.dart';
 import 'package:project_one/features/chat/screens/chat_home_screen.dart';
+import 'package:project_one/features/community/screens/community_screen.dart';
 import 'package:project_one/features/ledger/screens/ledger_screen.dart';
 import 'package:project_one/features/settings/screens/settings_screen.dart';
 import 'package:project_one/app/widgets/app_exit_button.dart';
@@ -31,7 +32,17 @@ void main() {
     router.dispose();
   });
 
-  testWidgets('the navigation offers both the canvas and the ledger', (
+  testWidgets('the community tab opens the community screen', (tester) async {
+    final router = createAppRouter();
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    router.go(AppRoutes.community);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CommunityScreen), findsOneWidget);
+    router.dispose();
+  });
+
+  testWidgets('the navigation offers home, ledger, community and budget', (
     tester,
   ) async {
     final router = createAppRouter();
@@ -40,6 +51,8 @@ void main() {
 
     expect(find.text('Trang chủ'), findsOneWidget);
     expect(find.text('Sổ thu chi'), findsOneWidget);
+    expect(find.text('Cộng đồng'), findsOneWidget);
+    expect(find.text('Ngân sách'), findsOneWidget);
     router.dispose();
   });
 
@@ -114,7 +127,6 @@ void main() {
 
   for (final entry in {
     AppRoutes.plan: ('Ngân sách', AppRoutes.budget),
-    AppRoutes.forecast: ('Báo cáo', AppRoutes.reports),
   }.entries) {
     testWidgets('${entry.key} allows returning through its highlighted tab', (
       tester,
@@ -133,6 +145,7 @@ void main() {
   for (final route in [
     AppRoutes.home,
     AppRoutes.ledger,
+    AppRoutes.community,
     AppRoutes.reports,
     AppRoutes.budget,
     AppRoutes.plan,

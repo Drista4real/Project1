@@ -6,6 +6,9 @@ import 'package:project_one/features/management/screens/record_form_screen.dart'
 import 'package:project_one/features/management/screens/resource_list_screen.dart';
 import 'package:project_one/features/budget/screens/category_envelopes_screen.dart';
 import 'package:project_one/features/management/config/management_metadata.dart';
+import 'package:project_one/features/profile/screens/edit_profile_screen.dart';
+
+bool _openingFinanceModule = false;
 
 /// Reuse the authenticated CRUD forms from the existing feature screens.
 Future<void> openFinanceModule(
@@ -16,27 +19,42 @@ Future<void> openFinanceModule(
   Map<String, dynamic> defaults = const {},
   ManagementRepository? repository,
 }) async {
-  final source = repository ?? AppDependencies.managementRepository;
-  if (create && generatedFinanceResources.contains(name)) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Dữ liệu do hệ thống tạo, chỉ có thể xem.')),
-    );
-    return;
-  }
-  if ((name == 'categories' || name == 'budgets') &&
-      !create &&
-      record == null) {
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => CategoryEnvelopesScreen(
-          repository: source,
-          month: DateTime.tryParse('${defaults['month_year']}'),
-        ),
-      ),
-    );
-    return;
-  }
+  if (_openingFinanceModule) return;
+  _openingFinanceModule = true;
   try {
+    final source = repository ?? AppDependencies.managementRepository;
+    if (create && generatedFinanceResources.contains(name)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Dữ liệu do hệ thống tạo, chỉ có thể xem.'),
+        ),
+      );
+      return;
+    }
+    if (name == 'profile') {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => EditProfileScreen(
+            repository: source,
+            initialProfile: record,
+          ),
+        ),
+      );
+      return;
+    }
+    if ((name == 'categories' || name == 'budgets') &&
+        !create &&
+        record == null) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => CategoryEnvelopesScreen(
+            repository: source,
+            month: DateTime.tryParse('${defaults['month_year']}'),
+          ),
+        ),
+      );
+      return;
+    }
     final resources = await source.resources();
     final resource = resources.firstWhere((item) => item['name'] == name);
     Map<String, dynamic>? fresh;
@@ -65,5 +83,7 @@ Future<void> openFinanceModule(
         context,
       ).showSnackBar(SnackBar(content: Text('$error')));
     }
+  } finally {
+    _openingFinanceModule = false;
   }
 }

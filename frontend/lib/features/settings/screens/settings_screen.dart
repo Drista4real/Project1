@@ -17,6 +17,8 @@ import 'package:project_one/shared/widgets/kakeibo_card.dart';
 import 'package:project_one/shared/formatters/currency_formatter.dart';
 import 'package:project_one/features/settings/cubit/app_preferences.dart';
 import 'package:project_one/features/settings/services/report_exporter.dart';
+import 'package:project_one/features/profile/screens/edit_profile_screen.dart';
+import 'package:project_one/shared/widgets/user_avatar.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -42,6 +44,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       widget.preferences ?? AppDependencies.preferences;
   bool _updatingDevice = false;
   bool _exporting = false;
+  bool _openingProfile = false;
   bool get _reminders => _preferences.reminderTime != null;
   bool get _biometrics => _preferences.biometrics;
   bool get _darkMode => _preferences.darkMode;
@@ -212,20 +215,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
             if (_profile != null)
               Card(
                 child: ListTile(
-                  leading: const Icon(Icons.person_outline),
+                  leading: UserAvatar(
+                    radius: 22,
+                    avatarUrl: _profile!['avatar_url']?.toString(),
+                    displayName:
+                        (_profile!['full_name'] ?? _profile!['email'])
+                            ?.toString(),
+                  ),
                   title: Text('${_profile!['full_name'] ?? 'Hồ sơ cá nhân'}'),
                   subtitle: Text(
                     'Ngày nhận lương: ${_profile!['payroll_day'] ?? 'Chưa đặt'}',
                   ),
                   trailing: const Icon(Icons.edit_outlined),
-                  onTap: () async {
-                    await openFinanceModule(
-                      context,
-                      'profile',
-                      repository: _repository,
-                    );
-                    if (mounted) await _loadSettings();
-                  },
+                  onTap: _openingProfile
+                      ? null
+                      : () async {
+                          setState(() => _openingProfile = true);
+                          try {
+                            final saved = await Navigator.of(context).push<bool>(
+                              MaterialPageRoute(
+                                builder: (_) => EditProfileScreen(
+                                  repository: _repository,
+                                  initialProfile: _profile,
+                                ),
+                              ),
+                            );
+                            if (saved == true && mounted) {
+                              await _loadSettings();
+                            }
+                          } finally {
+                            if (mounted) {
+                              setState(() => _openingProfile = false);
+                            }
+                          }
+                        },
                 ),
               ),
             Card(
