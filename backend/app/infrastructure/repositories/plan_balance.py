@@ -51,7 +51,8 @@ class SupabasePlanBalanceSource(RemainingBalanceSource):
         The plan grants a spendable budget over its window. The money already
         used is the confirmed spending recorded from 00:00 of the start day in
         Vietnam up to the preview moment, so the remainder is the grant minus
-        what the user really spent.
+        what the user really spent. Spending beyond the grant gives a negative
+        remainder, the size of the deficit.
         """
         if day_index < 1 or day_index > plan.duration_days:
             return None
@@ -61,8 +62,7 @@ class SupabasePlanBalanceSource(RemainingBalanceSource):
             plan.start_date, plan.duration_days, self.clock()
         )
         spent = self._spent_between(start, end, plan) if start < end else Decimal("0")
-        remaining = plan.spendable_budget - spent
-        return remaining if remaining > 0 else Decimal("0")
+        return plan.spendable_budget - spent
 
     def _has_allocations(self, plan_id: int) -> bool:
         """Report whether the plan has a daily projection to read."""
