@@ -109,4 +109,24 @@ class FixedExpenseMarkerIT {
         assertEquals("42501", response.jsonPath().getString("code"));
         owner.balance(wallet, "5000000");
     }
+
+    @Test
+    void theApiAcceptsReturnsAndClearsTheMarker() {
+        Api owner = Api.newUser();
+        Api other = Api.newUser();
+        long plan = plan(owner);
+        long wallet = owner.account("Ví", "5000000");
+        long transaction = owner.transaction(Map.of(
+            "account_id", wallet, "amount", "2500000", "transaction_type", "expense", MARKER, plan));
+        String path = TRANSACTIONS + "/" + transaction;
+        assertEquals(plan, expect(owner.get(path), 200).jsonPath().getLong(MARKER));
+
+        Map<String, Object> clear = new HashMap<>();
+        clear.put(MARKER, null);
+        assertNull(expect(owner.patch(path, clear), 200).jsonPath().get(MARKER));
+
+        long otherWallet = other.account("Ví", "100");
+        expect(other.post(TRANSACTIONS, Map.of(
+            "account_id", otherWallet, "amount", "10", "transaction_type", "expense", MARKER, plan)), 422);
+    }
 }

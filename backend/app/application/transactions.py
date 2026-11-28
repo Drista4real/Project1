@@ -23,6 +23,9 @@ class TransactionService:
                 raise TransactionError(422, "Category is unavailable")
             if category["is_income"] != (data.transaction_type == "income"):
                 raise TransactionError(422, "Category does not match transaction type")
+        if data.fixed_expense_plan_id is not None:
+            if self.repository.plan(data.fixed_expense_plan_id) is None:
+                raise TransactionError(422, "Budget plan is unavailable")
 
     def create(self, data: TransactionData):
         self._validate_references(data)
