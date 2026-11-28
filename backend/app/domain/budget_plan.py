@@ -10,7 +10,7 @@ envelope limits.
 """
 
 import re
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Literal, Protocol
 from uuid import UUID
@@ -370,6 +370,26 @@ def compute_plan_totals(
 
 #: The day of a ledger expense is the user's local day (the app is Vietnamese).
 LOCAL_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
+
+
+def plan_window_bounds(
+    start_date: date, duration_days: int, as_of: datetime
+) -> tuple[datetime, datetime]:
+    """Return the half-open window ``[start, end)`` of plan spending E.
+
+    The window opens at 00:00 of ``start_date`` in Vietnam and closes at the
+    preview moment ``as_of`` or at 00:00 after the last plan day, whichever
+    comes first. A preview before the plan gives an empty window
+    (``start == end``). Both bounds carry a timezone; a naive ``as_of`` is
+    rejected because its moment is unknown.
+    """
+    if as_of.utcoffset() is None:
+        raise ValueError("as_of must carry a timezone")
+    start = datetime.combine(start_date, time.min, tzinfo=LOCAL_TIMEZONE)
+    plan_end = datetime.combine(
+        start_date + timedelta(days=duration_days), time.min, tzinfo=LOCAL_TIMEZONE
+    )
+    return start, max(start, min(as_of, plan_end))
 
 
 def group_for_category(name: str | None) -> GroupKey:
