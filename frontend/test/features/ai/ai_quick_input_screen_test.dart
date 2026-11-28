@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:project_one/core/theme/app_theme.dart';
@@ -7,6 +8,7 @@ import 'package:project_one/features/ai/models/transaction_draft.dart';
 import 'package:project_one/features/ai/screens/ai_quick_input_screen.dart';
 import 'package:project_one/features/ai/services/input_preferences.dart';
 import 'package:project_one/features/ai/services/voice_input.dart';
+import 'package:project_one/features/ai/services/receipt_input.dart';
 import 'package:project_one/features/finance/domain/usecases/finance_insights.dart';
 import '../../helpers/envelope_memory_repository.dart';
 import '../../helpers/fake_finance_repository.dart';
@@ -16,10 +18,35 @@ final _previewBoundary = GlobalKey();
 
 class FakeInput implements AiInputRepository {
   String? received;
+  bool single = false;
+  int textCalls = 0;
+  ReceiptImage? receipt;
+  Object? receiptError;
+  Completer<List<TransactionDraft>>? pendingReceipt;
+  @override
+  Future<List<TransactionDraft>> analyzeReceipt(ReceiptImage image) async {
+    receipt = image;
+    if (receiptError != null) throw receiptError!;
+    if (pendingReceipt != null) return pendingReceipt!.future;
+    return [
+      TransactionDraft(
+        text: 'Hóa đơn quán ăn',
+        normalizedText: 'hóa đơn quán ăn',
+        amount: 100000,
+        type: 'expense',
+        category: 'Ăn uống',
+        confidence: 0,
+        source: 'QWEN',
+        occurredOn: DateTime(2026, 11, 10),
+      ),
+    ];
+  }
+
   @override
   Future<List<TransactionDraft>> analyze(String text) async {
+    textCalls++;
     received = text;
-    return [
+    final drafts = [
       const TransactionDraft(
         text: 'Bún bò 65k tiền mặt',
         normalizedText: 'bún bò 65000 đồng tiền mặt',
@@ -39,6 +66,7 @@ class FakeInput implements AiInputRepository {
         source: 'LOCAL',
       ),
     ];
+    return single ? [drafts.first] : drafts;
   }
 }
 
@@ -51,9 +79,21 @@ class MemoryPreferences implements InputPreferences {
       categories[text] = categoryId;
 }
 
+class FakeReceipt implements ReceiptInput {
+  ReceiptImage? image;
+  Completer<ReceiptImage?>? pending;
+  @override
+  Future<ReceiptImage?> pick() async =>
+      pending != null ? pending!.future : image;
+}
+
 class FakeVoice implements VoiceInput {
   bool started = false, cancelled = false, disposed = false;
   Completer<void>? permission;
+
+  /// The transcript the fake recogniser returns when recording stops.
+  String transcript = 'ăn trưa sáu mươi lăm nghìn';
+
   @override
   bool get supported => true;
   @override
@@ -63,7 +103,7 @@ class FakeVoice implements VoiceInput {
   }
 
   @override
-  Future<String> stop() async => 'ăn trưa sáu mươi lăm nghìn';
+  Future<String> stop() async => transcript;
   @override
   Future<void> cancel() async => cancelled = true;
   @override
@@ -92,6 +132,7 @@ class SavingRepository extends FakeFinanceRepository {
       'category_id': categoryId,
       'type': transactionType,
       'description': description,
+      'date': transactionDate,
     });
   }
 }
@@ -101,6 +142,9 @@ Future<void> open(
   SavingRepository finance, {
   FakeInput? api,
   FakeVoice? voice,
+  FakeReceipt? receipt,
+  ThemeData? theme,
+  double textScale = 1,
 }) async {
   final management = EnvelopeMemoryRepository();
   final now = DateTime.now();
@@ -120,7 +164,13 @@ Future<void> open(
     RepaintBoundary(
       key: _previewBoundary,
       child: MaterialApp(
-        theme: AppTheme.kakeiboTheme,
+        theme: theme ?? AppTheme.kakeiboTheme,
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(textScale)),
+          child: child!,
+        ),
         home: Builder(
           builder: (context) => Scaffold(
             body: TextButton(
@@ -131,6 +181,7 @@ Future<void> open(
                     inputRepository: api ?? FakeInput(),
                     financeRepository: finance,
                     voiceInput: voice ?? FakeVoice(),
+                    receiptInput: receipt ?? FakeReceipt(),
                     preferences: MemoryPreferences(),
                     insights: FinanceInsights(management),
                   ),
@@ -152,7 +203,17 @@ Future<void> analyze(WidgetTester tester) async {
     find.byKey(const ValueKey('aiInputText')),
     'bún bò 65k, trà sữa 35k',
   );
-  await tester.tap(find.text('Phân tích'));
+  await tester.pump();
+  await tester.ensureVisible(find.byKey(const ValueKey('aiAnalyzeButton')));
+  await tester.tap(find.text('Xem giao dịch'));
+  await tester.pumpAndSettle();
+}
+
+/// Record and stop, so the fake recogniser returns its transcript.
+Future<void> speak(WidgetTester tester) async {
+  await tester.tap(find.text('Ghi âm'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Dừng ghi âm'));
   await tester.pumpAndSettle();
 }
 
@@ -162,21 +223,126 @@ Future<void> save(WidgetTester tester) async {
     200,
     scrollable: find.byType(Scrollable).first,
   );
+  await Scrollable.ensureVisible(
+    tester.element(find.byKey(const ValueKey('confirmAiTransactions'))),
+    alignment: 0.5,
+  );
+  await tester.pumpAndSettle();
   await tester.tap(find.byKey(const ValueKey('confirmAiTransactions')));
   await tester.pumpAndSettle();
 }
 
 void main() {
-  if (captureUiEnabled) {
-    testWidgets('reference preview', (tester) async {
-      await loadEnvelopeFonts();
-      tester.view.physicalSize = const Size(498, 1400);
+  testWidgets(
+    'one text draft opens review and applies edits before explicit save',
+    (tester) async {
+      final finance = SavingRepository();
+      await open(tester, finance, api: FakeInput()..single = true);
+      await analyze(tester);
+      expect(find.text('Kiểm tra giao dịch'), findsOneWidget);
+      expect(finance.saved, isEmpty);
+      await tester.enterText(
+        find.byKey(const ValueKey('draftAmount')),
+        '72.000',
+      );
+      await tester.ensureVisible(find.text('Áp dụng thay đổi'));
+      await tester.tap(find.text('Áp dụng thay đổi'));
+      await tester.pumpAndSettle();
+      expect(find.text('Kiểm tra giao dịch'), findsNothing);
+      expect(finance.saved, isEmpty);
+      await save(tester);
+      expect(finance.saved.single['amount'], 72000);
+    },
+  );
+
+  testWidgets(
+    'dismissing automatic review retains the draft without reopening or saving',
+    (tester) async {
+      final finance = SavingRepository();
+      await open(tester, finance, api: FakeInput()..single = true);
+      await analyze(tester);
+      expect(find.text('Kiểm tra giao dịch'), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('Kiểm tra giao dịch'), findsNothing);
+      expect(find.text('1 giao dịch'), findsOneWidget);
+      expect(finance.saved, isEmpty);
+      await tester.pump(const Duration(seconds: 1));
+      expect(find.text('Kiểm tra giao dịch'), findsNothing);
+      await tester.ensureVisible(find.byTooltip('Sửa giao dịch'));
+      await tester.tap(find.byTooltip('Sửa giao dịch'));
+      await tester.pumpAndSettle();
+      expect(find.text('Kiểm tra giao dịch'), findsOneWidget);
+      expect(finance.saved, isEmpty);
+    },
+  );
+
+  testWidgets(
+    'multiple drafts scroll into view on a narrow phone without opening a sheet',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
-      await open(tester, SavingRepository());
+      final finance = SavingRepository();
+      await open(tester, finance);
       await analyze(tester);
-      await captureUi(tester, _previewBoundary, 'ai-quick-input');
+      expect(find.text('2 giao dịch').hitTestable(), findsOneWidget);
+      expect(
+        find.byTooltip('Sửa giao dịch').first.hitTestable(),
+        findsOneWidget,
+      );
+      expect(find.text('Kiểm tra giao dịch'), findsNothing);
+      expect(finance.saved, isEmpty);
+    },
+  );
+
+  testWidgets('switching to the manual form retains the typed description', (
+    tester,
+  ) async {
+    final finance = SavingRepository();
+    await open(tester, finance);
+    await tester.enterText(
+      find.byKey(const ValueKey('aiInputText')),
+      'cơm trưa 65k',
+    );
+    await tester.ensureVisible(find.text('Chuyển sang biểu mẫu'));
+    await tester.tap(find.text('Chuyển sang biểu mẫu'));
+    await tester.pumpAndSettle();
+    expect(find.text('cơm trưa 65k'), findsOneWidget);
+    expect(find.byKey(const ValueKey('aiInputText')), findsNothing);
+    expect(finance.saved, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  if (captureUiEnabled) {
+    testWidgets('reference preview', (tester) async {
+      await loadEnvelopeFonts();
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      for (final variant in ['light', 'dark', 'large-text']) {
+        tester.view.physicalSize = Size(
+          variant == 'large-text' ? 320 : 360,
+          640,
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+        await open(
+          tester,
+          SavingRepository(),
+          theme: variant == 'dark'
+              ? AppTheme.kakeiboDarkTheme
+              : AppTheme.kakeiboTheme,
+          textScale: variant == 'large-text' ? 1.6 : 1,
+        );
+        await captureUi(tester, _previewBoundary, 'ai-input-$variant');
+        await analyze(tester);
+        await captureUi(tester, _previewBoundary, 'ai-review-$variant');
+        await tester.ensureVisible(find.byTooltip('Sửa giao dịch').first);
+        await tester.tap(find.byTooltip('Sửa giao dịch').first);
+        await tester.pumpAndSettle();
+        await captureUi(tester, _previewBoundary, 'ai-edit-$variant');
+      }
       expect(tester.takeException(), isNull);
     });
   }
@@ -186,7 +352,7 @@ void main() {
       final finance = SavingRepository();
       await open(tester, finance);
       await analyze(tester);
-      expect(find.text('Đã tách 2 giao dịch'), findsOneWidget);
+      expect(find.text('2 giao dịch'), findsOneWidget);
       expect(finance.saved, isEmpty);
       await save(tester);
       expect(finance.saved.map((row) => row['amount']), [65000, 35000]);
@@ -209,11 +375,11 @@ void main() {
     await tester.drag(card, const Offset(-600, 0));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      find.text('Đã tách 1 giao dịch'),
+      find.text('1 giao dịch'),
       -150,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('Đã tách 1 giao dịch'), findsOneWidget);
+    expect(find.text('1 giao dịch'), findsOneWidget);
     await save(tester);
     expect(finance.saved.single['amount'], 35000);
   });
@@ -223,7 +389,7 @@ void main() {
     await open(tester, finance);
     await analyze(tester);
     await tester.scrollUntilVisible(
-      find.byTooltip('Sửa giao dịch'),
+      find.byTooltip('Sửa giao dịch').first,
       150,
       scrollable: find.byType(Scrollable).first,
     );
@@ -273,13 +439,14 @@ void main() {
     final finance = SavingRepository();
     final voice = FakeVoice();
     await open(tester, finance, voice: voice);
-    await tester.tap(find.text('Nói nhanh'));
+    await tester.tap(find.text('Ghi âm'));
     await tester.pumpAndSettle();
     expect(voice.started, isTrue);
     await tester.tap(find.text('Dừng ghi âm'));
     await tester.pumpAndSettle();
     expect(find.text('ăn trưa sáu mươi lăm nghìn'), findsOneWidget);
     expect(finance.saved, isEmpty);
+    await tester.ensureVisible(find.byTooltip('Đóng'));
     await tester.tap(find.byTooltip('Đóng'));
     await tester.pumpAndSettle();
     expect(voice.disposed, isTrue);
@@ -290,7 +457,7 @@ void main() {
     (tester) async {
       final voice = FakeVoice()..permission = Completer<void>();
       await open(tester, SavingRepository(), voice: voice);
-      await tester.tap(find.text('Nói nhanh'));
+      await tester.tap(find.text('Ghi âm'));
       await tester.pump();
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       await tester.pump();
@@ -304,6 +471,145 @@ void main() {
       expect(find.text('ăn trưa sáu mươi lăm nghìn'), findsOneWidget);
     },
   );
+
+  testWidgets('the spoken transcript reaches the ingestion request unchanged', (
+    tester,
+  ) async {
+    final finance = SavingRepository();
+    final api = FakeInput();
+    final voice = FakeVoice()..transcript = 'cơm ba mươi nghìn tiền mặt';
+    await open(tester, finance, api: api, voice: voice);
+    await speak(tester);
+    expect(find.text('cơm ba mươi nghìn tiền mặt'), findsOneWidget);
+    expect(api.received, 'cơm ba mươi nghìn tiền mặt');
+    expect(api.textCalls, 1);
+    expect(finance.saved, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('an empty transcript reports the problem and sends nothing', (
+    tester,
+  ) async {
+    final api = FakeInput();
+    final voice = FakeVoice()..transcript = '';
+    await open(tester, SavingRepository(), api: api, voice: voice);
+    await speak(tester);
+    expect(find.textContaining('Chưa nhận được lời nói'), findsOneWidget);
+    expect(api.received, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a transcript longer than the endpoint limit is truncated', (
+    tester,
+  ) async {
+    final api = FakeInput();
+    final voice = FakeVoice()..transcript = 'a' * 2500;
+    await open(tester, SavingRepository(), api: api, voice: voice);
+    await speak(tester);
+    expect(api.received?.length, 2000);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'receipt extraction is reviewed and preserves date on confirmation',
+    (tester) async {
+      final finance = SavingRepository();
+      final api = FakeInput();
+      final picker = FakeReceipt()
+        ..image = ReceiptImage(
+          bytes: Uint8List.fromList([1]),
+          mimeType: 'image/png',
+        );
+      await open(tester, finance, api: api, receipt: picker);
+      await tester.tap(find.byKey(const ValueKey('aiReceiptButton')));
+      await tester.pumpAndSettle();
+      expect(api.receipt, same(picker.image));
+      expect(api.textCalls, 0);
+      expect(finance.saved, isEmpty);
+      expect(find.text('Kiểm tra giao dịch'), findsOneWidget);
+      await tester.ensureVisible(find.text('Áp dụng thay đổi'));
+      await tester.tap(find.text('Áp dụng thay đổi'));
+      await tester.pumpAndSettle();
+      expect(finance.saved, isEmpty);
+      await save(tester);
+      expect(finance.saved.single['amount'], 100000);
+      expect(finance.saved.single['date'], DateTime(2026, 11, 10));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'canceling receipt selection preserves existing text and drafts',
+    (tester) async {
+      final api = FakeInput();
+      final finance = SavingRepository();
+      await open(tester, finance, api: api);
+      await analyze(tester);
+      await tester.ensureVisible(find.byKey(const ValueKey('aiReceiptButton')));
+      await tester.tap(find.byKey(const ValueKey('aiReceiptButton')));
+      await tester.pumpAndSettle();
+      expect(api.receipt, isNull);
+      expect(find.text('2 giao dịch'), findsOneWidget);
+      expect(find.text('bún bò 65k, trà sữa 35k'), findsOneWidget);
+      expect(finance.saved, isEmpty);
+    },
+  );
+
+  testWidgets('receipt failure is visible and never saves a transaction', (
+    tester,
+  ) async {
+    final api = FakeInput()
+      ..receiptError = Exception('Dịch vụ đọc hóa đơn tạm thời không khả dụng');
+    final finance = SavingRepository();
+    final picker = FakeReceipt()
+      ..image = ReceiptImage(
+        bytes: Uint8List.fromList([1]),
+        mimeType: 'image/png',
+      );
+    await open(tester, finance, api: api, receipt: picker);
+    await tester.tap(find.byKey(const ValueKey('aiReceiptButton')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Dịch vụ đọc hóa đơn tạm thời'), findsOneWidget);
+    expect(finance.saved, isEmpty);
+  });
+
+  testWidgets('late receipt response after closing the screen is discarded', (
+    tester,
+  ) async {
+    final api = FakeInput()
+      ..pendingReceipt = Completer<List<TransactionDraft>>();
+    final finance = SavingRepository();
+    final picker = FakeReceipt()
+      ..image = ReceiptImage(
+        bytes: Uint8List.fromList([1]),
+        mimeType: 'image/png',
+      );
+    await open(tester, finance, api: api, receipt: picker);
+    await tester.tap(find.byKey(const ValueKey('aiReceiptButton')));
+    await tester.pump();
+    expect(find.text('Đang đọc hóa đơn…'), findsOneWidget);
+    await tester.tap(find.byTooltip('Đóng'));
+    await tester.pumpAndSettle();
+    api.pendingReceipt!.complete([]);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(finance.saved, isEmpty);
+  });
+
+  testWidgets('the receipt button is disabled while the screen is busy', (
+    tester,
+  ) async {
+    final voice = FakeVoice()..permission = Completer<void>();
+    await open(tester, SavingRepository(), voice: voice);
+    await tester.tap(find.text('Ghi âm'));
+    await tester.pump();
+    final button = tester.widget<OutlinedButton>(
+      find.byKey(const ValueKey('aiReceiptButton')),
+    );
+    expect(button.onPressed, isNull);
+    voice.permission!.complete();
+    await tester.pumpAndSettle();
+  });
 
   testWidgets('reference layout fits a narrow phone', (tester) async {
     tester.view.physicalSize = const Size(360, 800);

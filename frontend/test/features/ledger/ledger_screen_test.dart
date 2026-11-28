@@ -63,7 +63,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Sổ thu chi'), findsWidgets);
+      expect(find.text('Trang chủ'), findsWidgets);
       expect(find.text('CÒN DƯ KHẢ DỤNG'), findsOneWidget);
       expect(find.textContaining('18.450.000₫'), findsOneWidget);
       expect(find.text('Lịch'), findsOneWidget);

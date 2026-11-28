@@ -35,6 +35,7 @@ class LoRAClassifier(ITransactionClassifier):
         device: str = "cpu",
         cache_dir: Path | None = None,
         local_files_only: bool = False,
+        merge_adapter: bool = False,
     ) -> None:
         from peft import PeftModel
 
@@ -65,6 +66,8 @@ class LoRAClassifier(ITransactionClassifier):
             local_files_only=local_files_only,
         )
         self.model = PeftModel.from_pretrained(base, artifact_dir, is_trainable=False)
+        if merge_adapter:
+            self.model = self.model.merge_and_unload(safe_merge=True)
         self.model.to(self.device).eval()
 
     def predict(self, text: str) -> dict[str, str | float]:

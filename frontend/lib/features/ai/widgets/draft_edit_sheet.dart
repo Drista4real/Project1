@@ -24,7 +24,10 @@ class _DraftEditSheetState extends State<DraftEditSheet> {
   );
   late final _note = TextEditingController(text: widget.item.description);
   late String _type = widget.item.type == 'income' ? 'income' : 'expense';
-  late int? _accountId = widget.item.accountId;
+  // The single balance lives in the primary wallet.
+  late final int? _accountId =
+      widget.item.accountId ??
+      (widget.accounts.isEmpty ? null : widget.accounts.first.id);
   late int? _categoryId = widget.item.categoryId;
   late DateTime _date = widget.item.date;
 
@@ -37,6 +40,8 @@ class _DraftEditSheetState extends State<DraftEditSheet> {
 
   void _confirm() {
     if (!_form.currentState!.validate()) return;
+    final accountId = _accountId;
+    if (accountId == null) return;
     Navigator.pop(
       context,
       widget.item.edited(
@@ -45,7 +50,7 @@ class _DraftEditSheetState extends State<DraftEditSheet> {
           _amount.text.trim().replaceAll('.', '').replaceAll(',', '.'),
         ),
         type: _type,
-        accountId: _accountId!,
+        accountId: accountId,
         categoryId: _categoryId,
         date: _date,
       ),
@@ -65,9 +70,34 @@ class _DraftEditSheetState extends State<DraftEditSheet> {
       child: ListView(
         shrinkWrap: true,
         children: [
+          Center(
+            child: Container(
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
           const Text(
             'Kiểm tra giao dịch',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              fontFamily: 'BeVietnamPro',
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Sửa thông tin nếu cần. Khoản này chưa được lưu.',
+            style: TextStyle(
+              fontFamily: 'BeVietnamPro',
+              fontSize: 13,
+              height: 1.5,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 16),
           SegmentedButton<String>(
@@ -94,7 +124,7 @@ class _DraftEditSheetState extends State<DraftEditSheet> {
             key: const ValueKey('draftAmount'),
             controller: _amount,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(labelText: 'Số tiền (VND)'),
+            decoration: _decoration('Số tiền', suffix: 'đ'),
             validator: (value) {
               final input = (value ?? '').trim();
               final amount = double.tryParse(
@@ -117,38 +147,28 @@ class _DraftEditSheetState extends State<DraftEditSheet> {
             controller: _note,
             maxLength: 2000,
             maxLines: 2,
-            decoration: const InputDecoration(labelText: 'Nội dung'),
+            decoration: _decoration('Nội dung').copyWith(counterText: ''),
             validator: (value) => value == null || value.trim().isEmpty
                 ? 'Nhập nội dung giao dịch'
                 : null,
-          ),
-          DropdownButtonFormField<int>(
-            initialValue: _accountId,
-            decoration: const InputDecoration(labelText: 'Ví thanh toán'),
-            items: [
-              for (final account in widget.accounts)
-                DropdownMenuItem(value: account.id, child: Text(account.name)),
-            ],
-            onChanged: (value) => setState(() => _accountId = value),
-            validator: (value) => value == null ? 'Hãy chọn ví' : null,
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<int>(
             key: ValueKey('draftCategory-$_type'),
             initialValue: _categoryId,
-            decoration: const InputDecoration(labelText: 'Danh mục'),
+            isExpanded: true,
+            decoration: _decoration('Danh mục'),
             items: [
               for (final category in widget.categories.where(
                 (c) => c.isIncome == (_type == 'income'),
               ))
                 DropdownMenuItem(
                   value: category.id,
-                  child: Text(category.name),
+                  child: Text(category.name, overflow: TextOverflow.ellipsis),
                 ),
             ],
             onChanged: (value) => setState(() => _categoryId = value),
-            validator: (value) =>
-                value == null ? 'Hãy chọn danh mục để gán phong bao' : null,
+            validator: (value) => value == null ? 'Hãy chọn danh mục' : null,
           ),
           const SizedBox(height: 12),
           ListTile(
@@ -179,10 +199,41 @@ class _DraftEditSheetState extends State<DraftEditSheet> {
           const SizedBox(height: 12),
           FilledButton(
             onPressed: _confirm,
+            style: FilledButton.styleFrom(
+              textStyle: const TextStyle(
+                fontFamily: 'BeVietnamPro',
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+              minimumSize: const Size.fromHeight(52),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
             child: const Text('Áp dụng thay đổi'),
           ),
         ],
       ),
     ),
   );
+
+  InputDecoration _decoration(String label, {String? suffix}) =>
+      InputDecoration(
+        labelText: label,
+        suffixText: suffix,
+        filled: true,
+        fillColor: Theme.of(context).colorScheme.surface,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 16,
+        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+        ),
+      );
 }

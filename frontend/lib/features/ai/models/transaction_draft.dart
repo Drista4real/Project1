@@ -11,6 +11,7 @@ class TransactionDraft {
     required this.confidence,
     required this.source,
     this.warnings = const [],
+    this.occurredOn,
   });
 
   final String text, normalizedText, type, source;
@@ -18,6 +19,7 @@ class TransactionDraft {
   final int? amount;
   final double confidence;
   final List<String> warnings;
+  final DateTime? occurredOn;
 
   factory TransactionDraft.fromJson(Map<String, dynamic> json) =>
       TransactionDraft(
@@ -29,6 +31,7 @@ class TransactionDraft {
         confidence: (json['confidence'] as num).toDouble(),
         source: json['source'] as String,
         warnings: (json['warnings'] as List).cast<String>(),
+        occurredOn: DateTime.tryParse(json['occurred_on'] as String? ?? ''),
       );
 }
 
@@ -77,31 +80,10 @@ class ReviewTransaction {
                       ))),
         )
         .toList();
-    String walletKey(String value) => value
-        .toLowerCase()
-        .replaceAll(RegExp(r'^(?:ví|tài khoản|ngân hàng)\s+'), '')
-        .replaceAll(RegExp(r'\s+'), '');
-    final inputKey = walletKey(draft.text);
-    final wallets = accounts
-        .where(
-          (account) =>
-              walletKey(account.name).isNotEmpty &&
-              inputKey.contains(walletKey(account.name)),
-        )
-        .toList();
-    final bankMention = RegExp(
-      r'chuyển khoản|ngân hàng|thẻ',
-    ).hasMatch(draft.text.toLowerCase());
-    final namedPayment = RegExp(
-      r'momo|mo mo|zalopay|zalo pay|tiền mặt|vietcombank|techcombank|mbbank|mb bank|bidv|vietinbank',
-    ).hasMatch(draft.text.toLowerCase());
-    final banks = accounts
-        .where((account) => !account.name.toLowerCase().contains('tiền mặt'))
-        .toList();
     final now = DateTime.now();
-    var date = now;
+    var date = draft.occurredOn ?? now;
     final time = RegExp(r'\b(\d{1,2})(?:h|:)(\d{2})\b').firstMatch(draft.text);
-    if (time != null) {
+    if (time != null && draft.occurredOn == null) {
       final hour = int.parse(time[1]!);
       final minute = int.parse(time[2]!);
       if (hour < 24 && minute < 60) {
@@ -115,13 +97,8 @@ class ReviewTransaction {
       amount: draft.amount?.toDouble(),
       type: draft.type,
       date: date,
-      accountId: wallets.length == 1
-          ? wallets.single.id
-          : namedPayment
-          ? null
-          : bankMention
-          ? (banks.length == 1 ? banks.single.id : null)
-          : (accounts.isEmpty ? null : accounts.first.id),
+      // The app keeps one balance; it lives in the primary (oldest) wallet.
+      accountId: accounts.isEmpty ? null : accounts.first.id,
       categoryId: matches.length == 1 ? matches.single.id : null,
     );
   }

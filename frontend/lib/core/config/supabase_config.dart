@@ -1,13 +1,16 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SupabaseConfig {
+  // Must match the backend's SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY. A token
+  // signed by another Supabase project is rejected with 401 by the backend.
   static const String supabaseUrl = String.fromEnvironment(
     'SUPABASE_URL',
-    defaultValue: 'https://syjigvtyxfkmmqipxufm.supabase.co',
+    defaultValue: 'https://wvzceuvziyeppmkrozqk.supabase.co',
   );
   static const String supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
-    defaultValue: 'sb_publishable_gexOlWlrEdiPuyda9jixOA_cujZIIOX',
+    defaultValue:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2emNldXZ6aXllcHBta3JvenFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMyNTY2MTIsImV4cCI6MjEwODgzMjYxMn0.gTeom8Em0OG3Jhrf7XPK6LIe0-pVCkn1e6yY2JLD3gQ',
   );
 
   static Future<void> initialize() async {

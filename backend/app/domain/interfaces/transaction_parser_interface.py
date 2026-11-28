@@ -1,6 +1,7 @@
 """Pure-domain contract for a transaction draft that still needs confirmation."""
 
 from dataclasses import dataclass
+from datetime import date
 from typing import Literal, Protocol
 
 
@@ -14,8 +15,9 @@ class TransactionDraft:
     transaction_type: Literal["expense", "income", "transfer"]
     category: str | None
     confidence: float
-    source: Literal["LOCAL", "GEMINI", "RULES", "UNAVAILABLE"]
+    source: Literal["LOCAL", "GEMINI", "RULES", "UNAVAILABLE", "QWEN"]
     warnings: tuple[str, ...] = ()
+    occurred_on: date | None = None
 
 
 class ITransactionParser(Protocol):

@@ -5,17 +5,15 @@ import json
 import logging
 import re
 from dataclasses import replace
-from functools import lru_cache
-from threading import Lock
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
-from app.domain.interfaces.classifier_interface import ITransactionClassifier
 from app.domain.interfaces.transaction_parser_interface import (
     ITransactionParser,
     TransactionDraft,
 )
+from app.infrastructure.ai.classifier.runtime import local_classifier
 from app.infrastructure.ai.cloud_vlm._gemini import (
     CloudVLMError,
     configured_input_model_name,
@@ -26,10 +24,8 @@ from app.infrastructure.ai.edge_asr.normalizer import (
     VietnameseFinancialSlangNormalizer,
 )
 from app.infrastructure.ai.input_rules import split_transactions, suggest_category
-from app.infrastructure.config.settings import get_settings
 
 logger = logging.getLogger(__name__)
-_CLASSIFIER_LOCK = Lock()
 _AMOUNTS = re.compile(r"(?<![\w+\-])\d+ đồng(?!\w)")
 _INCOME = re.compile(
     r"\b(?:nhận (?:được )?(?:lương|tiền|thưởng)|được (?:lương|tiền|thưởng)|"
@@ -70,46 +66,6 @@ def category_schema(names: tuple[str, ...] | None) -> type[CategorySuggestion]:
         __base__=CategorySuggestion,
         category=(Literal[tuple(dict.fromkeys(names))], ...),
     )
-
-
-def local_classifier() -> ITransactionClassifier | None:
-    """Serialize initialization so a batch cannot load several large models."""
-    with _CLASSIFIER_LOCK:
-        return _load_local_classifier()
-
-
-@lru_cache(maxsize=1)
-def _load_local_classifier() -> ITransactionClassifier | None:
-    """Load trusted local artifacts once; optional dependencies can be absent."""
-    settings = get_settings()
-    try:
-        if settings.classifier_backend == "lora":
-            from app.infrastructure.ai.classifier.lora import LoRAClassifier
-
-            classifier = LoRAClassifier(
-                settings.classifier_lora_dir,
-                device=settings.classifier_device,
-                cache_dir=settings.classifier_lora_cache_dir,
-                local_files_only=True,
-            )
-            logger.info(
-                "Local classifier ready: LoRA on %s (%s)",
-                settings.classifier_device,
-                settings.classifier_lora_dir,
-            )
-            return classifier
-        from app.infrastructure.ai.classifier.lgbm_inference import (
-            LightGBMTransactionClassifier,
-        )
-
-        return LightGBMTransactionClassifier()
-    except (ImportError, OSError, RuntimeError, ValueError):
-        logger.warning(
-            "Local classifier %s unavailable; transaction drafts need review",
-            settings.classifier_backend,
-            exc_info=True,
-        )
-        return None
 
 
 class NaturalTransactionParser(ITransactionParser):
@@ -253,7 +209,7 @@ class NaturalTransactionParser(ITransactionParser):
         if not pending:
             return drafts
         if len(drafts) == 1:
-            return (await self.parse(drafts[0].text),)
+            return (await self._resolve_existing_draft(drafts[0]),)
         suggestions = await self._cloud_batch(drafts, pending)
         updated = list(drafts)
         for suggestion in suggestions:
@@ -279,6 +235,33 @@ class NaturalTransactionParser(ITransactionParser):
                 ),
             )
         return tuple(updated)
+
+    async def _resolve_existing_draft(
+        self, draft: TransactionDraft
+    ) -> TransactionDraft:
+        """Apply single-row cloud fallback without repeating local inference."""
+        if draft.transaction_type == "income" and not self.income_categories:
+            return draft
+        suggestion = await self._cloud_category(
+            draft.normalized_text, income=draft.transaction_type == "income"
+        )
+        if suggestion is None:
+            return draft
+        warnings = draft.warnings
+        if suggestion.confidence >= 0.8:
+            warnings = tuple(
+                warning
+                for warning in warnings
+                if not warning.startswith("Hãy kiểm tra loại")
+            )
+        return replace(
+            draft,
+            category=suggestion.category,
+            confidence=suggestion.confidence,
+            source="GEMINI",
+            transaction_type=suggestion.transaction_type or draft.transaction_type,
+            warnings=warnings,
+        )
 
     async def _cloud_batch(
         self, drafts: tuple[TransactionDraft, ...], pending: list[int]

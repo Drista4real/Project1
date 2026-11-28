@@ -330,10 +330,10 @@ CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON public.ai_chat_messages(
 CREATE OR REPLACE FUNCTION public.handle_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
-  NEW.updated_at = NOW();
+  NEW.updated_at = pg_catalog.now();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = '';
 
 CREATE OR REPLACE TRIGGER trg_profiles_updated_at
   BEFORE UPDATE ON public.profiles
@@ -370,7 +370,7 @@ BEGIN
   VALUES (
     NEW.id,
     NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
+    COALESCE(NEW.raw_user_meta_data->>'full_name', pg_catalog.split_part(NEW.email, '@', 1)),
     NEW.raw_user_meta_data->>'avatar_url',
     0.00
   )
@@ -391,7 +391,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 CREATE OR REPLACE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
@@ -489,7 +489,7 @@ BEGIN
   -- Đồng bộ lại tổng số dư khả dụng vào bảng profiles
   UPDATE public.profiles
   SET current_balance = COALESCE((
-    SELECT SUM(balance)
+    SELECT pg_catalog.sum(balance)
     FROM public.accounts
     WHERE user_id = v_user_id AND is_included_in_total = true
   ), 0.00)
@@ -497,7 +497,7 @@ BEGIN
 
   RETURN NULL;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = '';
 
 CREATE OR REPLACE TRIGGER trg_sync_transaction_balance
   AFTER INSERT OR UPDATE OR DELETE ON public.transactions
@@ -677,7 +677,10 @@ ON CONFLICT DO NOTHING;
 -- ==============================================================================
 
 -- 1. View: Báo cáo cơ cấu chi tiêu theo Danh mục trong tháng hiện tại
-CREATE OR REPLACE VIEW public.v_current_month_spending_by_category AS
+-- The views run with the caller's RLS (security_invoker) and are closed to
+-- anon; see backend/supabase/migrations/202611230002_secure_spending_views.sql.
+CREATE OR REPLACE VIEW public.v_current_month_spending_by_category
+WITH (security_invoker = true) AS
 SELECT 
   t.user_id,
   c.id AS category_id,
@@ -694,7 +697,8 @@ WHERE t.transaction_type = 'expense'
 GROUP BY t.user_id, c.id, c.name, c.color, c.icon, c.pillar;
 
 -- 2. View: Báo cáo chi tiêu theo 4 Trụ cột Kakeibo trong tháng hiện tại
-CREATE OR REPLACE VIEW public.v_kakeibo_monthly_summary AS
+CREATE OR REPLACE VIEW public.v_kakeibo_monthly_summary
+WITH (security_invoker = true) AS
 SELECT
   t.user_id,
   date_trunc('month', t.transaction_date)::DATE AS month_year,
@@ -707,7 +711,8 @@ WHERE t.transaction_type = 'expense'
 GROUP BY t.user_id, date_trunc('month', t.transaction_date), COALESCE(t.pillar, c.pillar, 'needs');
 
 -- 3. View: Tiến độ hạn mức ngân sách tháng hiện tại
-CREATE OR REPLACE VIEW public.v_monthly_budget_progress AS
+CREATE OR REPLACE VIEW public.v_monthly_budget_progress
+WITH (security_invoker = true) AS
 SELECT
   b.id AS budget_id,
   b.user_id,
@@ -731,3 +736,20 @@ LEFT JOIN public.transactions t ON t.user_id = b.user_id
     (b.category_id IS NULL AND b.pillar IS NULL) -- Tổng chi
   )
 GROUP BY b.id, b.user_id, b.month_year, b.limit_amount, b.alert_threshold_percent, b.category_id, c.name, b.pillar;
+
+REVOKE ALL ON
+  public.v_current_month_spending_by_category,
+  public.v_kakeibo_monthly_summary,
+  public.v_monthly_budget_progress
+FROM anon;
+
+REVOKE ALL ON
+  public.v_current_month_spending_by_category,
+  public.v_kakeibo_monthly_summary,
+  public.v_monthly_budget_progress
+FROM authenticated;
+GRANT SELECT ON
+  public.v_current_month_spending_by_category,
+  public.v_kakeibo_monthly_summary,
+  public.v_monthly_budget_progress
+TO authenticated;

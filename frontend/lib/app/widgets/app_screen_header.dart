@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:project_one/app/widgets/app_profile_button.dart';
 import 'package:project_one/shared/widgets/kakeibo_logo.dart';
 
 class AppScreenHeader extends StatelessWidget implements PreferredSizeWidget {
   final String subtitle;
+  final Widget? leading;
 
-  const AppScreenHeader({required this.subtitle, super.key});
+  const AppScreenHeader({required this.subtitle, this.leading, super.key});
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
   @override
   Widget build(BuildContext context) => AppBar(
+    automaticallyImplyLeading: false,
+    leading: leading,
     titleSpacing: 16,
     title: Row(
       children: [
@@ -52,19 +56,6 @@ class AppScreenHeader extends StatelessWidget implements PreferredSizeWidget {
         ),
       ],
     ),
-    actions: [
-      Padding(
-        padding: EdgeInsets.only(right: 16),
-        child: CircleAvatar(
-          radius: 16,
-          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-          child: Icon(
-            Icons.person,
-            color: Theme.of(context).colorScheme.primary,
-            size: 19,
-          ),
-        ),
-      ),
-    ],
+    actions: const [AppProfileButton()],
   );
 }

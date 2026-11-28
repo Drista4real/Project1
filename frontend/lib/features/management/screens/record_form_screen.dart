@@ -1,3 +1,4 @@
+import 'package:project_one/app/widgets/app_exit_button.dart';
 import 'dart:convert';
 import 'package:project_one/shared/state/async_data_cubit.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -236,7 +237,19 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
             : text;
       }
     }
+    if (data.containsKey('account_id') && data['account_id'] == null) {
+      data['account_id'] = _primaryAccountId();
+    }
     await _cubit.save(data);
+  }
+
+  /// The wallet that holds the single balance: the oldest one not archived.
+  int? _primaryAccountId() {
+    final ids = [
+      for (final item in _options['accounts'] ?? <Map<String, dynamic>>[])
+        if (item['is_archived'] != true && item['id'] is int) item['id'] as int,
+    ]..sort();
+    return ids.isEmpty ? null : ids.first;
   }
 
   void _choose(String field, dynamic value) {
@@ -763,10 +776,13 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
       'Tùy chọn': [],
     };
     for (final entry in _properties.entries) {
-      if (_isAdvanced(entry.key)) continue;
+      if (_isAdvanced(entry.key) || entry.key == 'account_id') continue;
       groups[_groupFor(entry.key, entry.value as Map)]!.add(entry.key);
     }
-    final advanced = _properties.keys.where(_isAdvanced).toList();
+    // The app keeps a single balance, so no form asks which wallet to use.
+    final advanced = _properties.keys
+        .where((key) => _isAdvanced(key) && key != 'account_id')
+        .toList();
     return PopScope(
       canPop: !_busy && (_allowPop || !_dirty || state.saved),
       onPopInvokedWithResult: (didPop, _) {
@@ -781,10 +797,10 @@ class _RecordFormScreenState extends State<RecordFormScreen> {
                 ? 'Thêm'
                 : 'Sửa'} ${widget.resource['title']}',
           ),
-          leading: IconButton(
-            tooltip: 'Quay lại',
-            icon: const Icon(Icons.arrow_back),
-            onPressed: _busy ? null : _leave,
+          leading: AppExitButton(
+            close: !_readOnly,
+            enabled: !_busy,
+            onPressed: _leave,
           ),
         ),
         bottomNavigationBar: _readOnly

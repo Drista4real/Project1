@@ -1,7 +1,9 @@
+import 'package:project_one/app/widgets/app_exit_button.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:project_one/features/budget/cubit/category_envelopes_cubit.dart';
 import 'package:project_one/shared/state/async_data_cubit.dart';
 import 'package:flutter/material.dart';
+import 'package:project_one/app/widgets/app_profile_button.dart';
 import 'package:go_router/go_router.dart';
 import 'package:project_one/app/app_dependencies.dart';
 import 'package:project_one/app/app_routes.dart';
@@ -173,11 +175,7 @@ class _CategoryEnvelopesScreenState extends State<CategoryEnvelopesScreen> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        leading: IconButton(
-          tooltip: 'Quay lại',
-          onPressed: () => Navigator.maybePop(context),
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-        ),
+        leading: const AppExitButton(fallbackRoute: AppRoutes.budget),
         titleSpacing: 0,
         title: Text(
           'Quản lý danh mục & phong bao',
@@ -207,7 +205,8 @@ class _CategoryEnvelopesScreenState extends State<CategoryEnvelopesScreen> {
             ),
             icon: const Icon(Icons.add, size: 22),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 4),
+          const AppProfileButton(),
         ],
       ),
       body: Builder(
@@ -254,7 +253,7 @@ class _CategoryEnvelopesScreenState extends State<CategoryEnvelopesScreen> {
         },
       ),
       bottomNavigationBar: AppScreenNavigation(
-        selectedIndex: 2,
+        selectedIndex: 3,
         onSelectedTab: () {
           final router = GoRouter.of(context);
           Navigator.pop(context);

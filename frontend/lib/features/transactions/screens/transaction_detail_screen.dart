@@ -1,3 +1,4 @@
+import 'package:project_one/app/widgets/app_exit_button.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:project_one/features/transactions/cubit/transaction_detail_cubit.dart';
 import 'package:flutter/material.dart';
@@ -59,9 +60,7 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Xóa giao dịch?'),
-        content: const Text(
-          'Giao dịch sẽ bị xóa và số dư ví sẽ được cập nhật.',
-        ),
+        content: const Text('Giao dịch sẽ bị xóa và số dư sẽ được cập nhật.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -107,9 +106,9 @@ class _TransactionDetailScreenState extends State<TransactionDetailScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Chi tiết giao dịch'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: _busy ? null : () => Navigator.pop(context, _changed),
+          leading: AppExitButton(
+            enabled: !_busy,
+            onPressed: () => Navigator.pop(context, _changed),
           ),
         ),
         body: _busy

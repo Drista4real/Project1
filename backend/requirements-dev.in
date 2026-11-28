@@ -5,3 +5,4 @@ pytest-asyncio>=1.4,<2
 coverage>=7.17,<8
 pandas>=2.2,<3
 ruff>=0.14,<1
+psycopg[binary]>=3.3,<4

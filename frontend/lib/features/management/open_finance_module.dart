@@ -6,6 +6,9 @@ import 'package:project_one/features/management/screens/record_form_screen.dart'
 import 'package:project_one/features/management/screens/resource_list_screen.dart';
 import 'package:project_one/features/budget/screens/category_envelopes_screen.dart';
 import 'package:project_one/features/management/config/management_metadata.dart';
+import 'package:project_one/features/profile/screens/edit_profile_screen.dart';
+
+bool _openingFinanceModule = false;
 
 /// Reuse the authenticated CRUD forms from the existing feature screens.
 Future<void> openFinanceModule(
@@ -16,10 +19,26 @@ Future<void> openFinanceModule(
   Map<String, dynamic> defaults = const {},
   ManagementRepository? repository,
 }) async {
+  if (_openingFinanceModule) return;
+  if (ModalRoute.of(context)?.isCurrent == false) return;
+
   final source = repository ?? AppDependencies.managementRepository;
   if (create && generatedFinanceResources.contains(name)) {
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Dữ liệu do hệ thống tạo, chỉ có thể xem.')),
+      const SnackBar(
+        content: Text('Dữ liệu do hệ thống tạo, chỉ có thể xem.'),
+      ),
+    );
+    return;
+  }
+  if (name == 'profile') {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EditProfileScreen(
+          repository: source,
+          initialProfile: record,
+        ),
+      ),
     );
     return;
   }
@@ -36,34 +55,38 @@ Future<void> openFinanceModule(
     );
     return;
   }
+
+  _openingFinanceModule = true;
+  late final Map<String, dynamic> resource;
+  Map<String, dynamic>? fresh;
   try {
     final resources = await source.resources();
-    final resource = resources.firstWhere((item) => item['name'] == name);
-    Map<String, dynamic>? fresh;
-    if (record != null || name == 'profile') {
-      fresh = await source.get(
-        name,
-        name == 'profile' ? 'me' : source.key(name, record!),
-      );
+    resource = resources.firstWhere((item) => item['name'] == name);
+    if (record != null) {
+      fresh = await source.get(name, source.key(name, record));
     }
-    if (!context.mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => create || fresh != null
-            ? RecordFormScreen(
-                resource: resource,
-                repository: source,
-                record: fresh,
-                initialValues: defaults,
-              )
-            : ResourceListScreen(resource: resource, repository: source),
-      ),
-    );
   } catch (error) {
     if (context.mounted) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('$error')));
     }
+    return;
+  } finally {
+    _openingFinanceModule = false;
   }
+
+  if (!context.mounted) return;
+  await Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => create || fresh != null
+          ? RecordFormScreen(
+              resource: resource,
+              repository: source,
+              record: fresh,
+              initialValues: defaults,
+            )
+          : ResourceListScreen(resource: resource, repository: source),
+    ),
+  );
 }

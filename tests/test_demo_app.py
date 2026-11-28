@@ -83,6 +83,19 @@ def test_local_text_and_voice(demo: AppTest) -> None:
     assert any("MOCK ASR" in item.value for item in demo.warning)
 
 
+def test_prepare_local_models_and_stage_timings(demo: AppTest) -> None:
+    """Preparation is visible and text analysis exposes separate timing stages."""
+    demo.button(key="warmup_models").click().run()
+    assert not demo.exception
+    assert demo.session_state["model_preparation"]["status"] == "ready"
+    demo.text_input(key="transaction_text").set_value("cơm sườn 35k").run()
+    demo.button(key="analyze_text").click().run()
+    assert not demo.exception
+    timings = demo.session_state["text_result"]["timings_ms"]
+    assert {"normalize_ms", "classifier_acquire_ms", "classify_ms"} <= timings.keys()
+    assert all(value >= 0 for value in timings.values())
+
+
 def test_standalone_lora_text_without_api(monkeypatch: pytest.MonkeyPatch) -> None:
     """The real LoRA adapter works through Streamlit with no API server."""
     import sys

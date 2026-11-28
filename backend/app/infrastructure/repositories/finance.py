@@ -32,6 +32,41 @@ class SupabaseFinanceQueries:
             .data
         )
 
+    def included_wallets(self) -> list[dict]:
+        """Every wallet counted in the total, archived ones included."""
+        return (
+            self.client.table("accounts")
+            .select("id, balance, is_archived")
+            .eq("user_id", self.user_id)
+            .eq("is_included_in_total", True)
+            .order("id")
+            .execute()
+            .data
+        )
+
+    def set_wallet_balance(self, wallet_id: int, balance: Decimal) -> None:
+        (
+            self.client.table("accounts")
+            .update({"balance": str(balance)})
+            .eq("id", wallet_id)
+            .eq("user_id", self.user_id)
+            .execute()
+        )
+
+    def create_wallet(self, balance: Decimal) -> None:
+        (
+            self.client.table("accounts")
+            .insert(
+                {
+                    "user_id": self.user_id,
+                    "name": "Ví Tiền Mặt",
+                    "account_type": "cash",
+                    "balance": str(balance),
+                }
+            )
+            .execute()
+        )
+
     def overview(self):
         now = datetime.now(UTC)
         start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)

@@ -71,26 +71,31 @@ class FinanceFormSection extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
     ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-        ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 5),
+    // The section paints a background, so a tile inside it needs its own
+    // Material ancestor; otherwise its ink splashes stay invisible.
+    child: Material(
+      type: MaterialType.transparency,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Text(
-            subtitle!,
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 12,
-            ),
+            title,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 5),
+            Text(
+              subtitle!,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12,
+              ),
+            ),
+          ],
+          const SizedBox(height: 18),
+          child,
         ],
-        const SizedBox(height: 18),
-        child,
-      ],
+      ),
     ),
   );
 }

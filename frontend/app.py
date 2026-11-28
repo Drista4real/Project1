@@ -17,10 +17,13 @@ import streamlit as st
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = ROOT / "backend"
-if str(BACKEND) not in sys.path:
-    sys.path.insert(0, str(BACKEND))
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+# Streamlit prepends frontend/ again on reruns. Keep backend/app ahead of this
+# script, otherwise importing "app" can resolve to frontend/app.py itself.
+for directory in (ROOT, BACKEND):
+    directory_name = str(directory)
+    while directory_name in sys.path:
+        sys.path.remove(directory_name)
+    sys.path.insert(0, directory_name)
 
 if TYPE_CHECKING:
     from app.domain.interfaces.classifier_interface import ITransactionClassifier
@@ -53,24 +56,13 @@ def money(value: float | int | None) -> str:
 
 @st.cache_resource(show_spinner=False)
 def classifier() -> ITransactionClassifier:
-    """Load PhoBERT and the classifier once, only when classification is requested."""
-    from app.infrastructure.config.settings import get_settings
+    """Reuse the backend runtime instead of loading a second classifier."""
+    from app.infrastructure.ai.classifier.runtime import local_classifier
 
-    settings = get_settings()
-    if settings.classifier_backend == "lora":
-        from app.infrastructure.ai.classifier.lora import LoRAClassifier
-
-        return LoRAClassifier(
-            settings.classifier_lora_dir,
-            device=settings.classifier_device,
-            cache_dir=settings.classifier_lora_cache_dir,
-            local_files_only=True,
-        )
-    from app.infrastructure.ai.classifier.lgbm_inference import (
-        LightGBMTransactionClassifier,
-    )
-
-    return LightGBMTransactionClassifier()
+    runtime = local_classifier()
+    if runtime is None:
+        raise RuntimeError("Local classifier unavailable")
+    return runtime
 
 
 @st.cache_resource(show_spinner=False)
@@ -206,6 +198,9 @@ def show_classification(result: dict[str, Any]) -> None:
         st.warning(
             "MOCK ASR · phiên âm giả lập, không phải kết quả nhận diện file audio."
         )
+    if result.get("timings_ms"):
+        with st.expander("Thời gian từng bước"):
+            st.json(result["timings_ms"])
     st.caption("Latency gồm tải model nếu chưa cache, xử lý cục bộ và fallback nếu có.")
 
 
@@ -223,6 +218,36 @@ async def extract_image(
 def ingestion_screen() -> None:
     """Render text, WAV/M4A/MP3 voice and receipt workflows with saved results."""
     st.subheader("Ghi chép nhanh, xem AI hiểu gì")
+    with st.expander("Chuẩn bị model & đo thời gian"):
+        st.caption(
+            "Chữ và giọng nói dùng chung classifier. Chuẩn bị model trước khi demo "
+            "để tách thời gian khởi tạo khỏi thời gian phân tích. Không gọi cloud."
+        )
+        if st.button("Nạp sẵn model 1 + 3", key="warmup_models"):
+            from app.infrastructure.ai.classifier.runtime import warmup_classifier
+
+            with st.spinner("Đang chuẩn bị model cục bộ…"):
+                report = warmup_classifier()
+                started = perf_counter()
+                try:
+                    engine = recognizer()
+                    asr_status = (
+                        "MOCK" if engine.is_mock else "ready (chưa giải mã audio)"
+                    )
+                except HANDLED_ERRORS as exc:
+                    asr_status = "unavailable"
+                    friendly_error("Chuẩn bị giọng nói", exc)
+                st.session_state["model_preparation"] = {
+                    **report,
+                    "asr_status": asr_status,
+                    "asr_acquire_ms": (perf_counter() - started) * 1000,
+                }
+        if report := st.session_state.get("model_preparation"):
+            st.json(report)
+        st.caption(
+            "load_ms gồm import và nạp classifier; warmup_ms là lượt chạy mẫu. "
+            "Khởi động lại tiến trình để đo lại lần nạp đầu tiên."
+        )
     text_tab, voice_tab, receipt_tab = st.tabs(["Văn bản", "Giọng nói", "Hóa đơn"])
     with text_tab:
         text = st.text_input(
@@ -364,6 +389,8 @@ def ingestion_screen() -> None:
                 "Khớp" if receipt["is_arithmetic_valid"] else "Cần kiểm tra",
             )
             columns[2].metric("Latency", f"{result['latency']:.0f} ms")
+            with st.expander("Thời gian đọc hóa đơn"):
+                st.json(result.get("timings_ms", {}))
             st.write("**Cửa hàng:**", receipt["merchant_name"])
             st.write("**Danh mục:**", receipt["category"])
             st.write(

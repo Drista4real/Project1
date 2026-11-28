@@ -9,6 +9,8 @@ class StubApi extends BackendClient {
     String method,
     String path, {
     Map<String, dynamic>? body,
+    List<int>? bytes,
+    String contentType = 'application/json',
   }) async {
     calls.add({'method': method, 'path': path, 'body': body});
     if (method != 'GET') return null;

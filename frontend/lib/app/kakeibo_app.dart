@@ -29,8 +29,12 @@ class KakeiboZenApp extends StatelessWidget {
   Widget _buildAccount(AppPreferences source) {
     return ListenableBuilder(
       listenable: source,
-      builder: (context, _) =>
-          _AccountApp(key: ValueKey(source.userId), preferences: source),
+      builder: (context, _) {
+        if (preferences == null) {
+          AppDependencies.userProfile.syncForUser(source.userId);
+        }
+        return _AccountApp(key: ValueKey(source.userId), preferences: source);
+      },
     );
   }
 }
@@ -52,7 +56,7 @@ class _AccountAppState extends State<_AccountApp> {
 
   @override
   Widget build(BuildContext context) => MaterialApp.router(
-    title: 'Kakeibo Zen - Sổ Thu Chi & Dự Báo Dòng Tiền AI',
+    title: 'Kakeibo Zen - Quản lý Tài chính & Ngân sách động AI',
     debugShowCheckedModeBanner: false,
     theme: AppTheme.kakeiboTheme,
     darkTheme: AppTheme.kakeiboDarkTheme,

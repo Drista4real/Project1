@@ -16,6 +16,62 @@ The preparation CLI only needs the Python standard library; it does not train
 models or modify the source CSV. Use `--dataset-dir` in `scripts/train_classifier.py`
 for verified fixed splits instead of the legacy random 80/20 mode.
 
+## Model runtime and latency
+
+[Sơ đồ trước–sau cho Model 1, 3 và 4](../docs/_shared/d2-architect/model-runtime-changes.svg)
+([PNG](../docs/_shared/d2-architect/model-runtime-changes.png),
+[nguồn D2](../docs/_shared/d2-architect/model-runtime-changes.d2)).
+
+Models 1 and 3 share one text/voice ingestion capability while retaining separate
+ASR and classifier adapters. Model 4 remains independent. See
+[ADR 0008](../docs/adr/0008-shared-ingestion-model-runtime.md) for lifecycle and scope.
+
+Android quick input also exposes `POST /api/v1/ingestion/receipt` (see #102).
+Send the user's bearer token and raw JPEG/PNG/WebP bytes with matching
+`Content-Type`; maximum 8 MiB / 20 megapixels / one frame. Configure the existing
+Qwen provider and key in `backend/.env`. Missing configuration returns 503,
+invalid images 422, unsupported formats 415 and oversized bodies 413. The
+response uses the text endpoint's `drafts` shape with `source: "QWEN"` and
+optional `occurred_on` (YYYY-MM-DD). One receipt is one expense draft using its
+printed VND total. This endpoint never writes transactions or stores uploaded
+images. Flutter uses on-device ASR for voice, then automatically sends the
+transcript through the text endpoint; audio is not uploaded. Model 3/4 media
+fallback remains outside this integration.
+
+The API warms its local classifier before serving by default. Inspect
+`GET /ready/ai` for startup warm-up status and timings; `/health` remains liveness.
+Missing optional model dependencies keep CRUD running and report AI readiness 503.
+The current Docker image does not bundle ML dependencies/checkpoints: local model
+serving needs the corresponding classifier requirements and prepared local weights.
+Warm-up does not download them or call Gemini/Qwen.
+
+```dotenv
+CLASSIFIER_WARMUP=true
+CLASSIFIER_LORA_MERGE=false
+# Optional; benchmark on the actual host before choosing:
+# CLASSIFIER_CPU_THREADS=2
+```
+
+Merge is opt-in and affects only the in-memory LoRA serving model. Set it true
+and restart to compare. Each API worker has its own model; measure RAM
+and throughput before adding workers. Inference within a worker is serialized;
+`asyncio.to_thread` keeps the event loop free but does not add CPU capacity.
+
+From the repository root, using the environment with your ML dependencies:
+
+```powershell
+.\.venv\Scripts\python.exe backend/scripts/benchmark_inference.py --runs 30
+.\.venv\Scripts\python.exe backend/scripts/benchmark_inference.py --merge --runs 30
+.\.venv\Scripts\python.exe backend/scripts/benchmark_inference.py --threads 2 --concurrency 4
+# Optional real recording:
+.\.venv\Scripts\python.exe backend/scripts/benchmark_inference.py --audio D:/samples/voice.wav
+```
+
+Use a fresh process for each comparison. The benchmark never calls cloud APIs,
+changes checkpoints or writes financial data. Warm p50/p95 includes inference-lock
+waiting but excludes executor backlog and HTTP/network/upload time. Concurrent
+throughput is a local smoke measurement, not a production capacity estimate.
+
 ## Requirements
 
 - Python 3.12 or newer
@@ -44,6 +100,124 @@ through the Supabase SQL editor. The guard checks wallet/category ownership
 before the existing balance trigger executes. These scripts are not applied
 automatically. Existing users need an account in `public.accounts`; the base
 schema creates a cash account when a new user signs up.
+
+### Apply the migrations
+
+Migrations are not applied automatically. Two of them are needed for the
+budget engine and the chat agent:
+
+- `supabase/migrations/202611010001_budget_plan_engine.sql` — the plan tables,
+  the RLS policies and the `rebalance_plan` RPC (ADR 0009).
+- `supabase/migrations/202611010002_chat_agent_slots.sql` — the server-side
+  slots and the tool-call trace (ADR 0010).
+
+Apply them from the repository with a direct PostgreSQL connection, not from
+the SQL editor: the editor records no migration history, so the database
+drifts from the files without anyone noticing (see the next section). Put the
+connection
+string in `backend/.env` (Supabase Dashboard → Settings → Database →
+Connection string, session pooler):
+
+```dotenv
+DATABASE_URL=postgresql://postgres.your-project-ref:your-password@aws-0-region.pooler.supabase.com:6543/postgres
+```
+
+URL-encode the special characters of the password (`!` becomes `%21`, for
+example). The script refuses to run while the template password is still in
+place, so a half-filled value fails fast instead of at the first query.
+
+`apply_migrations` and `check_function_drift` connect with psycopg, which is
+pinned in the dev requirements, not in `requirements.txt`:
+
+```powershell
+python -m pip install -r requirements-dev.txt
+python -m scripts.apply_migrations --check   # report what is missing
+python -m scripts.apply_migrations           # apply every migration in order
+python -m scripts.apply_migrations --only 202611010002_chat_agent_slots.sql
+```
+
+Without the migrations the chat still answers, but the collected slots and
+the tool trace are dropped, and `/api/v1/budget-plans` answers 503.
+
+### Track migrations with the Supabase CLI
+
+Until 2026-11-24 every migration was pasted into the SQL editor, so
+`supabase_migrations.schema_migrations` did not exist and a migration edited
+after it ran (B15) or never run at all (B16) went unnoticed. The history is now
+kept by the Supabase CLI. The commands below were run with CLI 3.3.0 from the
+repository root. Two details of this version matter:
+
+- Every command targets the **local** database unless `--remote` is given.
+  `--linked` is deprecated and will be removed in v4.
+- The `supabase/` folder lives under `backend/`, hence `--workdir backend`.
+  The 12-digit version prefixes are accepted as they are.
+
+Link the project once per machine. It asks for the database password and
+writes `backend/supabase/.temp/`, which is ignored by git:
+
+```powershell
+npx --yes supabase@3.3.0 login
+npx --yes supabase@3.3.0 link --workdir backend --project-ref <project-ref>
+npx --yes supabase@3.3.0 migration list --workdir backend --remote
+```
+
+Apply a new migration with `apply_migrations`, then record it:
+
+```powershell
+cd backend
+python -m scripts.apply_migrations --only 202611240001_sync_rebalance_plan.sql
+cd ..
+npx --yes supabase@3.3.0 db push --workdir backend --remote --dry-run
+npx --yes supabase@3.3.0 migration repair --workdir backend --remote --status applied 202611240001 --yes
+```
+
+`db push` is used only with `--dry-run`, to list the versions still pending.
+The CLI connects through a temporary login role it creates for the run, while
+`apply_migrations` runs as the `DATABASE_URL` role (`postgres`). The loop in
+202611230001 changes the default privileges of each role the migrating user
+can act for, and new functions are owned by that user. A different role can
+therefore leave a different result. Mark a version as applied only after
+its objects are visible in the catalog. `--yes` is needed because the CLI
+does not prompt when stdout is not a terminal.
+
+`supabase db diff --remote` cannot detect drift here yet. Its shadow database
+is built from `supabase/migrations` alone, and the base schema lives in
+`frontend/supabase/schema.sql`. With CLI 3.3.0 it fails on the first file with
+`relation "public.transactions" does not exist`.
+
+Detect function drift with `scripts/check_function_drift.py` instead. For
+every `public` function not owned by an extension, it compares md5 and length
+of the body, SECURITY DEFINER, `proconfig` and EXECUTE for `anon`,
+`authenticated` and `service_role` between a reference database and the target
+(`DATABASE_URL` by default). Functions owned by an extension come from the
+platform, so they are skipped and the report only prints how many there are.
+Function setting values other than `search_path` are shown as a sha256
+prefix. Any difference exits 1. Build the reference from the e2e `migrate` stack, which
+applies `schema.sql`, every migration and the catalog checks in
+`tests/backend-e2e/sql/`. Publish its database port on loopback with an
+override file kept outside the repository:
+
+```yaml
+# ref-override.yaml
+services:
+  db:
+    ports:
+      - "127.0.0.1:54329:5432"
+```
+
+```powershell
+cd tests/backend-e2e
+python docker/generate_env.py
+docker compose --project-name project1-drift-ref --env-file .env.ci -f compose.yaml -f <path>/ref-override.yaml up --exit-code-from migrate migrate
+docker compose --project-name project1-drift-ref --env-file .env.ci -f compose.yaml -f <path>/ref-override.yaml up -d --wait db
+cd ../../backend
+python -m scripts.check_function_drift --reference-url "postgresql://supabase_admin:<TEST_DB_PASSWORD from .env.ci>@127.0.0.1:54329/postgres"
+```
+
+The SQL files are checked out with LF endings (`.gitattributes`). A checkout
+with CRLF would put a carriage return into every function body of the
+reference and report all of them as different. Remove the stack afterwards
+with `docker compose --project-name project1-drift-ref down --volumes`.
 
 ### API AI (Model 4)
 

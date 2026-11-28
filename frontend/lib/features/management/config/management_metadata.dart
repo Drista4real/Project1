@@ -184,7 +184,7 @@ const managementRelations = <String, String>{
 };
 
 const managementModuleGroups = {
-  'Thu chi và tài khoản': ['accounts', 'recurring_transactions', 'debts_loans'],
+  'Thu chi': ['recurring_transactions', 'debts_loans'],
   'Ngân sách và tiết kiệm': ['budgets', 'saving_goals'],
   'Danh mục và thẻ': ['categories', 'tags', 'transaction_tags'],
   'Dự báo và tư vấn': [

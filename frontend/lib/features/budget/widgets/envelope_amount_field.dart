@@ -30,7 +30,7 @@ class EnvelopeAmountField extends StatelessWidget {
     inputFormatters: [
       FilteringTextInputFormatter.digitsOnly,
       LengthLimitingTextInputFormatter(13),
-      _VndInputFormatter(),
+      VndInputFormatter(),
     ],
     decoration: envelopeInput(context, '1.000.000').copyWith(
       suffixText: '₫',
@@ -49,7 +49,8 @@ class EnvelopeAmountField extends StatelessWidget {
   );
 }
 
-class _VndInputFormatter extends TextInputFormatter {
+/// Groups the digits of a typed VND amount as `1.000.000`.
+class VndInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,

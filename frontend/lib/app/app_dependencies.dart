@@ -8,12 +8,14 @@ import 'package:project_one/features/finance/domain/usecases/get_categories.dart
 import 'package:project_one/features/finance/domain/usecases/get_financial_overview.dart';
 import 'package:project_one/features/finance/domain/usecases/get_transactions.dart';
 import 'package:project_one/features/finance/domain/usecases/finance_insights.dart';
+import 'package:project_one/features/profile/user_profile_notifier.dart';
 import 'package:project_one/features/settings/cubit/app_preferences.dart';
 
 class AppDependencies {
   static final preferences = AppPreferences();
   static final ManagementRepository managementRepository =
       BackendManagementRepository();
+  static final userProfile = UserProfileNotifier(managementRepository);
   static final financeInsights = FinanceInsights(managementRepository);
   static final FinanceRepository financeRepository = SupabaseFinanceRepository(
     FinanceRemoteDataSource(),

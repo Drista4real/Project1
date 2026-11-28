@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:project_one/core/theme/app_theme.dart';
 import 'package:project_one/features/finance/domain/usecases/finance_insights.dart';
 import 'package:project_one/shared/formatters/currency_formatter.dart';
 import '../models/transaction_draft.dart';
@@ -58,136 +57,91 @@ class InputBudgetImpact extends StatelessWidget {
               draft.date.month == month.month,
         )
         .fold(0.0, (sum, draft) => sum + (draft.amount ?? 0));
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              CircleAvatar(
-                backgroundColor: Colors.white,
-                child: Icon(
-                  Icons.spa_outlined,
-                  color: Theme.of(context).colorScheme.primary,
+    final colors = Theme.of(context).colorScheme;
+    final income = drafts
+        .where((draft) => draft.type == 'income')
+        .fold(0.0, (sum, draft) => sum + (draft.amount ?? 0));
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (expenses.isNotEmpty)
+            Text(
+              'Tổng chi: ${formatVnd(total)}',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          if (income > 0) ...[
+            if (expenses.isNotEmpty) const SizedBox(height: 6),
+            Text(
+              'Tổng thu: ${formatVnd(income)}',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+          ],
+          if (expenses.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            if (touched.isEmpty)
+              Text(
+                loadFailed
+                    ? 'Chưa tải được ngân sách.'
+                    : data == null
+                    ? 'Đang tải ngân sách…'
+                    : 'Chưa có ngân sách cho khoản chi này.',
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.5,
+                  color: colors.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Tác động phong bao Kakeibo',
+            for (final budget in touched.take(4))
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Builder(
+                  builder: (_) {
+                    final remaining =
+                        financeAmount(budget['limit_amount']) -
+                        data!.used(budget, month) -
+                        pendingForBudget(data!, budget, drafts, month);
+                    return Text(
+                      '${data!.title(budget)}: ${remaining < 0 ? 'sẽ vượt' : 'sẽ còn'} ${formatVnd(remaining.abs())}',
                       style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
+                        fontSize: 12,
+                        height: 1.5,
+                        color: remaining < 0
+                            ? colors.error
+                            : colors.onSurfaceVariant,
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Các khoản chi đang chọn: ${formatVnd(total)}. Số dư và ngân sách sẽ cập nhật sau khi bạn xác nhận.',
-                      style: const TextStyle(fontSize: 13, height: 1.5),
-                    ),
-                    if (touched.isEmpty) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        loadFailed
-                            ? 'Chưa tải được ngân sách để đối chiếu.'
-                            : 'Chưa có ngân sách tương ứng để đối chiếu.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                    for (final budget in touched.take(4)) ...[
-                      const SizedBox(height: 8),
-                      Builder(
-                        builder: (_) {
-                          final remaining =
-                              financeAmount(budget['limit_amount']) -
-                              data!.used(budget, month) -
-                              pendingForBudget(data!, budget, drafts, month);
-                          return Text(
-                            '${data!.title(budget)}: ${remaining < 0 ? 'dự kiến vượt' : 'dự kiến còn'} ${formatVnd(remaining)}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: remaining < 0
-                                  ? AppTheme.expenseCoral
-                                  : Theme.of(context).colorScheme.primary,
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ],
+                    );
+                  },
                 ),
+              ),
+            if (limit != null && limit > 0) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Ngân sách tháng này sau khi lưu',
+                style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
+              ),
+              const SizedBox(height: 8),
+              LinearProgressIndicator(
+                value: ((spent + pending) / limit).clamp(0, 1),
+                color: spent + pending > limit ? colors.error : colors.primary,
+                backgroundColor: colors.surfaceContainerHighest,
+                minHeight: 5,
+                borderRadius: BorderRadius.circular(5),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${formatVnd(spent + pending)} / ${formatVnd(limit)}',
+                style: TextStyle(fontSize: 12, color: colors.onSurfaceVariant),
               ),
             ],
-          ),
-        ),
-        if (limit != null && limit > 0) ...[
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      SizedBox.expand(
-                        child: CircularProgressIndicator(
-                          value: ((spent + pending) / limit).clamp(0, 1),
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.surfaceContainerHighest,
-                          strokeWidth: 4,
-                        ),
-                      ),
-                      Text(
-                        '${((spent + pending) / limit * 100).round()}%',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Ngân sách tháng này',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Dự kiến ${formatVnd(spent + pending)} / ${formatVnd(limit)}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }

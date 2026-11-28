@@ -26,12 +26,20 @@ __pycache__/
 # Local IDE state
 .idea/
 *.iml
+*.ipr
+*.iws
+.vs/
 
 # Coverage and Python packaging outputs
 .coverage
 .coverage.*
 htmlcov/
 coverage.xml
+lcov.info
+# Local inference benchmark reports and Python profiler dumps
+/benchmark-results/
+*.prof
+*.pstats
 *.egg-info/
 /build/
 /dist/
@@ -44,6 +52,20 @@ coverage.xml
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Local Dart/Flutter tooling and Android signing credentials
+.dart_tool/
+.pub-cache/
+.pub/
+.flutter-plugins
+.flutter-plugins-dependencies
+# Machine-local Flutter SDK links and Pub credentials
+**/.fvm/flutter_sdk
+**/.fvm/versions/
+.pub-credentials.json
+**/android/key.properties
+*.jks
+*.keystore
 
 # Downloaded model caches and exported ASR binaries
 weights/cache/
@@ -61,3 +83,6 @@ weights/checkpoints/classifier_lora/
 /data/prepared/expense_six_v2_defaults_20261015_annotations/*
 !/data/prepared/expense_six_v2_defaults_20261015_annotations/annotation_approved.csv
 /data/private/
+
+# Supabase CLI link state (project ref, pooler URL); local to each machine.
+/backend/supabase/.temp/

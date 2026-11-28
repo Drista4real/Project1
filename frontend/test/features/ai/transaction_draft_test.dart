@@ -19,18 +19,22 @@ TransactionDraft draft({
 void main() {
   const cash = Account(id: 1, name: 'Tiền mặt');
   const bank = Account(id: 2, name: 'Vietcombank');
-  test('spoken wallet matches a prefixed wallet name', () {
+  test('a named wallet still spends from the single balance', () {
     final result = ReviewTransaction.fromDraft(1, draft(text: 'cơm 30k momo'), [
       cash,
       const Account(id: 4, name: 'Ví MoMo'),
     ], []);
-    expect(result.accountId, 4);
+    expect(result.accountId, 1);
   });
-  test('missing named wallet never silently spends from cash', () {
-    final result = ReviewTransaction.fromDraft(1, draft(text: 'cơm 30k momo'), [
-      cash,
-    ], []);
+  test('without any wallet the draft cannot be saved', () {
+    final result = ReviewTransaction.fromDraft(
+      1,
+      draft(text: 'cơm 30k momo'),
+      [],
+      [],
+    );
     expect(result.accountId, isNull);
+    expect(result.canSave, isFalse);
   });
   test(
     'unique broader category maps to the actual user category and envelope',
@@ -57,24 +61,23 @@ void main() {
     );
     expect(result.categoryId, isNull);
   });
-  test('bank payment never defaults to cash when banks are ambiguous', () {
+  test('a bank payment uses the single balance too', () {
     final result = ReviewTransaction.fromDraft(
       1,
       draft(text: 'trà sữa 35k chuyển khoản'),
       [cash, bank, const Account(id: 5, name: 'MB')],
       [],
     );
-    expect(result.accountId, isNull);
-    expect(result.canSave, isFalse);
+    expect(result.accountId, 1);
   });
-  test('explicit wallet and valid transaction time are preserved', () {
+  test('the transaction time is preserved', () {
     final result = ReviewTransaction.fromDraft(
       1,
       draft(text: 'trà sữa 35k Vietcombank lúc 12h30'),
       [cash, bank],
       [],
     );
-    expect(result.accountId, 2);
+    expect(result.accountId, 1);
     expect(result.date.hour, 12);
     expect(result.date.minute, 30);
   });

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:project_one/core/config/supabase_config.dart';
 import 'finance_api_error.dart';
@@ -27,6 +28,8 @@ class BackendClient {
     String method,
     String path, {
     Map<String, dynamic>? body,
+    List<int>? bytes,
+    String contentType = 'application/json',
   }) async {
     var session = SupabaseConfig.client.auth.currentSession;
     if (session == null) {
@@ -38,6 +41,9 @@ class BackendClient {
       try {
         session = (await SupabaseConfig.client.auth.refreshSession()).session;
       } catch (_) {
+        // Make AuthGate leave the signed-in shell when the refresh token is
+        // invalid or revoked, instead of leaving a dead session on screen.
+        await SupabaseConfig.client.auth.signOut(scope: SignOutScope.local);
         throw const FinanceApiException(
           'Phiên đã hết hạn. Vui lòng đăng nhập lại.',
         );
@@ -52,9 +58,10 @@ class BackendClient {
       final request = http.Request(method, Uri.parse('$baseUrl/api/v1$path'));
       request.headers.addAll({
         'Authorization': 'Bearer ${session.accessToken}',
-        'Content-Type': 'application/json',
+        'Content-Type': contentType,
       });
       if (body != null) request.body = jsonEncode(body);
+      if (bytes != null) request.bodyBytes = bytes;
       final response = await http.Response.fromStream(
         await client.send(request).timeout(timeout),
       ).timeout(timeout);
